@@ -15,6 +15,12 @@ npm install
 1. Create a [Supabase](https://supabase.com) project.
 2. Run `schema.sql` in the SQL editor (exactly as written).
 3. Run `supabase/migrations/001_auth_rls.sql` for auth triggers and RLS policies.
+4. Run `supabase/migrations/002_signup_provisioning.sql` (safe to re-run). This installs the
+   `on_auth_user_created` trigger so every signup creates `accounts`, `subscriptions`,
+   `workspaces`, and `users`, plus an `ensure_account_for_user` RPC the app uses as a fallback.
+
+Without step 3/4, Supabase Auth still creates `auth.users`, but the app tables stay empty and
+new users cannot load a workspace.
 
 ### 3. Environment variables
 

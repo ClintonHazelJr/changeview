@@ -9,7 +9,8 @@ alter table accounts enable row level security;
 alter table users enable row level security;
 alter table subscriptions enable row level security;
 
--- Signup: creates account, user profile, default workspace, tier_1 subscription
+-- Signup: creates account, user profile, default workspace, tier_1 subscription.
+-- Keep in sync with 002_signup_provisioning.sql (idempotent re-apply).
 create or replace function handle_new_user()
 returns trigger
 language plpgsql
@@ -22,8 +23,18 @@ declare
   v_full_name text;
   v_account_name text;
 begin
-  v_full_name := coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1));
-  v_account_name := coalesce(new.raw_user_meta_data->>'account_name', v_full_name || '''s Account');
+  if exists (select 1 from public.users where id = new.id) then
+    return new;
+  end if;
+
+  v_full_name := coalesce(
+    nullif(trim(new.raw_user_meta_data->>'full_name'), ''),
+    split_part(new.email, '@', 1)
+  );
+  v_account_name := coalesce(
+    nullif(trim(new.raw_user_meta_data->>'account_name'), ''),
+    v_full_name || '''s Account'
+  );
 
   insert into accounts (name) values (v_account_name) returning id into v_account_id;
 
@@ -45,6 +56,64 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function handle_new_user();
+
+-- App can call this if a session exists without a public.users row
+create or replace function ensure_account_for_user()
+returns public.users
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_auth auth.users%rowtype;
+  v_profile public.users%rowtype;
+  v_account_id uuid;
+  v_workspace_id uuid;
+  v_full_name text;
+  v_account_name text;
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select * into v_profile from public.users where id = auth.uid();
+  if found then
+    return v_profile;
+  end if;
+
+  select * into v_auth from auth.users where id = auth.uid();
+  if not found then
+    raise exception 'Auth user not found';
+  end if;
+
+  v_full_name := coalesce(
+    nullif(trim(v_auth.raw_user_meta_data->>'full_name'), ''),
+    split_part(v_auth.email, '@', 1)
+  );
+  v_account_name := coalesce(
+    nullif(trim(v_auth.raw_user_meta_data->>'account_name'), ''),
+    v_full_name || '''s Account'
+  );
+
+  insert into accounts (name) values (v_account_name) returning id into v_account_id;
+
+  insert into subscriptions (account_id, plan_tier, billing_cycle, status)
+  values (v_account_id, 'tier_1', 'monthly', 'active');
+
+  insert into workspaces (account_id, name)
+  values (v_account_id, 'Default Workspace')
+  returning id into v_workspace_id;
+
+  insert into users (id, account_id, email, full_name, role, default_workspace_id)
+  values (v_auth.id, v_account_id, v_auth.email, v_full_name, 'owner', v_workspace_id)
+  returning * into v_profile;
+
+  return v_profile;
+end;
+$$;
+
+revoke all on function ensure_account_for_user() from public;
+grant execute on function ensure_account_for_user() to authenticated;
 
 -- Auto-create default Program when Organization is created
 create or replace function create_default_program_for_org()

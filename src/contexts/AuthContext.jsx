@@ -13,26 +13,55 @@ export function AuthProvider({ children }) {
       .from('users')
       .select('*, accounts(name)')
       .eq('id', userId)
-      .single();
-    if (!error && data) setProfile(data);
-    return data;
+      .maybeSingle();
+    if (!error && data) {
+      setProfile(data);
+      return data;
+    }
+    setProfile(null);
+    return null;
   }, []);
 
+  // Trigger should create rows on signup; this recovers if it was missing.
+  const ensureProvisioned = useCallback(async (userId) => {
+    const existing = await loadProfile(userId);
+    if (existing) return existing;
+
+    const { error } = await supabase.rpc('ensure_account_for_user');
+    if (error) {
+      console.error('Account provisioning failed:', error.message);
+      return null;
+    }
+    return loadProfile(userId);
+  }, [loadProfile]);
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    let cancelled = false;
+
+    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
+      if (cancelled) return;
       setSession(s);
-      if (s?.user) loadProfile(s.user.id).finally(() => setLoading(false));
-      else setLoading(false);
+      if (s?.user) await ensureProvisioned(s.user.id);
+      if (!cancelled) setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
-      if (s?.user) loadProfile(s.user.id);
-      else setProfile(null);
+      if (s?.user) {
+        // Defer so we don't deadlock with auth lock; still provision on login/signup.
+        setTimeout(() => {
+          ensureProvisioned(s.user.id);
+        }, 0);
+      } else {
+        setProfile(null);
+      }
     });
 
-    return () => subscription.unsubscribe();
-  }, [loadProfile]);
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, [ensureProvisioned]);
 
   const signUp = async ({ email, password, fullName, accountName }) => {
     const { data, error } = await supabase.auth.signUp({
@@ -43,12 +72,18 @@ export function AuthProvider({ children }) {
       },
     });
     if (error) throw error;
+    if (data.session?.user) {
+      await ensureProvisioned(data.session.user.id);
+    }
     return data;
   };
 
   const signIn = async ({ email, password }) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    if (data.session?.user) {
+      await ensureProvisioned(data.session.user.id);
+    }
     return data;
   };
 
@@ -57,7 +92,7 @@ export function AuthProvider({ children }) {
     setProfile(null);
   };
 
-  const refreshProfile = () => session?.user && loadProfile(session.user.id);
+  const refreshProfile = () => session?.user && ensureProvisioned(session.user.id);
 
   return (
     <AuthContext.Provider value={{
