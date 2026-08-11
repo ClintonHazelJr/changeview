@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { packInitiativeMeta, parseDbError } from '../lib/constants';
 import { useWorkspace } from '../contexts/WorkspaceContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -33,6 +34,7 @@ export function useInitiatives() {
       .select('id')
       .eq('workspace_id', activeWorkspaceId)
       .eq('name', 'General')
+      .order('created_at')
       .limit(1);
 
     if (progError || !programs?.length) {
@@ -40,6 +42,10 @@ export function useInitiatives() {
     }
 
     const programId = programs[0].id;
+    const description = packInitiativeMeta(vals.description, {
+      changeOwner: vals.changeOwner || '',
+      projectManager: vals.projectManager || '',
+    });
 
     const { data, error } = await supabase
       .from('initiatives')
@@ -48,18 +54,16 @@ export function useInitiatives() {
         workspace_id: activeWorkspaceId,
         program_id: programId,
         name: vals.name,
-        description: vals.description,
+        description,
         status: 'planning',
         proposed_go_live_date: vals.goLiveDate || null,
         budget: vals.budget ? Number(vals.budget) : null,
         use_case: vals.useCase,
         expected_benefits: vals.expectedBenefits,
-        project_manager_id: vals.projectManagerId || null,
-        change_owner_id: vals.changeOwnerId || null,
       })
       .select()
       .single();
-    if (error) throw error;
+    if (error) throw new Error(parseDbError(error));
     await load();
     return data;
   };
@@ -123,7 +127,7 @@ export function useInitiativeDetail(initiativeId) {
       severity_environment: v.severity.environment,
       intervention_tags: v.tags.map((t) => t.toLowerCase()),
     });
-    if (error) throw error;
+    if (error) throw new Error(parseDbError(error));
     await load();
   };
 

@@ -3,7 +3,7 @@ import {
   Building2, Plus, ChevronRight, ChevronLeft, LayoutGrid, FileText, AlertTriangle,
   Users, GraduationCap, MessageSquare,
 } from 'lucide-react';
-import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR } from '../../lib/constants';
+import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, parseInitiativeMeta } from '../../lib/constants';
 import { useInitiatives, useInitiativeDetail } from '../../hooks/useInitiatives';
 import { useAdminData } from '../../hooks/useAdminData';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -141,17 +141,19 @@ export default function InitiativesPanel() {
       </div>
 
       <div className="flex-1 p-8 max-w-4xl">
-        {initTab === 'details' && selectedInit && (
+        {initTab === 'details' && selectedInit && (() => {
+          const meta = parseInitiativeMeta(selectedInit.description);
+          return (
           <div>
             <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>{selectedInit.name}</h2>
-            <p className="text-sm mb-6" style={{ color: C.sub }}>{selectedInit.description}</p>
+            <p className="text-sm mb-6" style={{ color: C.sub }}>{meta.description || '—'}</p>
             <div className="grid grid-cols-2 gap-3 mb-6">
               {[
                 ['Status', selectedInit.status],
                 ['Go Live Date', selectedInit.proposed_go_live_date || '—'],
                 ['Budget', selectedInit.budget ? `$${Number(selectedInit.budget).toLocaleString()}` : '—'],
-                ['Change Owner', personName(selectedInit.change_owner_id) || '—'],
-                ['Project Manager', personName(selectedInit.project_manager_id) || '—'],
+                ['Change Owner', meta.changeOwner || '—'],
+                ['Project Manager', meta.projectManager || '—'],
               ].map(([label, val]) => (
                 <div key={label} className="bg-white rounded-2xl p-4 shadow-sm border" style={{ borderColor: C.border }}>
                   <div className="text-[11px] font-semibold uppercase mb-1" style={{ color: C.sub }}>{label}</div>
@@ -168,7 +170,8 @@ export default function InitiativesPanel() {
               <div className="text-sm" style={{ color: C.ink }}>{selectedInit.expected_benefits || '—'}</div>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {initTab === 'impacts' && (
           <TabSection title="Impacts" subtitle="Scope who and what is affected by this change." onAdd={() => setModal('impact')} addLabel="Add Impact" color={C.coral} empty={initData.impacts.length === 0} emptyText="No impacts recorded yet." emptyIcon={AlertTriangle}>

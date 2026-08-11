@@ -125,10 +125,19 @@ export function FormInitiative({ people, onSave }) {
   });
   const [error, setError] = useState('');
   const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
+  const personName = (id) => people.find((p) => p.id === id)?.name || '';
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
-      try { if (vals.name) await onSave(vals); } catch (err) { setError(err.message); }
+      try {
+        if (vals.name) {
+          await onSave({
+            ...vals,
+            changeOwner: personName(vals.changeOwnerId),
+            projectManager: personName(vals.projectManagerId),
+          });
+        }
+      } catch (err) { setError(err.message); }
     }}>
       <Field label="Initiative Name"><input className={inputClass} style={inputStyle} value={vals.name} onChange={set('name')} placeholder="e.g. Salesforce Rollout" autoFocus /></Field>
       <Field label="Description"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.description} onChange={set('description')} /></Field>

@@ -35,3 +35,26 @@ export function parseDbError(err) {
   }
   return msg;
 }
+
+/** Store change owner / PM names in description until schema has text fields (FK is users, not people). */
+export function packInitiativeMeta(description, { changeOwner, projectManager }) {
+  const cleaned = (description || '').replace(/\n?\[cv-meta:[^\]]+\]\s*$/, '').trim();
+  if (!changeOwner && !projectManager) return cleaned;
+  return `${cleaned}\n[cv-meta:${JSON.stringify({ changeOwner: changeOwner || '', projectManager: projectManager || '' })}]`;
+}
+
+export function parseInitiativeMeta(description) {
+  const raw = description || '';
+  const match = raw.match(/\[cv-meta:({.*?})\]\s*$/);
+  if (!match) return { description: raw, changeOwner: '', projectManager: '' };
+  try {
+    const meta = JSON.parse(match[1]);
+    return {
+      description: raw.replace(/\n?\[cv-meta:[^\]]+\]\s*$/, '').trim(),
+      changeOwner: meta.changeOwner || '',
+      projectManager: meta.projectManager || '',
+    };
+  } catch {
+    return { description: raw, changeOwner: '', projectManager: '' };
+  }
+}

@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { C, HEAD, BODY } from '../lib/constants';
+import { C, HEAD, BODY } from '../../lib/constants';
 
 export default function Modal({ title, onClose, children, wide }) {
   return (

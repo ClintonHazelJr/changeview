@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { C, HEAD, BODY, inputClass, inputStyle } from '../lib/constants';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function SignupPage() {
   const { signUp, session, loading } = useAuth();
+  const navigate = useNavigate();
   const [fullName, setFullName] = useState('');
   const [accountName, setAccountName] = useState('');
   const [email, setEmail] = useState('');
@@ -19,7 +20,11 @@ export default function SignupPage() {
     e.preventDefault();
     setError('');
     try {
-      await signUp({ email, password, fullName, accountName });
+      const data = await signUp({ email, password, fullName, accountName });
+      if (data.session) {
+        navigate('/app');
+        return;
+      }
       setSuccess(true);
     } catch (err) {
       setError(err.message);
