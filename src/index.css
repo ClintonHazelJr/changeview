@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+:root {
+  --purple: #7C6FF0;
+  --teal: #2DD4BF;
+  --coral: #FF8C82;
+  --green: #34D399;
+  --amber: #FBBF24;
+  --ink: #1E2140;
+  --sub: #8A8CA5;
+  --bg: #F8F8FC;
+  --border: #EFEFF6;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+input:focus, select:focus, textarea:focus {
+  --tw-ring-color: #7C6FF044;
+}
