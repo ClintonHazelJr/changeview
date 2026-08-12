@@ -59,6 +59,7 @@ export async function listImpactAttachments(impactId) {
 export async function insertImpactAttachmentRow({
   accountId, workspaceId, impactId, field, fileName, storagePath, contentType, fileSize,
 }) {
+  console.log('[impact_attachments insert] account_id:', accountId, 'workspace_id:', workspaceId);
   const { data, error } = await supabase
     .from('impact_attachments')
     .insert({
