@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Layers, LayoutGrid, ClipboardList, AlertTriangle,
+  LayoutDashboard, Layers, LayoutGrid, ClipboardList,
   CalendarRange, BarChart3, Settings,
 } from 'lucide-react';
 import { C, HEAD, tint } from '../../lib/constants';
@@ -9,7 +9,6 @@ const NAV = [
   { key: 'program', label: 'Program', icon: Layers },
   { key: 'initiatives', label: 'Initiatives', icon: LayoutGrid },
   { key: 'requirements', label: 'Requirements', icon: ClipboardList },
-  { key: 'impacts', label: 'Impacts', icon: AlertTriangle },
   { key: 'schedule', label: 'Schedule', icon: CalendarRange },
   { key: 'reports', label: 'Reports', icon: BarChart3 },
 ];

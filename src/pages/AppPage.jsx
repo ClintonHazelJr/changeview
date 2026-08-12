@@ -10,7 +10,6 @@ import InitiativesPanel from '../components/initiatives/InitiativesPanel';
 import Dashboard from '../components/dashboard/Dashboard';
 import ProgramsPanel from '../components/programs/ProgramsPanel';
 import RequirementsPanel from '../components/requirements/RequirementsPanel';
-import ImpactsPanel from '../components/impacts/ImpactsPanel';
 import SchedulePanel from '../components/schedule/SchedulePanel';
 import ReportsPanel from '../components/reports/ReportsPanel';
 
@@ -34,7 +33,6 @@ function AppShell() {
       />
     );
   } else if (section === 'requirements') body = <RequirementsPanel />;
-  else if (section === 'impacts') body = <ImpactsPanel onOpenInitiative={openInitiative} />;
   else if (section === 'schedule') body = <SchedulePanel />;
   else if (section === 'reports') body = <ReportsPanel />;
   else if (section === 'settings') body = <SystemAdmin />;
