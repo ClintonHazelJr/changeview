@@ -97,6 +97,7 @@ export async function listLearningNeedAttachments(learningNeedId) {
 export async function insertLearningNeedAttachmentRow({
   accountId, workspaceId, learningNeedId, fileName, storagePath, contentType, fileSize,
 }) {
+  console.log('[learning_need_attachments insert] account_id:', accountId, 'workspace_id:', workspaceId);
   const { data, error } = await supabase
     .from('learning_need_attachments')
     .insert({
