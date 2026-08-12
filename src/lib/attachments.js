@@ -51,7 +51,7 @@ export async function listImpactAttachments(impactId) {
     .from('impact_attachments')
     .select('*')
     .eq('impact_id', impactId)
-    .order('created_at');
+    .order('uploaded_at');
   if (error) throw new Error(parseDbError(error));
   return data || [];
 }
@@ -88,7 +88,7 @@ export async function listLearningNeedAttachments(learningNeedId) {
     .from('learning_need_attachments')
     .select('*')
     .eq('learning_need_id', learningNeedId)
-    .order('created_at');
+    .order('uploaded_at');
   if (error) throw new Error(parseDbError(error));
   return data || [];
 }

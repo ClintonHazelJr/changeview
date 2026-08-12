@@ -29,7 +29,7 @@ create table if not exists impact_attachments (
   storage_path text not null,
   content_type text,
   file_size bigint,
-  created_at timestamptz not null default now()
+  uploaded_at timestamptz not null default now()
 );
 
 create table if not exists learning_need_attachments (
@@ -41,7 +41,7 @@ create table if not exists learning_need_attachments (
   storage_path text not null,
   content_type text,
   file_size bigint,
-  created_at timestamptz not null default now()
+  uploaded_at timestamptz not null default now()
 );
 
 create index if not exists idx_impact_attachments_impact on impact_attachments(impact_id);

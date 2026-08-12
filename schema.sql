@@ -338,7 +338,7 @@ create table impact_attachments (
   storage_path text not null,
   content_type text,
   file_size bigint,
-  created_at timestamptz not null default now()
+  uploaded_at timestamptz not null default now()
 );
 
 -- ---------- Stakeholders (belongs to Initiative) ----------
@@ -382,7 +382,7 @@ create table learning_need_attachments (
   storage_path text not null,
   content_type text,
   file_size bigint,
-  created_at timestamptz not null default now()
+  uploaded_at timestamptz not null default now()
 );
 
 -- ---------- Comms (belongs to Impact, optionally rolls up to Initiative-wide) ----------
