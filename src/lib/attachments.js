@@ -67,7 +67,7 @@ export async function insertImpactAttachmentRow({
       impact_id: impactId,
       field,
       file_name: fileName,
-      storage_path: storagePath,
+      file_path: storagePath,
       content_type: contentType,
       file_size: fileSize,
     })
@@ -78,7 +78,7 @@ export async function insertImpactAttachmentRow({
 }
 
 export async function deleteImpactAttachmentRow(row) {
-  await removeStorageObject(row.storage_path);
+  await removeStorageObject(row.file_path);
   const { error } = await supabase.from('impact_attachments').delete().eq('id', row.id);
   if (error) throw new Error(parseDbError(error));
 }
@@ -103,7 +103,7 @@ export async function insertLearningNeedAttachmentRow({
       workspace_id: workspaceId,
       learning_need_id: learningNeedId,
       file_name: fileName,
-      storage_path: storagePath,
+      file_path: storagePath,
       content_type: contentType,
       file_size: fileSize,
     })
@@ -114,7 +114,7 @@ export async function insertLearningNeedAttachmentRow({
 }
 
 export async function deleteLearningNeedAttachmentRow(row) {
-  await removeStorageObject(row.storage_path);
+  await removeStorageObject(row.file_path);
   const { error } = await supabase.from('learning_need_attachments').delete().eq('id', row.id);
   if (error) throw new Error(parseDbError(error));
 }

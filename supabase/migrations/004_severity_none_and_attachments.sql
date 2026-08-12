@@ -26,7 +26,7 @@ create table if not exists impact_attachments (
   impact_id uuid not null references impacts(id) on delete cascade,
   field text not null check (field in ('current_process', 'future_process')),
   file_name text not null,
-  storage_path text not null,
+  file_path text not null,
   content_type text,
   file_size bigint,
   uploaded_at timestamptz not null default now()
@@ -38,7 +38,7 @@ create table if not exists learning_need_attachments (
   workspace_id uuid not null references workspaces(id) on delete cascade,
   learning_need_id uuid not null references learning_needs(id) on delete cascade,
   file_name text not null,
-  storage_path text not null,
+  file_path text not null,
   content_type text,
   file_size bigint,
   uploaded_at timestamptz not null default now()

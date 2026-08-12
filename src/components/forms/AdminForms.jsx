@@ -532,7 +532,7 @@ export function FormImpact({ departments, initial, onSave, onDelete, onComplete 
           <AttachmentList
             items={currentFiles}
             onRemove={(item) => removeImpactFile(item, 'current_process', setCurrentFiles).catch((err) => setError(err.message))}
-            onDownload={(item) => downloadAttachment(item.storage_path, item.file_name).catch((err) => setError(err.message))}
+            onDownload={(item) => downloadAttachment(item.file_path, item.file_name).catch((err) => setError(err.message))}
           />
         </FieldWithAttach>
         <FieldWithAttach
@@ -543,7 +543,7 @@ export function FormImpact({ departments, initial, onSave, onDelete, onComplete 
           <AttachmentList
             items={futureFiles}
             onRemove={(item) => removeImpactFile(item, 'future_process', setFutureFiles).catch((err) => setError(err.message))}
-            onDownload={(item) => downloadAttachment(item.storage_path, item.file_name).catch((err) => setError(err.message))}
+            onDownload={(item) => downloadAttachment(item.file_path, item.file_name).catch((err) => setError(err.message))}
           />
         </FieldWithAttach>
       </div>
@@ -717,7 +717,7 @@ export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete,
         <AttachmentList
           items={materials}
           onRemove={(item) => removeMaterial(item).catch((err) => setError(err.message))}
-          onDownload={(item) => downloadAttachment(item.storage_path, item.file_name).catch((err) => setError(err.message))}
+          onDownload={(item) => downloadAttachment(item.file_path, item.file_name).catch((err) => setError(err.message))}
         />
       </FieldWithAttach>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}

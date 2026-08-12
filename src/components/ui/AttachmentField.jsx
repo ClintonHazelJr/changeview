@@ -19,8 +19,8 @@ export function AttachmentList({ items, onRemove, onDownload }) {
             <button
               type="button"
               className="flex-1 text-left truncate hover:underline"
-              style={{ color: item.storage_path ? C.purple : C.ink }}
-              onClick={() => item.storage_path && onDownload?.(item)}
+              style={{ color: item.file_path ? C.purple : C.ink }}
+              onClick={() => item.file_path && onDownload?.(item)}
               title={name}
             >
               {name}
