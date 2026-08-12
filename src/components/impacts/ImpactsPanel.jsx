@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Circle, CircleDot, AlertTriangle } from 'lucide-react';
-import { SEVERITY_COLOR } from '../../lib/constants';
+import { SEVERITY_COLOR, isRatedSeverity } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import {
@@ -14,7 +14,7 @@ const SEVERITIES = [
   { key: 'high', label: 'High', icon: AlertTriangle },
 ];
 
-const RANK = { low: 1, medium: 2, high: 3 };
+const RANK = { none: 0, low: 1, medium: 2, high: 3 };
 
 function peakSeverity(imp) {
   const values = [
@@ -23,8 +23,8 @@ function peakSeverity(imp) {
     imp.severity_process,
     imp.severity_system,
     imp.severity_environment,
-  ].filter(Boolean);
-  if (!values.length) return 'low';
+  ].filter(isRatedSeverity);
+  if (!values.length) return 'none';
   return values.reduce((best, cur) => ((RANK[cur] || 0) > (RANK[best] || 0) ? cur : best), 'low');
 }
 
@@ -117,7 +117,7 @@ export default function ImpactsPanel({ onOpenInitiative }) {
                 system: imp.severity_system,
                 env: imp.severity_environment,
               })
-                .filter(([, v]) => v)
+                .filter(([, v]) => isRatedSeverity(v))
                 .slice(0, 3)
                 .map(([k, v]) => ({ label: `${k}:${v}`, color: SEVERITY_COLOR[v] || statusColor(v) }));
 

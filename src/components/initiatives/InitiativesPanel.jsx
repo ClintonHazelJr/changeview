@@ -3,7 +3,7 @@ import {
   ChevronLeft, FileText, AlertTriangle, Users, GraduationCap, MessageSquare,
   CircleDot, Rocket, HeartPulse, CheckCircle2,
 } from 'lucide-react';
-import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, parseInitiativeMeta } from '../../lib/constants';
+import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, isRatedSeverity, parseInitiativeMeta } from '../../lib/constants';
 import { useInitiatives, useInitiativeDetail } from '../../hooks/useInitiatives';
 import { useAdminData } from '../../hooks/useAdminData';
 import { TabSection } from '../ui/shared';
@@ -248,7 +248,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                   >
                     <div className="text-sm font-bold mb-2" style={{ color: C.ink }}>{deptName(imp.department_id)} · {imp.headcount_impacted} impacted</div>
                     <div className="flex flex-wrap gap-2 mb-2">
-                      {Object.entries(severity).map(([k, v]) => v && (
+                      {Object.entries(severity).map(([k, v]) => isRatedSeverity(v) && (
                         <span key={k} className="text-[10px] font-semibold px-2 py-1 rounded-full capitalize" style={{ background: tint(SEVERITY_COLOR[v], '22'), color: SEVERITY_COLOR[v] }}>{k}: {v}</span>
                       ))}
                     </div>
@@ -344,11 +344,12 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
           <FormImpact
             departments={departments}
             initial={editingRecord}
-            onSave={async (v) => {
-              if (editingRecord) await detail.updateImpact(editingRecord.id, v);
-              else await detail.addImpact(v);
-              closeModal();
-            }}
+            onSave={async (v) => (
+              editingRecord
+                ? detail.updateImpact(editingRecord.id, v)
+                : detail.addImpact(v)
+            )}
+            onComplete={closeModal}
             onDelete={editingRecord ? async () => { await detail.deleteImpact(editingRecord.id); closeModal(); } : undefined}
           />
         </Modal>
@@ -373,11 +374,12 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
             impacts={initData.impacts}
             deptName={deptName}
             initial={editingRecord}
-            onSave={async (v) => {
-              if (editingRecord) await detail.updateLearningNeed(editingRecord.id, v);
-              else await detail.addLearningNeed(v);
-              closeModal();
-            }}
+            onSave={async (v) => (
+              editingRecord
+                ? detail.updateLearningNeed(editingRecord.id, v)
+                : detail.addLearningNeed(v)
+            )}
+            onComplete={closeModal}
             onDelete={editingRecord ? async () => { await detail.deleteLearningNeed(editingRecord.id); closeModal(); } : undefined}
           />
         </Modal>

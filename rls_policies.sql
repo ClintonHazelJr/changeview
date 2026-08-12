@@ -32,6 +32,8 @@ drop policy if exists "owner_or_member_hypercare" on hypercare;
 drop policy if exists "owner_or_member_cost_entries" on cost_entries;
 drop policy if exists "owner_or_member_requirements" on requirements;
 drop policy if exists "owner_or_member_requirement_impacts" on requirement_impacts;
+drop policy if exists "owner_or_member_impact_attachments" on impact_attachments;
+drop policy if exists "owner_or_member_learning_need_attachments" on learning_need_attachments;
 drop policy if exists "owners_read_own_account" on accounts;
 drop policy if exists "subscriptions_owner" on subscriptions;
 
@@ -256,6 +258,28 @@ create policy "owner_or_member_requirements" on requirements
   );
 
 create policy "owner_or_member_requirement_impacts" on requirement_impacts
+  for all
+  using (
+    account_id = public.current_account_id()
+    and (public.current_user_role() = 'owner' or workspace_id in (select public.current_workspace_ids()))
+  )
+  with check (
+    account_id = public.current_account_id()
+    and (public.current_user_role() = 'owner' or workspace_id in (select public.current_workspace_ids()))
+  );
+
+create policy "owner_or_member_impact_attachments" on impact_attachments
+  for all
+  using (
+    account_id = public.current_account_id()
+    and (public.current_user_role() = 'owner' or workspace_id in (select public.current_workspace_ids()))
+  )
+  with check (
+    account_id = public.current_account_id()
+    and (public.current_user_role() = 'owner' or workspace_id in (select public.current_workspace_ids()))
+  );
+
+create policy "owner_or_member_learning_need_attachments" on learning_need_attachments
   for all
   using (
     account_id = public.current_account_id()

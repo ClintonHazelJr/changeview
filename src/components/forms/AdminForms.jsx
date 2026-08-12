@@ -1,9 +1,23 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Sparkles, Copy } from 'lucide-react';
-import { C, inputClass, inputStyle, TAG_OPTIONS } from '../../lib/constants';
+import {
+  C, inputClass, inputStyle, TAG_OPTIONS, SEVERITY_COLOR, SEVERITY_LEVELS,
+} from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import {
+  uploadAttachment,
+  listImpactAttachments,
+  insertImpactAttachmentRow,
+  deleteImpactAttachmentRow,
+  downloadAttachment,
+  listLearningNeedAttachments,
+  insertLearningNeedAttachmentRow,
+  deleteLearningNeedAttachmentRow,
+} from '../../lib/attachments';
 import { Field, Pill, SaveRow } from '../ui/shared';
+import { AttachmentList, FieldWithAttach } from '../ui/AttachmentField';
 
 export function FormOrg({ onSave }) {
   const [name, setName] = useState('');
@@ -387,8 +401,22 @@ function titleCase(value = '') {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : '';
 }
 
-export function FormImpact({ departments, initial, onSave, onDelete }) {
+function makePending(files) {
+  return files.map((file) => ({
+    localKey: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`,
+    file_name: file.name,
+    file,
+    pending: true,
+  }));
+}
+
+export function FormImpact({ departments, initial, onSave, onDelete, onComplete }) {
   const editing = Boolean(initial?.id);
+  const { profile } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
+  const accountId = profile?.account_id;
+  const workspaceId = activeWorkspaceId;
+
   const [departmentId, setDepartmentId] = useState(initial?.department_id || departments[0]?.id || '');
   const [headcount, setHeadcount] = useState(initial?.headcount_impacted ?? '');
   const [currentSystem, setCurrentSystem] = useState(initial?.current_state_system || '');
@@ -397,27 +425,87 @@ export function FormImpact({ departments, initial, onSave, onDelete }) {
   const [futureProcess, setFutureProcess] = useState(initial?.future_state_process || '');
   const [description, setDescription] = useState(initial?.impact_description || '');
   const [severity, setSeverity] = useState({
-    org: initial?.severity_org || 'low',
-    people: initial?.severity_people || 'low',
-    process: initial?.severity_process || 'low',
-    system: initial?.severity_system || 'low',
-    environment: initial?.severity_environment || 'low',
+    org: initial?.severity_org || 'none',
+    people: initial?.severity_people || 'none',
+    process: initial?.severity_process || 'none',
+    system: initial?.severity_system || 'none',
+    environment: initial?.severity_environment || 'none',
   });
   const [tags, setTags] = useState(
     (initial?.intervention_tags || []).map((t) => TAG_OPTIONS.find((o) => o.toLowerCase() === String(t).toLowerCase()) || titleCase(t)),
   );
+  const [currentFiles, setCurrentFiles] = useState([]);
+  const [futureFiles, setFutureFiles] = useState([]);
   const [error, setError] = useState('');
-  const SEVERITY_COLOR = { low: C.green, medium: C.amber, high: C.coral };
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!initial?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await listImpactAttachments(initial.id);
+        if (cancelled) return;
+        setCurrentFiles(rows.filter((r) => r.field === 'current_process'));
+        setFutureFiles(rows.filter((r) => r.field === 'future_process'));
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [initial?.id]);
+
   function toggleTag(t) { setTags(tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t]); }
+
+  async function removeImpactFile(item, field, setter) {
+    if (item.pending) {
+      setter((prev) => prev.filter((x) => x.localKey !== item.localKey));
+      return;
+    }
+    await deleteImpactAttachmentRow(item);
+    setter((prev) => prev.filter((x) => x.id !== item.id));
+  }
+
+  async function syncFieldUploads(impactId, field, items) {
+    const pending = items.filter((i) => i.pending && i.file);
+    for (const item of pending) {
+      const uploaded = await uploadAttachment({
+        accountId,
+        workspaceId,
+        folder: `impacts/${impactId}`,
+        file: item.file,
+      });
+      await insertImpactAttachmentRow({
+        accountId,
+        workspaceId,
+        impactId,
+        field,
+        fileName: uploaded.fileName,
+        storagePath: uploaded.storagePath,
+        contentType: uploaded.contentType,
+        fileSize: uploaded.fileSize,
+      });
+    }
+  }
+
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
+      setSaving(true);
+      setError('');
       try {
-        await onSave({
+        const saved = await onSave({
           departmentId, headcount: Number(headcount) || 0, currentSystem, currentProcess,
           futureSystem, futureProcess, description, severity, tags,
         });
+        const impactId = saved?.id || initial?.id;
+        if (!impactId) throw new Error('Impact was saved but no id was returned.');
+        if (!accountId || !workspaceId) throw new Error('Missing account or workspace for attachments.');
+        await syncFieldUploads(impactId, 'current_process', currentFiles);
+        await syncFieldUploads(impactId, 'future_process', futureFiles);
+        onComplete?.();
       } catch (err) { setError(err.message); }
+      finally { setSaving(false); }
     }}>
       <div className="grid grid-cols-2 gap-4">
         <Field label="Department">
@@ -436,8 +524,28 @@ export function FormImpact({ departments, initial, onSave, onDelete }) {
         <Field label="Future State — System"><input className={inputClass} style={inputStyle} value={futureSystem} onChange={(e) => setFutureSystem(e.target.value)} /></Field>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Current State — Process"><input className={inputClass} style={inputStyle} value={currentProcess} onChange={(e) => setCurrentProcess(e.target.value)} /></Field>
-        <Field label="Future State — Process"><input className={inputClass} style={inputStyle} value={futureProcess} onChange={(e) => setFutureProcess(e.target.value)} /></Field>
+        <FieldWithAttach
+          label="Current State — Process"
+          onFiles={(files) => setCurrentFiles((prev) => [...prev, ...makePending(files)])}
+        >
+          <input className={inputClass} style={inputStyle} value={currentProcess} onChange={(e) => setCurrentProcess(e.target.value)} />
+          <AttachmentList
+            items={currentFiles}
+            onRemove={(item) => removeImpactFile(item, 'current_process', setCurrentFiles).catch((err) => setError(err.message))}
+            onDownload={(item) => downloadAttachment(item.storage_path, item.file_name).catch((err) => setError(err.message))}
+          />
+        </FieldWithAttach>
+        <FieldWithAttach
+          label="Future State — Process"
+          onFiles={(files) => setFutureFiles((prev) => [...prev, ...makePending(files)])}
+        >
+          <input className={inputClass} style={inputStyle} value={futureProcess} onChange={(e) => setFutureProcess(e.target.value)} />
+          <AttachmentList
+            items={futureFiles}
+            onRemove={(item) => removeImpactFile(item, 'future_process', setFutureFiles).catch((err) => setError(err.message))}
+            onDownload={(item) => downloadAttachment(item.storage_path, item.file_name).catch((err) => setError(err.message))}
+          />
+        </FieldWithAttach>
       </div>
       <Field label="Impact Description"><textarea rows={2} className={inputClass} style={inputStyle} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
       <Field label="Severity">
@@ -445,18 +553,30 @@ export function FormImpact({ departments, initial, onSave, onDelete }) {
           {Object.keys(severity).map((k) => (
             <div key={k} className="flex items-center justify-between">
               <span className="text-xs capitalize font-medium" style={{ color: C.ink }}>{k}</span>
-              <div className="flex gap-1.5">
-                {['low', 'medium', 'high'].map((lvl) => (
-                  <button type="button" key={lvl} onClick={() => setSeverity({ ...severity, [k]: lvl })} className="w-6 h-6 rounded-full border-2" style={{ background: severity[k] === lvl ? SEVERITY_COLOR[lvl] : '#fff', borderColor: SEVERITY_COLOR[lvl] }} />
+              <div className="flex items-center gap-1.5">
+                {SEVERITY_LEVELS.map((lvl) => (
+                  <button
+                    type="button"
+                    key={lvl}
+                    title={lvl === 'none' ? 'No Impact' : titleCase(lvl)}
+                    aria-label={`${k} ${lvl === 'none' ? 'No Impact' : lvl}`}
+                    onClick={() => setSeverity({ ...severity, [k]: lvl })}
+                    className="w-6 h-6 rounded-full border-2"
+                    style={{
+                      background: severity[k] === lvl ? SEVERITY_COLOR[lvl] : '#fff',
+                      borderColor: SEVERITY_COLOR[lvl],
+                    }}
+                  />
                 ))}
               </div>
             </div>
           ))}
+          <p className="text-[10px]" style={{ color: C.sub }}>Dots: No Impact · Low · Medium · High</p>
         </div>
       </Field>
       <Field label="Intervention"><div>{TAG_OPTIONS.map((t) => <Pill key={t} active={tags.includes(t)} color={C.coral} onClick={() => toggleTag(t)}>{t}</Pill>)}</div></Field>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow label={editing ? 'Save changes' : 'Save'} onDelete={onDelete} />
+      <SaveRow label={saving ? 'Saving…' : (editing ? 'Save changes' : 'Save')} onDelete={onDelete} disabled={saving} />
     </form>
   );
 }
@@ -502,8 +622,13 @@ export function FormStakeholder({ people, initial, onSave, onDelete }) {
   );
 }
 
-export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete }) {
+export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete, onComplete }) {
   const editing = Boolean(initial?.id);
+  const { profile } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
+  const accountId = profile?.account_id;
+  const workspaceId = activeWorkspaceId;
+
   const [impactId, setImpactId] = useState(initial?.impact_id || impacts[0]?.id || '');
   const [team, setTeam] = useState(initial?.team || '');
   const [goal, setGoal] = useState(initial?.goal || '');
@@ -511,13 +636,65 @@ export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete 
   const [type, setType] = useState(initial?.type || 'Training');
   const [sessions, setSessions] = useState(initial?.session_count ?? 1);
   const [hours, setHours] = useState(initial?.time_hours ?? 0.5);
+  const [materials, setMaterials] = useState([]);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!initial?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await listLearningNeedAttachments(initial.id);
+        if (!cancelled) setMaterials(rows);
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [initial?.id]);
+
+  async function removeMaterial(item) {
+    if (item.pending) {
+      setMaterials((prev) => prev.filter((x) => x.localKey !== item.localKey));
+      return;
+    }
+    await deleteLearningNeedAttachmentRow(item);
+    setMaterials((prev) => prev.filter((x) => x.id !== item.id));
+  }
+
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
+      setSaving(true);
+      setError('');
       try {
-        await onSave({ impactId, team, goal, headcount: Number(headcount) || 0, type, sessions: Number(sessions), hours: Number(hours) });
+        const saved = await onSave({
+          impactId, team, goal, headcount: Number(headcount) || 0, type, sessions: Number(sessions), hours: Number(hours),
+        });
+        const learningNeedId = saved?.id || initial?.id;
+        if (!learningNeedId) throw new Error('Learning Need was saved but no id was returned.');
+        if (!accountId || !workspaceId) throw new Error('Missing account or workspace for attachments.');
+        for (const item of materials.filter((m) => m.pending && m.file)) {
+          const uploaded = await uploadAttachment({
+            accountId,
+            workspaceId,
+            folder: `learning-needs/${learningNeedId}`,
+            file: item.file,
+          });
+          await insertLearningNeedAttachmentRow({
+            accountId,
+            workspaceId,
+            learningNeedId,
+            fileName: uploaded.fileName,
+            storagePath: uploaded.storagePath,
+            contentType: uploaded.contentType,
+            fileSize: uploaded.fileSize,
+          });
+        }
+        onComplete?.();
       } catch (err) { setError(err.message); }
+      finally { setSaving(false); }
     }}>
       <Field label="Impact">
         <select className={inputClass} style={inputStyle} value={impactId} onChange={(e) => setImpactId(e.target.value)}>
@@ -532,8 +709,19 @@ export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete 
         <Field label="# Sessions"><input type="number" className={inputClass} style={inputStyle} value={sessions} onChange={(e) => setSessions(e.target.value)} /></Field>
       </div>
       <Field label="Time (hrs)"><input type="number" step="0.5" className={inputClass} style={inputStyle} value={hours} onChange={(e) => setHours(e.target.value)} /></Field>
+      <FieldWithAttach
+        label="Training Material"
+        onFiles={(files) => setMaterials((prev) => [...prev, ...makePending(files)])}
+      >
+        <p className="text-[11px] mb-1" style={{ color: C.sub }}>Attach one or more training documents.</p>
+        <AttachmentList
+          items={materials}
+          onRemove={(item) => removeMaterial(item).catch((err) => setError(err.message))}
+          onDownload={(item) => downloadAttachment(item.storage_path, item.file_name).catch((err) => setError(err.message))}
+        />
+      </FieldWithAttach>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow label={editing ? 'Save changes' : 'Save'} onDelete={onDelete} />
+      <SaveRow label={saving ? 'Saving…' : (editing ? 'Save changes' : 'Save')} onDelete={onDelete} disabled={saving} />
     </form>
   );
 }

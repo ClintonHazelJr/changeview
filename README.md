@@ -21,6 +21,9 @@ npm install
    `current_workspace_ids()` helpers — do not reintroduce raw `users` subqueries in policies).
 5. If the DB already existed before Requirements: run
    `supabase/migrations/003_requirements.sql`, then re-run `rls_policies.sql`.
+6. For severity “No Impact” + file attachments: run
+   `supabase/migrations/004_severity_none_and_attachments.sql`, create a private Storage
+   bucket named `attachments`, run `storage_policies.sql`, then re-run `rls_policies.sql`.
 
 Without the signup trigger, Supabase Auth still creates `auth.users`, but the app tables stay
 empty and new users cannot load a workspace.

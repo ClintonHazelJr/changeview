@@ -128,20 +128,22 @@ export function useInitiativeDetail(initiativeId) {
   });
 
   const addImpact = async (vals) => {
-    const { error } = await supabase.from('impacts').insert({
+    const { data, error } = await supabase.from('impacts').insert({
       account_id: accountId,
       workspace_id: workspaceId,
       initiative_id: initiativeId,
       ...impactPayload(vals),
-    });
+    }).select().single();
     if (error) throw new Error(parseDbError(error));
     await load();
+    return data;
   };
 
   const updateImpact = async (id, vals) => {
-    const { error } = await supabase.from('impacts').update(impactPayload(vals)).eq('id', id);
+    const { data, error } = await supabase.from('impacts').update(impactPayload(vals)).eq('id', id).select().single();
     if (error) throw new Error(parseDbError(error));
     await load();
+    return data;
   };
 
   const deleteImpact = async (id) => {
@@ -193,19 +195,21 @@ export function useInitiativeDetail(initiativeId) {
   });
 
   const addLearningNeed = async (vals) => {
-    const { error } = await supabase.from('learning_needs').insert({
+    const { data, error } = await supabase.from('learning_needs').insert({
       account_id: accountId,
       workspace_id: workspaceId,
       ...learningPayload(vals),
-    });
-    if (error) throw error;
+    }).select().single();
+    if (error) throw new Error(parseDbError(error));
     await load();
+    return data;
   };
 
   const updateLearningNeed = async (id, vals) => {
-    const { error } = await supabase.from('learning_needs').update(learningPayload(vals)).eq('id', id);
+    const { data, error } = await supabase.from('learning_needs').update(learningPayload(vals)).eq('id', id).select().single();
     if (error) throw new Error(parseDbError(error));
     await load();
+    return data;
   };
 
   const deleteLearningNeed = async (id) => {

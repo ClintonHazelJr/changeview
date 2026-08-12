@@ -317,14 +317,28 @@ create table impacts (
   future_state_system text,
   future_state_process text,
   impact_description text,
-  severity_org text check (severity_org in ('low', 'medium', 'high')),
-  severity_people text check (severity_people in ('low', 'medium', 'high')),
-  severity_process text check (severity_process in ('low', 'medium', 'high')),
-  severity_system text check (severity_system in ('low', 'medium', 'high')),
-  severity_environment text check (severity_environment in ('low', 'medium', 'high')),
+  severity_org text check (severity_org in ('none', 'low', 'medium', 'high')),
+  severity_people text check (severity_people in ('none', 'low', 'medium', 'high')),
+  severity_process text check (severity_process in ('none', 'low', 'medium', 'high')),
+  severity_system text check (severity_system in ('none', 'low', 'medium', 'high')),
+  severity_environment text check (severity_environment in ('none', 'low', 'medium', 'high')),
   intervention_tags text[] default '{}', -- e.g. {training, huddle}
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+-- Files attached to Impact current/future process fields (Supabase Storage paths)
+create table impact_attachments (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  impact_id uuid not null references impacts(id) on delete cascade,
+  field text not null check (field in ('current_process', 'future_process')),
+  file_name text not null,
+  storage_path text not null,
+  content_type text,
+  file_size bigint,
+  created_at timestamptz not null default now()
 );
 
 -- ---------- Stakeholders (belongs to Initiative) ----------
@@ -356,6 +370,18 @@ create table learning_needs (
   type text, -- training, huddle
   session_count int default 1,
   time_hours numeric(5,2) default 0,
+  created_at timestamptz not null default now()
+);
+
+create table learning_need_attachments (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  learning_need_id uuid not null references learning_needs(id) on delete cascade,
+  file_name text not null,
+  storage_path text not null,
+  content_type text,
+  file_size bigint,
   created_at timestamptz not null default now()
 );
 

@@ -18,7 +18,14 @@ export const tint = (hex, a = '16') => hex + a;
 export const initials = (name = '') =>
   name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
 
-export const SEVERITY_COLOR = { low: C.green, medium: C.amber, high: C.coral };
+export const SEVERITY_COLOR = {
+  none: '#2A2D3A',
+  low: C.green,
+  medium: C.amber,
+  high: C.coral,
+};
+export const SEVERITY_LEVELS = ['none', 'low', 'medium', 'high'];
+export const isRatedSeverity = (value) => Boolean(value) && value !== 'none';
 export const STATUS_COLOR = {
   planning: C.purple,
   delivery: C.teal,
@@ -27,6 +34,7 @@ export const STATUS_COLOR = {
   draft: C.amber,
   approved: C.green,
   rejected: C.coral,
+  none: '#2A2D3A',
   low: C.green,
   medium: C.amber,
   high: C.coral,
