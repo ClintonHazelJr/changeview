@@ -1,25 +1,40 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Building2, Plus, ChevronRight, ChevronLeft, LayoutGrid, FileText, AlertTriangle,
-  Users, GraduationCap, MessageSquare,
+  ChevronLeft, FileText, AlertTriangle, Users, GraduationCap, MessageSquare,
+  CircleDot, Rocket, HeartPulse, CheckCircle2,
 } from 'lucide-react';
 import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, parseInitiativeMeta } from '../../lib/constants';
 import { useInitiatives, useInitiativeDetail } from '../../hooks/useInitiatives';
 import { useAdminData } from '../../hooks/useAdminData';
-import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { TabSection } from '../ui/shared';
 import Modal from '../ui/Modal';
 import {
   FormInitiative, FormImpact, FormStakeholder, FormLearningNeed, FormComms,
 } from '../forms/AdminForms';
+import {
+  ListPageShell, ListTopBar, StatusFilterRow, GroupSection, CompactListCard,
+  ListBody, countByStatus, statusColor,
+} from '../ui/ListChrome';
+
+const INIT_STATUSES = [
+  { key: 'planning', label: 'Planning', icon: CircleDot },
+  { key: 'delivery', label: 'Delivery', icon: Rocket },
+  { key: 'hypercare', label: 'Hypercare', icon: HeartPulse },
+  { key: 'closed', label: 'Closed', icon: CheckCircle2 },
+];
+
+function formatDate(value) {
+  if (!value) return null;
+  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 export default function InitiativesPanel({ initialSelectedId = null, onSelectedConsumed }) {
-  const { activeWorkspace } = useWorkspace();
   const { initiatives, programs, addInitiative } = useInitiatives();
   const { departments, people } = useAdminData();
   const [selectedInitId, setSelectedInitId] = useState(initialSelectedId);
   const [initTab, setInitTab] = useState('details');
   const [modal, setModal] = useState(null);
+  const [statusFilter, setStatusFilter] = useState(null);
 
   useEffect(() => {
     if (initialSelectedId) {
@@ -31,7 +46,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
 
   const detail = useInitiativeDetail(selectedInitId);
   const selectedInit = detail.initiative;
-  const programName = (id) => programs.find((p) => p.id === id)?.name || '—';
+  const programName = (id) => programs.find((p) => p.id === id)?.name || 'No Program';
 
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '—';
@@ -55,54 +70,71 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
     { key: 'comms', label: 'Comms', icon: MessageSquare, color: C.green, count: initData.comms.length },
   ];
 
+  const getStatus = (i) => i.status || 'planning';
+  const counts = countByStatus(initiatives, getStatus, INIT_STATUSES.map((s) => s.key));
+  const filtered = useMemo(
+    () => (statusFilter ? initiatives.filter((i) => getStatus(i) === statusFilter) : initiatives),
+    [initiatives, statusFilter],
+  );
+  const groups = useMemo(() => {
+    const map = new Map();
+    filtered.forEach((i) => {
+      const key = i.program_id || 'none';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(i);
+    });
+    return [...map.entries()].map(([key, items]) => ({
+      key,
+      label: key === 'none' ? 'No Program' : programName(key),
+      items,
+    }));
+  }, [filtered, programs]);
+
   if (!selectedInitId) {
     return (
-      <div className="flex-1 p-8 max-w-4xl w-full mx-auto overflow-y-auto" style={BODY}>
-        <div className="flex items-start justify-between mb-1">
-          <h2 className="text-xl font-extrabold" style={{ ...HEAD, color: C.ink }}>Initiatives — {activeWorkspace?.name}</h2>
-          <button
-            type="button"
-            onClick={() => setModal('initiative')}
-            disabled={programs.length === 0}
-            className="flex items-center gap-1.5 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-40 shadow-sm"
-            style={{ background: C.purple }}
-          >
-            <Plus size={15} /> Add Initiative
-          </button>
-        </div>
-        <p className="text-sm mb-5" style={{ color: C.sub }}>
-          {programs.length === 0
-            ? 'Create a Program first (sidebar → Program), then add Initiatives under it.'
-            : 'Pick one to open its Impacts, Stakeholders, Learning Needs, and Comms.'}
-        </p>
-        {initiatives.length === 0 ? (
-          <div className="text-center py-14 bg-white rounded-3xl border border-dashed" style={{ borderColor: C.border }}>
-            <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: tint(C.purple, '16') }}><LayoutGrid size={20} style={{ color: C.purple }} /></div>
-            <div className="text-sm" style={{ color: C.sub }}>No initiatives yet.</div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {initiatives.map((i) => (
-              <button
-                key={i.id}
-                type="button"
-                onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
-                className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-shadow"
-                style={{ borderColor: C.border }}
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: tint(C.purple, '18') }}><Building2 size={16} style={{ color: C.purple }} /></div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-bold truncate" style={{ color: C.ink }}>{i.name}</div>
-                    <div className="text-xs" style={{ color: C.sub }}>{programName(i.program_id)} · {i.status}</div>
-                  </div>
-                  <ChevronRight size={16} style={{ color: C.sub }} />
-                </div>
-                <p className="text-xs line-clamp-2" style={{ color: C.sub }}>{i.description}</p>
-              </button>
-            ))}
-          </div>
-        )}
+      <ListPageShell>
+        <ListTopBar
+          title="Initiatives"
+          addLabel="Add Initiative"
+          onAdd={() => setModal('initiative')}
+          addDisabled={programs.length === 0}
+        />
+        <StatusFilterRow
+          statuses={INIT_STATUSES}
+          counts={counts}
+          active={statusFilter}
+          onSelect={setStatusFilter}
+          onAddStatus={programs.length ? () => setModal('initiative') : undefined}
+        />
+        <ListBody
+          empty={filtered.length === 0}
+          emptyText={programs.length === 0 ? 'Create a Program first, then add Initiatives.' : 'No initiatives yet.'}
+        >
+          {groups.map((g) => (
+            <GroupSection
+              key={g.key}
+              title={g.label}
+              items={g.items}
+              getStatus={getStatus}
+              addLabel="Add Initiative"
+              onAdd={programs.length ? () => setModal('initiative') : undefined}
+            >
+              {g.items.map((i) => {
+                const meta = parseInitiativeMeta(i.description);
+                return (
+                  <CompactListCard
+                    key={i.id}
+                    title={i.name}
+                    subtitle={formatDate(i.proposed_go_live_date) ? `Go live ${formatDate(i.proposed_go_live_date)}` : 'No go-live date'}
+                    tags={[{ label: getStatus(i), color: statusColor(getStatus(i)) }]}
+                    avatars={[meta.changeOwner, meta.projectManager].filter(Boolean)}
+                    onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
+                  />
+                );
+              })}
+            </GroupSection>
+          ))}
+        </ListBody>
         {modal === 'initiative' && (
           <Modal title="Add Initiative" onClose={() => setModal(null)}>
             <FormInitiative
@@ -115,7 +147,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
             />
           </Modal>
         )}
-      </div>
+      </ListPageShell>
     );
   }
 

@@ -19,6 +19,18 @@ export const initials = (name = '') =>
   name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
 
 export const SEVERITY_COLOR = { low: C.green, medium: C.amber, high: C.coral };
+export const STATUS_COLOR = {
+  planning: C.purple,
+  delivery: C.teal,
+  hypercare: C.amber,
+  closed: C.sub,
+  draft: C.amber,
+  approved: C.green,
+  rejected: C.coral,
+  low: C.green,
+  medium: C.amber,
+  high: C.coral,
+};
 export const TAG_OPTIONS = ['Training', 'Huddle', 'Email', 'Documentation'];
 
 export const inputClass = 'w-full border rounded-2xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent';

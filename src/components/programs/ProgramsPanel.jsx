@@ -1,67 +1,94 @@
-import { useState } from 'react';
-import { Layers, Plus } from 'lucide-react';
-import { C, HEAD, BODY, tint } from '../../lib/constants';
+import { useMemo, useState } from 'react';
+import { CircleDot, Rocket, CheckCircle2 } from 'lucide-react';
 import { usePrograms } from '../../hooks/usePrograms';
-import { useWorkspace } from '../../contexts/WorkspaceContext';
 import Modal from '../ui/Modal';
 import { FormProgram } from '../forms/AdminForms';
-import { ListCard } from '../ui/shared';
+import {
+  ListPageShell, ListTopBar, StatusFilterRow, GroupSection, CompactListCard,
+  ListBody, countByStatus, statusColor,
+} from '../ui/ListChrome';
+
+const STATUSES = [
+  { key: 'planning', label: 'Planning', icon: CircleDot },
+  { key: 'delivery', label: 'Delivery', icon: Rocket },
+  { key: 'closed', label: 'Closed', icon: CheckCircle2 },
+];
+
+function formatDate(value) {
+  if (!value) return null;
+  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 export default function ProgramsPanel() {
-  const { activeWorkspace } = useWorkspace();
   const { programs, orgs, addProgram, updateProgram } = usePrograms();
   const [modal, setModal] = useState(null);
   const [editing, setEditing] = useState(null);
+  const [statusFilter, setStatusFilter] = useState(null);
 
-  const orgName = (id) => orgs.find((o) => o.id === id)?.name || '—';
+  const orgName = (id) => orgs.find((o) => o.id === id)?.name || 'Unassigned org';
+  const getStatus = (p) => p.status || 'planning';
+  const counts = countByStatus(programs, getStatus, STATUSES.map((s) => s.key));
+
+  const filtered = useMemo(
+    () => (statusFilter ? programs.filter((p) => getStatus(p) === statusFilter) : programs),
+    [programs, statusFilter],
+  );
+
+  const groups = useMemo(() => {
+    const map = new Map();
+    filtered.forEach((p) => {
+      const key = p.organization_id || 'none';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(p);
+    });
+    return [...map.entries()].map(([key, items]) => ({
+      key,
+      label: key === 'none' ? 'No Org' : orgName(key),
+      items,
+    }));
+  }, [filtered, orgs]);
+
+  const openAdd = () => { setEditing(null); setModal('program'); };
 
   return (
-    <div className="flex-1 p-8 max-w-4xl w-full mx-auto overflow-y-auto" style={BODY}>
-      <div className="flex items-start justify-between mb-1">
-        <h2 className="text-xl font-extrabold" style={{ ...HEAD, color: C.ink }}>Programs — {activeWorkspace?.name}</h2>
-        <button
-          type="button"
-          onClick={() => { setEditing(null); setModal('program'); }}
-          disabled={orgs.length === 0}
-          className="flex items-center gap-1.5 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-40 shadow-sm"
-          style={{ background: C.purple }}
-        >
-          <Plus size={15} /> Add Program
-        </button>
-      </div>
-      <p className="text-sm mb-5" style={{ color: C.sub }}>
-        {orgs.length === 0
-          ? 'Add an Org in Settings first, then create Programs to group Initiatives.'
-          : 'Programs sit under an Org and own Initiatives.'}
-      </p>
-
-      {programs.length === 0 ? (
-        <div className="text-center py-14 bg-white rounded-3xl border border-dashed" style={{ borderColor: C.border }}>
-          <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: tint(C.purple, '16') }}>
-            <Layers size={20} style={{ color: C.purple }} />
-          </div>
-          <div className="text-sm" style={{ color: C.sub }}>No programs yet.</div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3">
-          {programs.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => { setEditing(p); setModal('program'); }}
-              className="text-left"
-            >
-              <ListCard
-                icon={Layers}
-                color={C.purple}
+    <ListPageShell>
+      <ListTopBar
+        title="Program"
+        addLabel="Add Program"
+        onAdd={openAdd}
+        addDisabled={orgs.length === 0}
+      />
+      <StatusFilterRow
+        statuses={STATUSES}
+        counts={counts}
+        active={statusFilter}
+        onSelect={setStatusFilter}
+        onAddStatus={orgs.length ? openAdd : undefined}
+      />
+      <ListBody empty={filtered.length === 0} emptyText={orgs.length === 0 ? 'Add an Org in Settings first.' : 'No programs yet.'}>
+        {groups.map((g) => (
+          <GroupSection
+            key={g.key}
+            title={g.label}
+            items={g.items}
+            getStatus={getStatus}
+            addLabel="Add Program"
+            onAdd={orgs.length ? openAdd : undefined}
+          >
+            {g.items.map((p) => (
+              <CompactListCard
+                key={p.id}
                 title={p.name}
-                subtitle={orgName(p.organization_id)}
-                tag={p.status || 'planning'}
+                subtitle={[formatDate(p.proposed_go_live_date) && `Go live ${formatDate(p.proposed_go_live_date)}`, p.budget != null && p.budget !== '' ? `$${Number(p.budget).toLocaleString()}` : null].filter(Boolean).join(' · ') || 'No go-live date'}
+                tags={[
+                  { label: getStatus(p), color: statusColor(getStatus(p)) },
+                ]}
+                onClick={() => { setEditing(p); setModal('program'); }}
               />
-            </button>
-          ))}
-        </div>
-      )}
+            ))}
+          </GroupSection>
+        ))}
+      </ListBody>
 
       {modal === 'program' && (
         <Modal title={editing ? 'Edit Program' : 'Add Program'} onClose={() => setModal(null)} wide>
@@ -77,6 +104,6 @@ export default function ProgramsPanel() {
           />
         </Modal>
       )}
-    </div>
+    </ListPageShell>
   );
 }
