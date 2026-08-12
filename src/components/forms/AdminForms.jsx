@@ -132,7 +132,7 @@ function PersonSelect({ label, people, loading, value, onChange }) {
   if (people.length === 0) {
     return (
       <Field label={label}>
-        <p className="text-xs" style={{ color: C.sub }}>Add People in System Admin first.</p>
+        <p className="text-xs" style={{ color: C.sub }}>Add People in Settings first.</p>
       </Field>
     );
   }
@@ -151,9 +151,11 @@ function PersonSelect({ label, people, loading, value, onChange }) {
 export function FormInitiative({ onSave }) {
   const { activeWorkspaceId } = useWorkspace();
   const [people, setPeople] = useState([]);
+  const [programs, setPrograms] = useState([]);
   const [loadingPeople, setLoadingPeople] = useState(true);
+  const [loadingPrograms, setLoadingPrograms] = useState(true);
   const [vals, setVals] = useState({
-    name: '', description: '', goLiveDate: '', budget: '', useCase: '', expectedBenefits: '', changeOwnerId: '', projectManagerId: '',
+    name: '', description: '', programId: '', startDate: '', goLiveDate: '', budget: '', useCase: '', expectedBenefits: '', changeOwnerId: '', projectManagerId: '',
   });
   const [error, setError] = useState('');
   const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
@@ -165,24 +167,27 @@ export function FormInitiative({ onSave }) {
       if (!activeWorkspaceId) {
         if (!cancelled) {
           setPeople([]);
+          setPrograms([]);
           setLoadingPeople(false);
+          setLoadingPrograms(false);
         }
         return;
       }
       setLoadingPeople(true);
-      const { data, error: loadError } = await supabase
-        .from('people')
-        .select('id, name')
-        .eq('workspace_id', activeWorkspaceId)
-        .order('name');
+      setLoadingPrograms(true);
+      const [peopleRes, programsRes] = await Promise.all([
+        supabase.from('people').select('id, name').eq('workspace_id', activeWorkspaceId).order('name'),
+        supabase.from('programs').select('id, name').eq('workspace_id', activeWorkspaceId).order('name'),
+      ]);
       if (cancelled) return;
-      if (loadError) {
-        setError(loadError.message);
-        setPeople([]);
-      } else {
-        setPeople(data || []);
-      }
+      if (peopleRes.error) setError(peopleRes.error.message);
+      setPeople(peopleRes.data || []);
+      setPrograms(programsRes.data || []);
       setLoadingPeople(false);
+      setLoadingPrograms(false);
+      if ((programsRes.data || []).length === 1) {
+        setVals((prev) => ({ ...prev, programId: prev.programId || programsRes.data[0].id }));
+      }
     })();
     return () => { cancelled = true; };
   }, [activeWorkspaceId]);
@@ -191,6 +196,7 @@ export function FormInitiative({ onSave }) {
     <form onSubmit={async (e) => {
       e.preventDefault();
       try {
+        if (!vals.programId) throw new Error('Select a Program, or create one under Program first.');
         if (vals.name) {
           await onSave({
             ...vals,
@@ -200,9 +206,24 @@ export function FormInitiative({ onSave }) {
         }
       } catch (err) { setError(err.message); }
     }}>
+      <Field label="Program">
+        {loadingPrograms ? (
+          <p className="text-xs" style={{ color: C.sub }}>Loading programs…</p>
+        ) : programs.length === 0 ? (
+          <p className="text-xs" style={{ color: C.sub }}>Create a Program first (sidebar → Program).</p>
+        ) : (
+          <select className={inputClass} style={inputStyle} value={vals.programId} onChange={set('programId')} required>
+            <option value="">Select program</option>
+            {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        )}
+      </Field>
       <Field label="Initiative Name"><input className={inputClass} style={inputStyle} value={vals.name} onChange={set('name')} placeholder="e.g. Salesforce Rollout" autoFocus /></Field>
       <Field label="Description"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.description} onChange={set('description')} /></Field>
-      <Field label="Proposed Go Live Date"><input type="date" className={inputClass} style={inputStyle} value={vals.goLiveDate} onChange={set('goLiveDate')} /></Field>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Start Date"><input type="date" className={inputClass} style={inputStyle} value={vals.startDate} onChange={set('startDate')} /></Field>
+        <Field label="Proposed Go Live Date"><input type="date" className={inputClass} style={inputStyle} value={vals.goLiveDate} onChange={set('goLiveDate')} /></Field>
+      </div>
       <Field label="Budget"><input type="number" className={inputClass} style={inputStyle} value={vals.budget} onChange={set('budget')} placeholder="e.g. 45000" /></Field>
       <Field label="Use Case"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.useCase} onChange={set('useCase')} /></Field>
       <Field label="Expected Benefits"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.expectedBenefits} onChange={set('expectedBenefits')} /></Field>
@@ -221,7 +242,143 @@ export function FormInitiative({ onSave }) {
         onChange={set('projectManagerId')}
       />
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow />
+      <SaveRow disabled={programs.length === 0} />
+    </form>
+  );
+}
+
+export function FormProgram({ orgs, initial, onSave }) {
+  const [vals, setVals] = useState({
+    name: initial?.name || '',
+    organizationId: initial?.organization_id || orgs[0]?.id || '',
+    description: initial?.description || '',
+    status: initial?.status || 'planning',
+    startDate: initial?.start_date || '',
+    goLiveDate: initial?.proposed_go_live_date || '',
+    budget: initial?.budget ?? '',
+    goal: initial?.goal || '',
+    benefits: initial?.benefits || '',
+  });
+  const [error, setError] = useState('');
+  const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
+  return (
+    <form onSubmit={async (e) => {
+      e.preventDefault();
+      try {
+        if (!vals.organizationId) throw new Error('Select an Org first (Settings → Org).');
+        if (vals.name) await onSave(vals);
+      } catch (err) { setError(err.message); }
+    }}>
+      <Field label="Org">
+        {orgs.length === 0 ? (
+          <p className="text-xs" style={{ color: C.sub }}>Add an Org in Settings first.</p>
+        ) : (
+          <select className={inputClass} style={inputStyle} value={vals.organizationId} onChange={set('organizationId')}>
+            {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+        )}
+      </Field>
+      <Field label="Program name"><input className={inputClass} style={inputStyle} value={vals.name} onChange={set('name')} placeholder="e.g. ERP Transformation" autoFocus /></Field>
+      <Field label="Description"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.description} onChange={set('description')} /></Field>
+      <Field label="Status">
+        <select className={inputClass} style={inputStyle} value={vals.status} onChange={set('status')}>
+          <option value="planning">Planning</option>
+          <option value="delivery">Delivery</option>
+          <option value="closed">Closed</option>
+        </select>
+      </Field>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Start Date"><input type="date" className={inputClass} style={inputStyle} value={vals.startDate} onChange={set('startDate')} /></Field>
+        <Field label="Proposed Go Live"><input type="date" className={inputClass} style={inputStyle} value={vals.goLiveDate} onChange={set('goLiveDate')} /></Field>
+      </div>
+      <Field label="Budget"><input type="number" className={inputClass} style={inputStyle} value={vals.budget} onChange={set('budget')} /></Field>
+      <Field label="Goal"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.goal} onChange={set('goal')} /></Field>
+      <Field label="Benefits"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.benefits} onChange={set('benefits')} /></Field>
+      {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
+      <SaveRow disabled={orgs.length === 0} />
+    </form>
+  );
+}
+
+export function FormRequirement({ initiatives, people, impacts, initial, onSave }) {
+  const [vals, setVals] = useState({
+    initiativeId: initial?.initiative_id || initiatives[0]?.id || '',
+    description: initial?.description || '',
+    status: initial?.status || 'draft',
+    priority: initial?.priority || 'medium',
+    authorId: initial?.author_id || '',
+    approverId: initial?.business_approver_id || '',
+    impactIds: initial?.impactIds || [],
+  });
+  const [error, setError] = useState('');
+  const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
+  const initiativeImpacts = impacts.filter((i) => i.initiative_id === vals.initiativeId);
+  const toggleImpact = (id) => {
+    setVals((prev) => ({
+      ...prev,
+      impactIds: prev.impactIds.includes(id)
+        ? prev.impactIds.filter((x) => x !== id)
+        : [...prev.impactIds, id],
+    }));
+  };
+  return (
+    <form onSubmit={async (e) => {
+      e.preventDefault();
+      try {
+        if (!vals.initiativeId) throw new Error('Select an Initiative.');
+        if (!vals.description.trim()) throw new Error('Description is required.');
+        await onSave(vals);
+      } catch (err) { setError(err.message); }
+    }}>
+      <Field label="Initiative">
+        {initiatives.length === 0 ? (
+          <p className="text-xs" style={{ color: C.sub }}>Create an Initiative first.</p>
+        ) : (
+          <select className={inputClass} style={inputStyle} value={vals.initiativeId} onChange={set('initiativeId')}>
+            {initiatives.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+          </select>
+        )}
+      </Field>
+      <Field label="Description"><textarea rows={3} className={inputClass} style={inputStyle} value={vals.description} onChange={set('description')} autoFocus /></Field>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Status">
+          <select className={inputClass} style={inputStyle} value={vals.status} onChange={set('status')}>
+            <option value="draft">Draft</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </Field>
+        <Field label="Priority">
+          <select className={inputClass} style={inputStyle} value={vals.priority} onChange={set('priority')}>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </Field>
+      </div>
+      <PersonSelect label="Author" people={people} loading={false} value={vals.authorId} onChange={set('authorId')} />
+      <PersonSelect label="Business Approver" people={people} loading={false} value={vals.approverId} onChange={set('approverId')} />
+      <Field label="Linked Impacts">
+        {initiativeImpacts.length === 0 ? (
+          <p className="text-xs" style={{ color: C.sub }}>No impacts on this Initiative yet.</p>
+        ) : (
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {initiativeImpacts.map((imp) => (
+              <label key={imp.id} className="flex items-start gap-2 text-sm" style={{ color: C.ink }}>
+                <input
+                  type="checkbox"
+                  checked={vals.impactIds.includes(imp.id)}
+                  onChange={() => toggleImpact(imp.id)}
+                  className="mt-1"
+                />
+                <span>{imp.reference_number || 'Impact'} — {imp.impact_description || 'No description'}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </Field>
+      {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
+      <SaveRow disabled={initiatives.length === 0} />
     </form>
   );
 }
@@ -303,7 +460,7 @@ export function FormStakeholder({ people, onSave }) {
     }}>
       <Field label="Person">
         {people.length === 0 ? (
-          <p className="text-xs" style={{ color: C.sub }}>Add People in System Admin first.</p>
+          <p className="text-xs" style={{ color: C.sub }}>Add People in Settings first.</p>
         ) : (
           <select className={inputClass} style={inputStyle} value={personId} onChange={(e) => setPersonId(e.target.value)}>
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}

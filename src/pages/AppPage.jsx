@@ -4,16 +4,50 @@ import { C, BODY } from '../lib/constants';
 import { useAuth } from '../contexts/AuthContext';
 import { WorkspaceProvider } from '../contexts/WorkspaceContext';
 import TopNav from '../components/layout/TopNav';
+import AppSidebar from '../components/layout/AppSidebar';
 import SystemAdmin from '../components/admin/SystemAdmin';
 import InitiativesPanel from '../components/initiatives/InitiativesPanel';
+import Dashboard from '../components/dashboard/Dashboard';
+import ProgramsPanel from '../components/programs/ProgramsPanel';
+import RequirementsPanel from '../components/requirements/RequirementsPanel';
+import ImpactsPanel from '../components/impacts/ImpactsPanel';
+import SchedulePanel from '../components/schedule/SchedulePanel';
+import ReportsPanel from '../components/reports/ReportsPanel';
 
 function AppShell() {
-  const [section, setSection] = useState('admin');
+  const [section, setSection] = useState('dashboard');
+  const [initiativeFocusId, setInitiativeFocusId] = useState(null);
+
+  const openInitiative = (id) => {
+    setInitiativeFocusId(id);
+    setSection('initiatives');
+  };
+
+  let body = null;
+  if (section === 'dashboard') body = <Dashboard onOpenInitiative={openInitiative} />;
+  else if (section === 'program') body = <ProgramsPanel />;
+  else if (section === 'initiatives') {
+    body = (
+      <InitiativesPanel
+        initialSelectedId={initiativeFocusId}
+        onSelectedConsumed={() => setInitiativeFocusId(null)}
+      />
+    );
+  } else if (section === 'requirements') body = <RequirementsPanel />;
+  else if (section === 'impacts') body = <ImpactsPanel onOpenInitiative={openInitiative} />;
+  else if (section === 'schedule') body = <SchedulePanel />;
+  else if (section === 'reports') body = <ReportsPanel />;
+  else if (section === 'settings') body = <SystemAdmin />;
 
   return (
     <div className="min-h-screen w-full flex flex-col" style={{ ...BODY, background: C.bg }}>
-      <TopNav section={section} setSection={setSection} />
-      {section === 'admin' ? <SystemAdmin /> : <InitiativesPanel />}
+      <TopNav />
+      <div className="flex flex-1 min-h-0">
+        <AppSidebar section={section} setSection={setSection} />
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
+          {body}
+        </main>
+      </div>
     </div>
   );
 }

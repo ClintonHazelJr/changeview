@@ -69,7 +69,7 @@ export default function SystemAdmin() {
         {adminSteps.filter((s) => s.count > 0).length === 0 && (
           <div className="rounded-3xl p-7 mb-6" style={{ background: `linear-gradient(120deg, ${tint(C.purple, '12')}, ${tint(C.teal, '10')})` }}>
             <div className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Welcome to {activeWorkspace?.name}</div>
-            <p className="text-sm max-w-md" style={{ color: C.sub }}>Set up your Org, Department, People, and Project Teams, in that order, then head to Initiatives.</p>
+            <p className="text-sm max-w-md" style={{ color: C.sub }}>Set up your Org, Department, People, and Project Teams, in that order, then create a Program and Initiatives.</p>
           </div>
         )}
         <div className="grid grid-cols-4 gap-3 mb-7">

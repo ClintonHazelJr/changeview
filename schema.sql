@@ -274,6 +274,34 @@ create table cost_entries (
 --                 join programs p on p.id = i.program_id
 --                 where p.organization_id = '...' and ce.billable = true;
 
+-- ---------- Requirements (belongs to Initiative) ----------
+-- Added when Requirements moved from "out of scope" to a real nav item.
+-- Deliberately does NOT link to a Tasks table, Planning/Tasks/Kanban stays
+-- out of scope. requirement_impacts is a simple many-to-many so a
+-- Requirement can reference the Impacts it relates to.
+
+create table requirements (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  initiative_id uuid not null references initiatives(id) on delete cascade,
+  reference_number text,
+  description text not null,
+  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected')),
+  priority text check (priority in ('low', 'medium', 'high')),
+  author_id uuid references people(id),
+  business_approver_id uuid references people(id),
+  created_at timestamptz not null default now()
+);
+
+create table requirement_impacts (
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  requirement_id uuid not null references requirements(id) on delete cascade,
+  impact_id uuid not null references impacts(id) on delete cascade,
+  primary key (requirement_id, impact_id)
+);
+
 -- ---------- Impact (belongs to Initiative) ----------
 
 create table impacts (
@@ -376,6 +404,9 @@ create table hypercare (
 
 create index idx_initiatives_account on initiatives(account_id);
 create index idx_initiatives_program on initiatives(program_id);
+create index idx_requirements_initiative on requirements(initiative_id);
+create index idx_requirement_impacts_requirement on requirement_impacts(requirement_id);
+create index idx_requirement_impacts_impact on requirement_impacts(impact_id);
 create index idx_cost_entries_initiative on cost_entries(initiative_id);
 create index idx_cost_entries_account on cost_entries(account_id);
 create index idx_workspaces_account on workspaces(account_id);
@@ -421,6 +452,8 @@ alter table stakeholders enable row level security;
 alter table learning_needs enable row level security;
 alter table comms enable row level security;
 alter table hypercare enable row level security;
+alter table requirements enable row level security;
+alter table requirement_impacts enable row level security;
 alter table cost_entries enable row level security;
 alter table programs enable row level security;
 alter table organizations enable row level security;

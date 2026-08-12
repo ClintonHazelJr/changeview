@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Building2, Plus, ChevronRight, ChevronLeft, LayoutGrid, FileText, AlertTriangle,
   Users, GraduationCap, MessageSquare,
@@ -13,16 +13,25 @@ import {
   FormInitiative, FormImpact, FormStakeholder, FormLearningNeed, FormComms,
 } from '../forms/AdminForms';
 
-export default function InitiativesPanel() {
+export default function InitiativesPanel({ initialSelectedId = null, onSelectedConsumed }) {
   const { activeWorkspace } = useWorkspace();
-  const { initiatives, addInitiative } = useInitiatives();
-  const { orgs, departments, people } = useAdminData();
-  const [selectedInitId, setSelectedInitId] = useState(null);
+  const { initiatives, programs, addInitiative } = useInitiatives();
+  const { departments, people } = useAdminData();
+  const [selectedInitId, setSelectedInitId] = useState(initialSelectedId);
   const [initTab, setInitTab] = useState('details');
   const [modal, setModal] = useState(null);
 
+  useEffect(() => {
+    if (initialSelectedId) {
+      setSelectedInitId(initialSelectedId);
+      setInitTab('details');
+      onSelectedConsumed?.();
+    }
+  }, [initialSelectedId, onSelectedConsumed]);
+
   const detail = useInitiativeDetail(selectedInitId);
   const selectedInit = detail.initiative;
+  const programName = (id) => programs.find((p) => p.id === id)?.name || '—';
 
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '—';
@@ -48,13 +57,13 @@ export default function InitiativesPanel() {
 
   if (!selectedInitId) {
     return (
-      <div className="flex-1 p-8 max-w-4xl w-full mx-auto" style={BODY}>
+      <div className="flex-1 p-8 max-w-4xl w-full mx-auto overflow-y-auto" style={BODY}>
         <div className="flex items-start justify-between mb-1">
           <h2 className="text-xl font-extrabold" style={{ ...HEAD, color: C.ink }}>Initiatives — {activeWorkspace?.name}</h2>
           <button
             type="button"
             onClick={() => setModal('initiative')}
-            disabled={orgs.length === 0}
+            disabled={programs.length === 0}
             className="flex items-center gap-1.5 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-40 shadow-sm"
             style={{ background: C.purple }}
           >
@@ -62,7 +71,9 @@ export default function InitiativesPanel() {
           </button>
         </div>
         <p className="text-sm mb-5" style={{ color: C.sub }}>
-          {orgs.length === 0 ? 'Set up an Org in System Admin first.' : 'Pick one to open its Impacts, Stakeholders, Learning Needs, and Comms.'}
+          {programs.length === 0
+            ? 'Create a Program first (sidebar → Program), then add Initiatives under it.'
+            : 'Pick one to open its Impacts, Stakeholders, Learning Needs, and Comms.'}
         </p>
         {initiatives.length === 0 ? (
           <div className="text-center py-14 bg-white rounded-3xl border border-dashed" style={{ borderColor: C.border }}>
@@ -83,7 +94,7 @@ export default function InitiativesPanel() {
                   <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: tint(C.purple, '18') }}><Building2 size={16} style={{ color: C.purple }} /></div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-bold truncate" style={{ color: C.ink }}>{i.name}</div>
-                    <div className="text-xs" style={{ color: C.sub }}>{i.status}</div>
+                    <div className="text-xs" style={{ color: C.sub }}>{programName(i.program_id)} · {i.status}</div>
                   </div>
                   <ChevronRight size={16} style={{ color: C.sub }} />
                 </div>
@@ -109,8 +120,8 @@ export default function InitiativesPanel() {
   }
 
   return (
-    <div className="flex flex-1" style={BODY}>
-      <div className="w-56 bg-white border-r flex flex-col py-5 px-3" style={{ borderColor: C.border }}>
+    <div className="flex flex-1 min-h-0 overflow-hidden" style={BODY}>
+      <div className="w-56 bg-white border-r flex flex-col py-5 px-3 shrink-0 overflow-y-auto" style={{ borderColor: C.border }}>
         <button type="button" onClick={() => setSelectedInitId(null)} className="flex items-center gap-1.5 text-xs font-semibold mb-4 px-2" style={{ color: C.sub }}>
           <ChevronLeft size={14} /> All Initiatives
         </button>
@@ -139,7 +150,7 @@ export default function InitiativesPanel() {
         ))}
       </div>
 
-      <div className="flex-1 p-8 max-w-4xl">
+      <div className="flex-1 p-8 max-w-4xl overflow-y-auto">
         {initTab === 'details' && selectedInit && (() => {
           const meta = parseInitiativeMeta(selectedInit.description);
           return (
@@ -149,6 +160,7 @@ export default function InitiativesPanel() {
             <div className="grid grid-cols-2 gap-3 mb-6">
               {[
                 ['Status', selectedInit.status],
+                ['Program', programName(selectedInit.program_id)],
                 ['Go Live Date', selectedInit.proposed_go_live_date || '—'],
                 ['Budget', selectedInit.budget ? `$${Number(selectedInit.budget).toLocaleString()}` : '—'],
                 ['Change Owner', meta.changeOwner || '—'],
@@ -199,7 +211,7 @@ export default function InitiativesPanel() {
         )}
 
         {initTab === 'stakeholders' && (
-          <TabSection title="Stakeholders" subtitle="Who's involved, and their RACI role on this Initiative." onAdd={() => setModal('stakeholder')} addLabel="Add Stakeholder" color={C.teal} disabled={people.length === 0} disabledText="Add People in System Admin first." empty={initData.stakeholders.length === 0} emptyText="No stakeholders added yet." emptyIcon={Users}>
+          <TabSection title="Stakeholders" subtitle="Who's involved, and their RACI role on this Initiative." onAdd={() => setModal('stakeholder')} addLabel="Add Stakeholder" color={C.teal} disabled={people.length === 0} disabledText="Add People in Settings first." empty={initData.stakeholders.length === 0} emptyText="No stakeholders added yet." emptyIcon={Users}>
             <div className="grid grid-cols-2 gap-3">
               {initData.stakeholders.map((s) => {
                 const raci = { r: s.raci_responsible, a: s.raci_accountable, c: s.raci_consulted, i: s.raci_informed };

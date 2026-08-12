@@ -13,14 +13,17 @@ npm install
 ### 2. Supabase
 
 1. Create a [Supabase](https://supabase.com) project.
-2. Run `schema.sql` in the SQL editor (exactly as written).
-3. Run `supabase/migrations/001_auth_rls.sql` for auth triggers and RLS policies.
-4. Run `supabase/migrations/002_signup_provisioning.sql` (safe to re-run). This installs the
-   `on_auth_user_created` trigger so every signup creates `accounts`, `subscriptions`,
-   `workspaces`, and `users`, plus an `ensure_account_for_user` RPC the app uses as a fallback.
+2. Run `schema.sql` in the SQL editor (exactly as written). Includes `requirements` /
+   `requirement_impacts`.
+3. Run `supabase/migrations/002_signup_provisioning.sql` (safe to re-run) so signup creates
+   `accounts`, `subscriptions`, `workspaces`, and `users`.
+4. Run `rls_policies.sql` (uses `current_account_id()` / `current_user_role()` /
+   `current_workspace_ids()` helpers — do not reintroduce raw `users` subqueries in policies).
+5. If the DB already existed before Requirements: run
+   `supabase/migrations/003_requirements.sql`, then re-run `rls_policies.sql`.
 
-Without step 3/4, Supabase Auth still creates `auth.users`, but the app tables stay empty and
-new users cannot load a workspace.
+Without the signup trigger, Supabase Auth still creates `auth.users`, but the app tables stay
+empty and new users cannot load a workspace.
 
 ### 3. Environment variables
 

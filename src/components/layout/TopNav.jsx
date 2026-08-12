@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Menu, Search, Briefcase, ChevronDown, Check, Plus, Settings, LayoutGrid, LogOut,
+  Search, Briefcase, ChevronDown, Check, Plus, LogOut,
 } from 'lucide-react';
 import { C, HEAD, BODY, tint, initials } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
@@ -9,7 +9,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 import Modal from '../ui/Modal';
 import { FormWorkspace } from '../forms/AdminForms';
 
-export default function TopNav({ section, setSection }) {
+export default function TopNav() {
   const { profile, signOut } = useAuth();
   const { workspaces, activeWorkspace, activeWorkspaceId, planTier, switchWorkspace, createWorkspace } = useWorkspace();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -28,8 +28,7 @@ export default function TopNav({ section, setSection }) {
 
   return (
     <>
-      <div className="flex items-center gap-4 px-6 py-3.5 bg-white border-b" style={{ ...BODY, borderColor: C.border }}>
-        <Menu size={20} style={{ color: C.sub }} />
+      <div className="flex items-center gap-4 px-6 py-3.5 bg-white border-b shrink-0" style={{ ...BODY, borderColor: C.border }}>
         <Link to="/app" className="font-extrabold tracking-tight text-lg no-underline" style={{ ...HEAD, color: C.ink }}>
           ChangeView
         </Link>
@@ -76,33 +75,6 @@ export default function TopNav({ section, setSection }) {
               )}
             </div>
           )}
-        </div>
-
-        <div className="flex items-center gap-1 bg-gray-50 rounded-full p-1">
-          <button
-            type="button"
-            onClick={() => setSection('admin')}
-            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
-            style={{
-              background: section === 'admin' ? '#fff' : 'transparent',
-              color: section === 'admin' ? C.ink : C.sub,
-              boxShadow: section === 'admin' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-            }}
-          >
-            <Settings size={13} /> System Admin
-          </button>
-          <button
-            type="button"
-            onClick={() => setSection('initiatives')}
-            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full transition-colors"
-            style={{
-              background: section === 'initiatives' ? '#fff' : 'transparent',
-              color: section === 'initiatives' ? C.ink : C.sub,
-              boxShadow: section === 'initiatives' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-            }}
-          >
-            <LayoutGrid size={13} /> Initiatives
-          </button>
         </div>
 
         <div className="flex-1 max-w-md ml-2 relative">
