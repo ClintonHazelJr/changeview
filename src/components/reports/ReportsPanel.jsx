@@ -8,7 +8,7 @@ export default function ReportsPanel() {
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const [report, setReport] = useState({
     initiativesByStatus: {},
-    impactsBySeverity: { low: 0, medium: 0, high: 0 },
+    impactsBySeverity: { none: 0, low: 0, medium: 0, high: 0 },
     requirementsByStatus: {},
     costByProgram: [],
   });
@@ -37,7 +37,7 @@ export default function ReportsPanel() {
         initiativesByStatus[i.status] = (initiativesByStatus[i.status] || 0) + 1;
       });
 
-      const impactsBySeverity = { low: 0, medium: 0, high: 0 };
+      const impactsBySeverity = { none: 0, low: 0, medium: 0, high: 0 };
       (impacts.data || []).forEach((imp) => {
         ['severity_org', 'severity_people', 'severity_process', 'severity_system', 'severity_environment'].forEach((k) => {
           const v = imp[k];
@@ -98,11 +98,16 @@ export default function ReportsPanel() {
           )}
 
           <h3 className="text-sm font-bold mb-3" style={{ ...HEAD, color: C.ink }}>Impacts by severity (all categories)</h3>
-          <div className="grid grid-cols-3 gap-3 mb-8">
-            {['low', 'medium', 'high'].map((sev) => (
-              <div key={sev} className="bg-white rounded-2xl p-4 border shadow-sm" style={{ borderColor: C.border }}>
-                <div className="text-[11px] font-semibold uppercase mb-1" style={{ color: C.sub }}>{sev}</div>
-                <div className="text-2xl font-extrabold" style={{ color: SEVERITY_COLOR[sev] }}>{report.impactsBySeverity[sev]}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+            {[
+              { key: 'none', label: 'No Impact' },
+              { key: 'low', label: 'Low' },
+              { key: 'medium', label: 'Medium' },
+              { key: 'high', label: 'High' },
+            ].map(({ key, label }) => (
+              <div key={key} className="bg-white rounded-2xl p-4 border shadow-sm" style={{ borderColor: C.border }}>
+                <div className="text-[11px] font-semibold uppercase mb-1" style={{ color: C.sub }}>{label}</div>
+                <div className="text-2xl font-extrabold" style={{ color: SEVERITY_COLOR[key] }}>{report.impactsBySeverity[key]}</div>
               </div>
             ))}
           </div>

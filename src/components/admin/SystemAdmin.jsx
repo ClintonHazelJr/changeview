@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Building2, MapPin, Users, UserCircle2, Plus, ChevronRight, Mail, Tag,
 } from 'lucide-react';
@@ -11,15 +11,21 @@ import {
   FormOrg, FormDepartment, FormPerson, FormTeam, FormTeamMember,
 } from '../forms/AdminForms';
 
-export default function SystemAdmin() {
+export default function SystemAdmin({ initialTab = null, onInitialTabConsumed }) {
   const { activeWorkspace } = useWorkspace();
   const {
     orgs, departments, people, teams,
     addOrg, addDepartment, addPerson, addTeam, addTeamMember,
   } = useAdminData();
-  const [adminTab, setAdminTab] = useState('org');
+  const [adminTab, setAdminTab] = useState(initialTab || 'org');
   const [modal, setModal] = useState(null);
   const [expandedTeam, setExpandedTeam] = useState(null);
+
+  useEffect(() => {
+    if (!initialTab) return;
+    setAdminTab(initialTab);
+    onInitialTabConsumed?.();
+  }, [initialTab, onInitialTabConsumed]);
 
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '—';

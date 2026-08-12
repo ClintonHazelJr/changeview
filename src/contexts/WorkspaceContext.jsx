@@ -67,6 +67,20 @@ export function WorkspaceProvider({ children }) {
     return data;
   };
 
+  const renameWorkspace = async (id, name) => {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) throw new Error('Workspace name is required.');
+    const { data, error } = await supabase
+      .from('workspaces')
+      .update({ name: trimmed })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error(parseDbError(error));
+    setWorkspaces((prev) => prev.map((w) => (w.id === id ? data : w)));
+    return data;
+  };
+
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
 
   return (
@@ -78,6 +92,7 @@ export function WorkspaceProvider({ children }) {
       loading,
       switchWorkspace,
       createWorkspace,
+      renameWorkspace,
       reload: loadWorkspaces,
     }}>
       {children}
