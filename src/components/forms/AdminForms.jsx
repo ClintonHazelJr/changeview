@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, Sparkles, Copy } from 'lucide-react';
 import { C, inputClass, inputStyle, TAG_OPTIONS } from '../../lib/constants';
+import { supabase } from '../../lib/supabase';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { Field, Pill, SaveRow } from '../ui/shared';
 
 export function FormOrg({ onSave }) {
@@ -119,13 +121,72 @@ export function FormWorkspace({ onSave }) {
   );
 }
 
-export function FormInitiative({ people, onSave }) {
+function PersonSelect({ label, people, loading, value, onChange }) {
+  if (loading) {
+    return (
+      <Field label={label}>
+        <p className="text-xs" style={{ color: C.sub }}>Loading people…</p>
+      </Field>
+    );
+  }
+  if (people.length === 0) {
+    return (
+      <Field label={label}>
+        <p className="text-xs" style={{ color: C.sub }}>Add People in System Admin first.</p>
+      </Field>
+    );
+  }
+  return (
+    <Field label={label}>
+      <select className={inputClass} style={inputStyle} value={value} onChange={onChange}>
+        <option value="">Select</option>
+        {people.map((p) => (
+          <option key={p.id} value={p.id}>{p.name}</option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
+export function FormInitiative({ onSave }) {
+  const { activeWorkspaceId } = useWorkspace();
+  const [people, setPeople] = useState([]);
+  const [loadingPeople, setLoadingPeople] = useState(true);
   const [vals, setVals] = useState({
     name: '', description: '', goLiveDate: '', budget: '', useCase: '', expectedBenefits: '', changeOwnerId: '', projectManagerId: '',
   });
   const [error, setError] = useState('');
   const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
   const personName = (id) => people.find((p) => p.id === id)?.name || '';
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!activeWorkspaceId) {
+        if (!cancelled) {
+          setPeople([]);
+          setLoadingPeople(false);
+        }
+        return;
+      }
+      setLoadingPeople(true);
+      const { data, error: loadError } = await supabase
+        .from('people')
+        .select('id, name')
+        .eq('workspace_id', activeWorkspaceId)
+        .order('name');
+      if (cancelled) return;
+      if (loadError) {
+        setError(loadError.message);
+        setPeople([]);
+      } else {
+        setPeople(data || []);
+      }
+      setLoadingPeople(false);
+    })();
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId]);
+
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
@@ -145,18 +206,20 @@ export function FormInitiative({ people, onSave }) {
       <Field label="Budget"><input type="number" className={inputClass} style={inputStyle} value={vals.budget} onChange={set('budget')} placeholder="e.g. 45000" /></Field>
       <Field label="Use Case"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.useCase} onChange={set('useCase')} /></Field>
       <Field label="Expected Benefits"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.expectedBenefits} onChange={set('expectedBenefits')} /></Field>
-      <Field label="Change Owner">
-        <select className={inputClass} style={inputStyle} value={vals.changeOwnerId} onChange={set('changeOwnerId')}>
-          <option value="">Select</option>
-          {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      </Field>
-      <Field label="Project Manager">
-        <select className={inputClass} style={inputStyle} value={vals.projectManagerId} onChange={set('projectManagerId')}>
-          <option value="">Select</option>
-          {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      </Field>
+      <PersonSelect
+        label="Change Owner"
+        people={people}
+        loading={loadingPeople}
+        value={vals.changeOwnerId}
+        onChange={set('changeOwnerId')}
+      />
+      <PersonSelect
+        label="Project Manager"
+        people={people}
+        loading={loadingPeople}
+        value={vals.projectManagerId}
+        onChange={set('projectManagerId')}
+      />
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
       <SaveRow />
     </form>

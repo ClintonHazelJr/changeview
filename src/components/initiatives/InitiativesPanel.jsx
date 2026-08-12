@@ -95,7 +95,6 @@ export default function InitiativesPanel() {
         {modal === 'initiative' && (
           <Modal title="Add Initiative" onClose={() => setModal(null)}>
             <FormInitiative
-              people={people}
               onSave={async (vals) => {
                 const data = await addInitiative(vals);
                 setModal(null);
