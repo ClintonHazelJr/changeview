@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { C } from '../../lib/constants';
 
@@ -27,9 +28,29 @@ export function Pill({ active, color, onClick, children }) {
   );
 }
 
-export function SaveRow({ label = 'Save', disabled }) {
+export function SaveRow({ label = 'Save', disabled, onDelete }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   return (
-    <div className="flex justify-end gap-2 mt-2 sticky bottom-0 bg-white pt-2">
+    <div className="flex items-center justify-between gap-2 mt-2 sticky bottom-0 bg-white pt-2">
+      <div className="min-h-[28px]">
+        {onDelete && !confirmDelete && (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="text-xs font-semibold"
+            style={{ color: C.coral }}
+          >
+            Delete
+          </button>
+        )}
+        {onDelete && confirmDelete && (
+          <div className="flex items-center gap-2 text-xs">
+            <span style={{ color: C.sub }}>Delete this record?</span>
+            <button type="button" onClick={onDelete} className="font-bold" style={{ color: C.coral }}>Yes, delete</button>
+            <button type="button" onClick={() => setConfirmDelete(false)} className="font-semibold" style={{ color: C.sub }}>Cancel</button>
+          </div>
+        )}
+      </div>
       <button
         type="submit"
         disabled={disabled}

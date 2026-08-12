@@ -34,7 +34,21 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
   const [selectedInitId, setSelectedInitId] = useState(initialSelectedId);
   const [initTab, setInitTab] = useState('details');
   const [modal, setModal] = useState(null);
+  const [editingRecord, setEditingRecord] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
+
+  const openCreate = (type) => {
+    setEditingRecord(null);
+    setModal(type);
+  };
+  const openEdit = (type, record) => {
+    setEditingRecord(record);
+    setModal(type);
+  };
+  const closeModal = () => {
+    setModal(null);
+    setEditingRecord(null);
+  };
 
   useEffect(() => {
     if (initialSelectedId) {
@@ -217,7 +231,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
         })()}
 
         {initTab === 'impacts' && (
-          <TabSection title="Impacts" subtitle="Scope who and what is affected by this change." onAdd={() => setModal('impact')} addLabel="Add Impact" color={C.coral} empty={initData.impacts.length === 0} emptyText="No impacts recorded yet." emptyIcon={AlertTriangle}>
+          <TabSection title="Impacts" subtitle="Scope who and what is affected by this change." onAdd={() => openCreate('impact')} addLabel="Add Impact" color={C.coral} empty={initData.impacts.length === 0} emptyText="No impacts recorded yet." emptyIcon={AlertTriangle}>
             <div className="space-y-3">
               {initData.impacts.map((imp) => {
                 const severity = {
@@ -225,7 +239,13 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                   system: imp.severity_system, environment: imp.severity_environment,
                 };
                 return (
-                  <div key={imp.id} className="bg-white rounded-2xl p-4 shadow-sm border" style={{ borderColor: C.border }}>
+                  <button
+                    key={imp.id}
+                    type="button"
+                    onClick={() => openEdit('impact', imp)}
+                    className="w-full text-left bg-white rounded-2xl p-4 shadow-sm border hover:shadow-md transition-shadow"
+                    style={{ borderColor: C.border }}
+                  >
                     <div className="text-sm font-bold mb-2" style={{ color: C.ink }}>{deptName(imp.department_id)} · {imp.headcount_impacted} impacted</div>
                     <div className="flex flex-wrap gap-2 mb-2">
                       {Object.entries(severity).map(([k, v]) => v && (
@@ -235,7 +255,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                     <p className="text-xs mb-1" style={{ color: C.sub }}><b>Now:</b> {imp.current_state_process}</p>
                     <p className="text-xs" style={{ color: C.sub }}><b>Future:</b> {imp.future_state_process}</p>
                     <div className="flex gap-1.5 mt-2">{(imp.intervention_tags || []).map((t) => <span key={t} className="text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize" style={{ background: tint(C.coral, '18'), color: C.coral }}>{t}</span>)}</div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -243,19 +263,25 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
         )}
 
         {initTab === 'stakeholders' && (
-          <TabSection title="Stakeholders" subtitle="Who's involved, and their RACI role on this Initiative." onAdd={() => setModal('stakeholder')} addLabel="Add Stakeholder" color={C.teal} disabled={people.length === 0} disabledText="Add People in Settings first." empty={initData.stakeholders.length === 0} emptyText="No stakeholders added yet." emptyIcon={Users}>
+          <TabSection title="Stakeholders" subtitle="Who's involved, and their RACI role on this Initiative." onAdd={() => openCreate('stakeholder')} addLabel="Add Stakeholder" color={C.teal} disabled={people.length === 0} disabledText="Add People in Settings first." empty={initData.stakeholders.length === 0} emptyText="No stakeholders added yet." emptyIcon={Users}>
             <div className="grid grid-cols-2 gap-3">
               {initData.stakeholders.map((s) => {
                 const raci = { r: s.raci_responsible, a: s.raci_accountable, c: s.raci_consulted, i: s.raci_informed };
                 return (
-                  <div key={s.id} className="bg-white rounded-2xl p-4 shadow-sm border flex items-center gap-3" style={{ borderColor: C.border }}>
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => openEdit('stakeholder', s)}
+                    className="w-full text-left bg-white rounded-2xl p-4 shadow-sm border flex items-center gap-3 hover:shadow-md transition-shadow"
+                    style={{ borderColor: C.border }}
+                  >
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: C.teal }}>{initials(personName(s.person_id))}</div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-bold truncate" style={{ color: C.ink }}>{personName(s.person_id)}</div>
                       <div className="text-xs truncate" style={{ color: C.sub }}>{s.project_role}</div>
                       <div className="flex gap-1 mt-1">{Object.entries(raci).filter(([, v]) => v).map(([k]) => <span key={k} className="text-[9px] font-bold w-4 h-4 rounded flex items-center justify-center uppercase" style={{ background: tint(C.teal, '20'), color: C.teal }}>{k}</span>)}</div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -263,10 +289,16 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
         )}
 
         {initTab === 'learning' && (
-          <TabSection title="Learning Needs" subtitle="Training required per Impact, feeds directly into the delivery plan." onAdd={() => setModal('learning')} addLabel="Add Learning Need" color={C.amber} disabled={initData.impacts.length === 0} disabledText="Add an Impact first." empty={initData.learningNeeds.length === 0} emptyText="No learning needs yet." emptyIcon={GraduationCap}>
+          <TabSection title="Learning Needs" subtitle="Training required per Impact, feeds directly into the delivery plan." onAdd={() => openCreate('learning')} addLabel="Add Learning Need" color={C.amber} disabled={initData.impacts.length === 0} disabledText="Add an Impact first." empty={initData.learningNeeds.length === 0} emptyText="No learning needs yet." emptyIcon={GraduationCap}>
             <div className="space-y-2">
               {initData.learningNeeds.map((ln) => (
-                <div key={ln.id} className="bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between" style={{ borderColor: C.border }}>
+                <button
+                  key={ln.id}
+                  type="button"
+                  onClick={() => openEdit('learning', ln)}
+                  className="w-full text-left bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between hover:shadow-md transition-shadow"
+                  style={{ borderColor: C.border }}
+                >
                   <div>
                     <div className="text-sm font-bold" style={{ color: C.ink }}>{ln.team} <span className="font-normal text-xs" style={{ color: C.sub }}>· {impactLabel(ln.impact_id)}</span></div>
                     <div className="text-xs" style={{ color: C.sub }}>{ln.goal}</div>
@@ -275,17 +307,23 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                     <div className="font-semibold" style={{ color: C.amber }}>{ln.type}</div>
                     {ln.headcount} people · {ln.session_count} session · {ln.time_hours}h
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </TabSection>
         )}
 
         {initTab === 'comms' && (
-          <TabSection title="Comms" subtitle="Draft and save communications, generated with AI from your Impact data." onAdd={() => setModal('comms')} addLabel="Add Comms" color={C.green} empty={initData.comms.length === 0} emptyText="No comms drafted yet." emptyIcon={MessageSquare}>
+          <TabSection title="Comms" subtitle="Draft and save communications, generated with AI from your Impact data." onAdd={() => openCreate('comms')} addLabel="Add Comms" color={C.green} empty={initData.comms.length === 0} emptyText="No comms drafted yet." emptyIcon={MessageSquare}>
             <div className="space-y-3">
               {initData.comms.map((c) => (
-                <div key={c.id} className="bg-white rounded-2xl p-4 shadow-sm border" style={{ borderColor: C.border }}>
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => openEdit('comms', c)}
+                  className="w-full text-left bg-white rounded-2xl p-4 shadow-sm border hover:shadow-md transition-shadow"
+                  style={{ borderColor: C.border }}
+                >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-bold" style={{ color: C.ink }}>{c.key_message || 'Untitled'}</span>
                     <span className="text-[10px] font-semibold px-2 py-1 rounded-full capitalize" style={{ background: tint(C.green, '18'), color: '#1a8a5f' }}>{c.tone}</span>
@@ -294,19 +332,70 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                     {c.impact_id ? impactLabel(c.impact_id) : 'Initiative-wide'} · {(c.channel || []).join(', ') || '—'}
                   </p>
                   {c.final_content && <p className="text-xs whitespace-pre-wrap" style={{ color: C.ink }}>{c.final_content}</p>}
-                </div>
+                </button>
               ))}
             </div>
           </TabSection>
         )}
       </div>
 
-      {modal === 'impact' && <Modal title="Add Impact" wide onClose={() => setModal(null)}><FormImpact departments={departments} onSave={async (v) => { await detail.addImpact(v); setModal(null); }} /></Modal>}
-      {modal === 'stakeholder' && <Modal title="Add Stakeholder" onClose={() => setModal(null)}><FormStakeholder people={people} onSave={async (v) => { await detail.addStakeholder(v); setModal(null); }} /></Modal>}
-      {modal === 'learning' && <Modal title="Add Learning Need" onClose={() => setModal(null)}><FormLearningNeed impacts={initData.impacts} deptName={deptName} onSave={async (v) => { await detail.addLearningNeed(v); setModal(null); }} /></Modal>}
+      {modal === 'impact' && (
+        <Modal title={editingRecord ? 'Edit Impact' : 'Add Impact'} wide onClose={closeModal}>
+          <FormImpact
+            departments={departments}
+            initial={editingRecord}
+            onSave={async (v) => {
+              if (editingRecord) await detail.updateImpact(editingRecord.id, v);
+              else await detail.addImpact(v);
+              closeModal();
+            }}
+            onDelete={editingRecord ? async () => { await detail.deleteImpact(editingRecord.id); closeModal(); } : undefined}
+          />
+        </Modal>
+      )}
+      {modal === 'stakeholder' && (
+        <Modal title={editingRecord ? 'Edit Stakeholder' : 'Add Stakeholder'} onClose={closeModal}>
+          <FormStakeholder
+            people={people}
+            initial={editingRecord}
+            onSave={async (v) => {
+              if (editingRecord) await detail.updateStakeholder(editingRecord.id, v);
+              else await detail.addStakeholder(v);
+              closeModal();
+            }}
+            onDelete={editingRecord ? async () => { await detail.deleteStakeholder(editingRecord.id); closeModal(); } : undefined}
+          />
+        </Modal>
+      )}
+      {modal === 'learning' && (
+        <Modal title={editingRecord ? 'Edit Learning Need' : 'Add Learning Need'} onClose={closeModal}>
+          <FormLearningNeed
+            impacts={initData.impacts}
+            deptName={deptName}
+            initial={editingRecord}
+            onSave={async (v) => {
+              if (editingRecord) await detail.updateLearningNeed(editingRecord.id, v);
+              else await detail.addLearningNeed(v);
+              closeModal();
+            }}
+            onDelete={editingRecord ? async () => { await detail.deleteLearningNeed(editingRecord.id); closeModal(); } : undefined}
+          />
+        </Modal>
+      )}
       {modal === 'comms' && selectedInit && (
-        <Modal title="Add Comms" wide onClose={() => setModal(null)}>
-          <FormComms initiative={selectedInit} impacts={initData.impacts} deptName={deptName} onSave={async (v) => { await detail.addComms(v); setModal(null); }} />
+        <Modal title={editingRecord ? 'Edit Comms' : 'Add Comms'} wide onClose={closeModal}>
+          <FormComms
+            initiative={selectedInit}
+            impacts={initData.impacts}
+            deptName={deptName}
+            initial={editingRecord}
+            onSave={async (v) => {
+              if (editingRecord) await detail.updateComms(editingRecord.id, v);
+              else await detail.addComms(v);
+              closeModal();
+            }}
+            onDelete={editingRecord ? async () => { await detail.deleteComms(editingRecord.id); closeModal(); } : undefined}
+          />
         </Modal>
       )}
     </div>

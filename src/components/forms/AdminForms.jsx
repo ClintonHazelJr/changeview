@@ -383,16 +383,29 @@ export function FormRequirement({ initiatives, people, impacts, initial, onSave 
   );
 }
 
-export function FormImpact({ departments, onSave }) {
-  const [departmentId, setDepartmentId] = useState(departments[0]?.id || '');
-  const [headcount, setHeadcount] = useState('');
-  const [currentSystem, setCurrentSystem] = useState('');
-  const [currentProcess, setCurrentProcess] = useState('');
-  const [futureSystem, setFutureSystem] = useState('');
-  const [futureProcess, setFutureProcess] = useState('');
-  const [description, setDescription] = useState('');
-  const [severity, setSeverity] = useState({ org: 'low', people: 'low', process: 'low', system: 'low', environment: 'low' });
-  const [tags, setTags] = useState([]);
+function titleCase(value = '') {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : '';
+}
+
+export function FormImpact({ departments, initial, onSave, onDelete }) {
+  const editing = Boolean(initial?.id);
+  const [departmentId, setDepartmentId] = useState(initial?.department_id || departments[0]?.id || '');
+  const [headcount, setHeadcount] = useState(initial?.headcount_impacted ?? '');
+  const [currentSystem, setCurrentSystem] = useState(initial?.current_state_system || '');
+  const [currentProcess, setCurrentProcess] = useState(initial?.current_state_process || '');
+  const [futureSystem, setFutureSystem] = useState(initial?.future_state_system || '');
+  const [futureProcess, setFutureProcess] = useState(initial?.future_state_process || '');
+  const [description, setDescription] = useState(initial?.impact_description || '');
+  const [severity, setSeverity] = useState({
+    org: initial?.severity_org || 'low',
+    people: initial?.severity_people || 'low',
+    process: initial?.severity_process || 'low',
+    system: initial?.severity_system || 'low',
+    environment: initial?.severity_environment || 'low',
+  });
+  const [tags, setTags] = useState(
+    (initial?.intervention_tags || []).map((t) => TAG_OPTIONS.find((o) => o.toLowerCase() === String(t).toLowerCase()) || titleCase(t)),
+  );
   const [error, setError] = useState('');
   const SEVERITY_COLOR = { low: C.green, medium: C.amber, high: C.coral };
   function toggleTag(t) { setTags(tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t]); }
@@ -409,7 +422,7 @@ export function FormImpact({ departments, onSave }) {
       <div className="grid grid-cols-2 gap-4">
         <Field label="Department">
           {departments.length === 0 ? (
-            <p className="text-xs" style={{ color: C.sub }}>Add a Department in System Admin first.</p>
+            <p className="text-xs" style={{ color: C.sub }}>Add a Department in Settings first.</p>
           ) : (
             <select className={inputClass} style={inputStyle} value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
               {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -443,15 +456,21 @@ export function FormImpact({ departments, onSave }) {
       </Field>
       <Field label="Intervention"><div>{TAG_OPTIONS.map((t) => <Pill key={t} active={tags.includes(t)} color={C.coral} onClick={() => toggleTag(t)}>{t}</Pill>)}</div></Field>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow />
+      <SaveRow label={editing ? 'Save changes' : 'Save'} onDelete={onDelete} />
     </form>
   );
 }
 
-export function FormStakeholder({ people, onSave }) {
-  const [personId, setPersonId] = useState(people[0]?.id || '');
-  const [role, setRole] = useState('');
-  const [raci, setRaci] = useState({ r: false, a: false, c: false, i: false });
+export function FormStakeholder({ people, initial, onSave, onDelete }) {
+  const editing = Boolean(initial?.id);
+  const [personId, setPersonId] = useState(initial?.person_id || people[0]?.id || '');
+  const [role, setRole] = useState(initial?.project_role || '');
+  const [raci, setRaci] = useState({
+    r: Boolean(initial?.raci_responsible),
+    a: Boolean(initial?.raci_accountable),
+    c: Boolean(initial?.raci_consulted),
+    i: Boolean(initial?.raci_informed),
+  });
   const [error, setError] = useState('');
   return (
     <form onSubmit={async (e) => {
@@ -478,19 +497,20 @@ export function FormStakeholder({ people, onSave }) {
         </div>
       </Field>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow />
+      <SaveRow label={editing ? 'Save changes' : 'Save'} onDelete={onDelete} />
     </form>
   );
 }
 
-export function FormLearningNeed({ impacts, deptName, onSave }) {
-  const [impactId, setImpactId] = useState(impacts[0]?.id || '');
-  const [team, setTeam] = useState('');
-  const [goal, setGoal] = useState('');
-  const [headcount, setHeadcount] = useState('');
-  const [type, setType] = useState('Training');
-  const [sessions, setSessions] = useState(1);
-  const [hours, setHours] = useState(0.5);
+export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete }) {
+  const editing = Boolean(initial?.id);
+  const [impactId, setImpactId] = useState(initial?.impact_id || impacts[0]?.id || '');
+  const [team, setTeam] = useState(initial?.team || '');
+  const [goal, setGoal] = useState(initial?.goal || '');
+  const [headcount, setHeadcount] = useState(initial?.headcount ?? '');
+  const [type, setType] = useState(initial?.type || 'Training');
+  const [sessions, setSessions] = useState(initial?.session_count ?? 1);
+  const [hours, setHours] = useState(initial?.time_hours ?? 0.5);
   const [error, setError] = useState('');
   return (
     <form onSubmit={async (e) => {
@@ -513,19 +533,20 @@ export function FormLearningNeed({ impacts, deptName, onSave }) {
       </div>
       <Field label="Time (hrs)"><input type="number" step="0.5" className={inputClass} style={inputStyle} value={hours} onChange={(e) => setHours(e.target.value)} /></Field>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow />
+      <SaveRow label={editing ? 'Save changes' : 'Save'} onDelete={onDelete} />
     </form>
   );
 }
 
-export function FormComms({ initiative, impacts, deptName, onSave }) {
-  const [impactId, setImpactId] = useState('');
-  const [keyMessage, setKeyMessage] = useState('');
-  const [audience, setAudience] = useState([]);
-  const [tone, setTone] = useState('professional');
-  const [channel, setChannel] = useState([]);
-  const [prompt, setPrompt] = useState('');
-  const [generated, setGenerated] = useState('');
+export function FormComms({ initiative, impacts, deptName, initial, onSave, onDelete }) {
+  const editing = Boolean(initial?.id);
+  const [impactId, setImpactId] = useState(initial?.impact_id || '');
+  const [keyMessage, setKeyMessage] = useState(initial?.key_message || '');
+  const [audience, setAudience] = useState((initial?.audience || []).map(titleCase));
+  const [tone, setTone] = useState(initial?.tone || 'professional');
+  const [channel, setChannel] = useState((initial?.channel || []).map(titleCase));
+  const [prompt, setPrompt] = useState(initial?.ai_prompt_used || '');
+  const [generated, setGenerated] = useState(initial?.final_content || initial?.ai_generated_content || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [saveError, setSaveError] = useState('');
@@ -612,7 +633,7 @@ export function FormComms({ initiative, impacts, deptName, onSave }) {
         )}
       </div>
       {saveError && <p className="text-xs mb-2" style={{ color: C.coral }}>{saveError}</p>}
-      <SaveRow label="Save Comms" />
+      <SaveRow label={editing ? 'Save changes' : 'Save Comms'} onDelete={onDelete} />
     </form>
   );
 }
