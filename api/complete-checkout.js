@@ -1,16 +1,15 @@
 import Stripe from 'stripe';
 import { adminClient, setCors, requireAccountOwner } from './_adminAuth.js';
+import {
+  planFromPriceId, MARKETING_TO_DB, unixToDateString,
+} from './_stripePlans.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
-const TIER_TO_DB = {
-  solo: 'tier_1',
-  small: 'small',
-  enterprise: 'tier_2',
-  tier_1: 'tier_1',
-  tier_2: 'tier_2',
-};
-
+/**
+ * Optimistic activation after Checkout redirect.
+ * The Stripe webhook is the source of truth; this endpoint unblocks the UI quickly.
+ */
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -24,7 +23,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
 
-  // Owners convert the account; also allow the signed-in account holder via same helper.
   const { caller, error: authError } = await requireAccountOwner(admin, req);
   if (authError) return res.status(authError.status).json({ error: authError.message });
 
@@ -33,7 +31,9 @@ export default async function handler(req, res) {
 
   let session;
   try {
-    session = await stripe.checkout.sessions.retrieve(sessionId);
+    session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ['subscription', 'subscription.items.data.price'],
+    });
   } catch (err) {
     return res.status(400).json({ error: err.message || 'Invalid checkout session' });
   }
@@ -42,15 +42,25 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Checkout is not complete yet' });
   }
 
-  const metaAccount = session.metadata?.account_id;
+  const metaAccount = session.metadata?.account_id || session.client_reference_id;
   if (metaAccount && metaAccount !== caller.account_id) {
     return res.status(403).json({ error: 'Checkout session does not belong to this account' });
   }
 
-  const marketingTier = session.metadata?.tier || 'solo';
-  const planTier = TIER_TO_DB[marketingTier] || 'tier_1';
-  let billingCycle = session.metadata?.billing_cycle || 'monthly';
+  const stripeSub = typeof session.subscription === 'object' ? session.subscription : null;
+  const priceId = stripeSub?.items?.data?.[0]?.price?.id || null;
+  const fromPrice = planFromPriceId(priceId);
+  const marketingTier = session.metadata?.tier || fromPrice?.marketingTier || 'solo';
+  const planTier = fromPrice?.planTier || MARKETING_TO_DB[marketingTier] || 'tier_1';
+  let billingCycle = fromPrice?.billingCycle || session.metadata?.billing_cycle || 'monthly';
   if (planTier === 'tier_1') billingCycle = 'monthly';
+
+  const stripeCustomerId = typeof session.customer === 'string'
+    ? session.customer
+    : session.customer?.id || null;
+  const stripeSubscriptionId = typeof session.subscription === 'string'
+    ? session.subscription
+    : stripeSub?.id || null;
 
   const { error: updateErr } = await admin
     .from('subscriptions')
@@ -59,9 +69,9 @@ export default async function handler(req, res) {
       billing_cycle: billingCycle,
       status: 'active',
       trial_ends_at: null,
-      stripe_subscription_id: typeof session.subscription === 'string'
-        ? session.subscription
-        : session.subscription?.id || null,
+      stripe_customer_id: stripeCustomerId,
+      stripe_subscription_id: stripeSubscriptionId,
+      current_period_end: unixToDateString(stripeSub?.current_period_end),
       updated_at: new Date().toISOString(),
     })
     .eq('account_id', caller.account_id);

@@ -125,7 +125,7 @@ export default function TrialEndedGate({ dismissible = false, onClose }) {
                   className="w-full text-sm font-bold text-white py-3 rounded-full disabled:opacity-50"
                   style={{ background: featured ? C.purple : C.ink }}
                 >
-                  {busy === tier ? 'Redirecting…' : `Continue with ${p.label}`}
+                  {busy === tier ? 'Redirecting…' : 'Choose this plan'}
                 </button>
                 {tier === 'solo' && annual && (
                   <p className="text-[10px] mt-2 text-center" style={{ color: C.sub }}>Solo is monthly only</p>

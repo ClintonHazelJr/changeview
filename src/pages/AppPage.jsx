@@ -36,6 +36,13 @@ function AppShell() {
 
   useEffect(() => {
     const checkout = params.get('checkout');
+    if (checkout === 'cancelled') {
+      setCheckoutMsg('Checkout cancelled — your trial status is unchanged.');
+      params.delete('checkout');
+      setParams(params, { replace: true });
+      return undefined;
+    }
+
     const sessionId = params.get('session_id');
     if (checkout !== 'success' || !sessionId || !session?.access_token) return undefined;
 

@@ -41,6 +41,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 ANTHROPIC_API_KEY=
 STRIPE_SECRET_KEY=
 STRIPE_PUBLISHABLE_KEY=
+STRIPE_WEBHOOK_SECRET=              # signing secret for /api/stripe-webhook
 ```
 
 Stripe Price IDs (for checkout — create one Product per tier in Stripe):
@@ -53,7 +54,10 @@ STRIPE_PRICE_ENTERPRISE_MONTHLY=    # $299 / month
 STRIPE_PRICE_ENTERPRISE_ANNUAL=     # $2,990 / year
 ```
 
-Add the same variable names in Vercel project settings for deployment.
+Webhook endpoint (Stripe Dashboard → Developers → Webhooks): `https://<your-domain>/api/stripe-webhook`  
+Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`.
+
+Add the same variable names in Vercel project settings for deployment. Also apply migration `010_stripe_customer_id.sql` so Checkout can store `stripe_customer_id`.
 
 ### 4. Run locally
 

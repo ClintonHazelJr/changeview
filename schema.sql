@@ -43,6 +43,7 @@ create table subscriptions (
   status text not null default 'trialing' check (status in ('trialing', 'active', 'cancelled', 'past_due')),
   trial_ends_at timestamptz,
   current_period_end date,
+  stripe_customer_id text,
   stripe_subscription_id text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
