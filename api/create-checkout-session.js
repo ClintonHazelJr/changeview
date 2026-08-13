@@ -2,10 +2,30 @@ import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
+/** One Product per tier in Stripe; attach these Price IDs via env. */
 const PRICES = {
-  tier_1_monthly: process.env.STRIPE_PRICE_TIER1_MONTHLY || 'price_tier1_monthly_placeholder',
-  tier_2_monthly: process.env.STRIPE_PRICE_TIER2_MONTHLY || 'price_tier2_monthly_placeholder',
-  tier_2_annual: process.env.STRIPE_PRICE_TIER2_ANNUAL || 'price_tier2_annual_placeholder',
+  solo_monthly:
+    process.env.STRIPE_PRICE_SOLO_MONTHLY
+    || process.env.STRIPE_PRICE_TIER1_MONTHLY
+    || '',
+  small_monthly: process.env.STRIPE_PRICE_SMALL_MONTHLY || '',
+  small_annual: process.env.STRIPE_PRICE_SMALL_ANNUAL || '',
+  enterprise_monthly:
+    process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY
+    || process.env.STRIPE_PRICE_TIER2_MONTHLY
+    || '',
+  enterprise_annual:
+    process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL
+    || process.env.STRIPE_PRICE_TIER2_ANNUAL
+    || '',
+};
+
+const TIER_ALIASES = {
+  solo: 'solo',
+  small: 'small',
+  enterprise: 'enterprise',
+  tier_1: 'solo',
+  tier_2: 'enterprise',
 };
 
 export default async function handler(req, res) {
@@ -25,14 +45,29 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
 
-  const { tier, billingCycle = 'monthly' } = req.body;
+  const { tier: rawTier, billingCycle = 'monthly' } = req.body || {};
+  const tier = TIER_ALIASES[rawTier];
 
-  if (tier === 'tier_1' && billingCycle !== 'monthly') {
-    return res.status(400).json({ error: 'Sole Practitioner is month-to-month only' });
+  if (!tier) {
+    return res.status(400).json({ error: 'Unknown plan tier' });
   }
 
-  const priceKey = tier === 'tier_1' ? 'tier_1_monthly' : `tier_2_${billingCycle}`;
+  if (billingCycle !== 'monthly' && billingCycle !== 'annual') {
+    return res.status(400).json({ error: 'Billing cycle must be monthly or annual' });
+  }
+
+  if (tier === 'solo' && billingCycle !== 'monthly') {
+    return res.status(400).json({ error: 'Solo is billed monthly only' });
+  }
+
+  const priceKey = `${tier}_${billingCycle}`;
   const priceId = PRICES[priceKey];
+
+  if (!priceId) {
+    return res.status(500).json({
+      error: `Stripe Price not configured for ${tier} (${billingCycle}). Set ${priceEnvHint(tier, billingCycle)}.`,
+    });
+  }
 
   const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, '') || 'http://localhost:5173';
 
@@ -49,4 +84,15 @@ export default async function handler(req, res) {
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Checkout failed' });
   }
+}
+
+function priceEnvHint(tier, billingCycle) {
+  const map = {
+    solo_monthly: 'STRIPE_PRICE_SOLO_MONTHLY',
+    small_monthly: 'STRIPE_PRICE_SMALL_MONTHLY',
+    small_annual: 'STRIPE_PRICE_SMALL_ANNUAL',
+    enterprise_monthly: 'STRIPE_PRICE_ENTERPRISE_MONTHLY',
+    enterprise_annual: 'STRIPE_PRICE_ENTERPRISE_ANNUAL',
+  };
+  return map[`${tier}_${billingCycle}`] || 'the matching STRIPE_PRICE_* env var';
 }

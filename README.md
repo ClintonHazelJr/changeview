@@ -43,12 +43,14 @@ STRIPE_SECRET_KEY=
 STRIPE_PUBLISHABLE_KEY=
 ```
 
-Optional Stripe price IDs (for checkout):
+Stripe Price IDs (for checkout — create one Product per tier in Stripe):
 
 ```
-STRIPE_PRICE_TIER1_MONTHLY=
-STRIPE_PRICE_TIER2_MONTHLY=
-STRIPE_PRICE_TIER2_ANNUAL=
+STRIPE_PRICE_SOLO_MONTHLY=          # $59 / month
+STRIPE_PRICE_SMALL_MONTHLY=         # $149 / month
+STRIPE_PRICE_SMALL_ANNUAL=          # $1,490 / year
+STRIPE_PRICE_ENTERPRISE_MONTHLY=    # $299 / month
+STRIPE_PRICE_ENTERPRISE_ANNUAL=     # $2,990 / year
 ```
 
 Add the same variable names in Vercel project settings for deployment.
@@ -69,6 +71,6 @@ npx vercel dev
 
 Push to GitHub and connect to Vercel. Set all env vars in Vercel project settings.
 
-## Pricing placeholders
+## Pricing
 
-Tier 1 and Tier 2 prices on the landing page are `[PLACEHOLDER]` — swap with real numbers before launch.
+Landing page plans: **Solo** $59/mo (monthly only), **Small** $149/mo or $1,490/yr, **Enterprise** $299/mo or $2,990/yr. Checkout uses the Stripe Price IDs above based on tier + billing cycle.

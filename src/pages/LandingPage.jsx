@@ -1,12 +1,19 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, Target, MessageSquare, TrendingUp, Check, GraduationCap,
 } from 'lucide-react';
 import { C, HEAD, BODY, tint } from '../lib/constants';
 
-const TIER1_PRICE = '[PLACEHOLDER]';
-const TIER2_MONTHLY = '[PLACEHOLDER]';
-const TIER2_ANNUAL = '[PLACEHOLDER]';
+const PRICING = {
+  solo: { monthly: 59 },
+  small: { monthly: 149, annual: 1490, save: 298 },
+  enterprise: { monthly: 299, annual: 2990, save: 598 },
+};
+
+function formatUsd(n) {
+  return `$${n.toLocaleString('en-US')}`;
+}
 
 async function startCheckout(tier, billingCycle = 'monthly') {
   try {
@@ -86,6 +93,9 @@ function HeroMockup() {
 }
 
 export default function LandingPage() {
+  const [billingCycle, setBillingCycle] = useState('monthly');
+  const annual = billingCycle === 'annual';
+
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ ...BODY, background: C.bg, color: C.ink }}>
       {/* Nav */}
@@ -173,16 +183,19 @@ export default function LandingPage() {
 
       {/* Pricing */}
       <section id="pricing" className="px-6 md:px-10 py-20" style={{ background: `linear-gradient(180deg, ${C.bg}, ${tint(C.purple, '08')})` }}>
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-extrabold text-center mb-3" style={{ ...HEAD, color: C.ink }}>Simple pricing</h2>
-          <p className="text-sm text-center mb-12" style={{ color: C.sub }}>Start alone. Scale to your whole change practice.</p>
-          <div className="grid md:grid-cols-2 gap-6 items-stretch">
-            <div className="bg-white rounded-3xl p-8 border shadow-sm flex flex-col" style={{ borderColor: C.border }}>
-              <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>Sole Practitioner</div>
+          <p className="text-sm text-center mb-10" style={{ color: C.sub }}>Start alone. Scale to your whole change practice.</p>
+
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-6 items-start">
+            {/* Solo — monthly only, no billing toggle */}
+            <div className="bg-white rounded-3xl p-8 border shadow-sm flex flex-col h-full" style={{ borderColor: C.border }}>
+              <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>Solo</div>
               <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
-                {TIER1_PRICE}<span className="text-base font-medium" style={{ color: C.sub }}>/mo</span>
+                {formatUsd(PRICING.solo.monthly)}
+                <span className="text-base font-medium" style={{ color: C.sub }}>/mo</span>
               </div>
-              <p className="text-sm mb-6" style={{ color: C.sub }}>One workspace, one user, month-to-month.</p>
+              <p className="text-sm mb-6" style={{ color: C.sub }}>Billed monthly. One workspace, one user.</p>
               <ul className="space-y-2.5 mb-8 flex-1">
                 {[
                   '1 Workspace',
@@ -198,7 +211,7 @@ export default function LandingPage() {
               </ul>
               <button
                 type="button"
-                onClick={() => startCheckout('tier_1', 'monthly')}
+                onClick={() => startCheckout('solo', 'monthly')}
                 className="w-full text-sm font-bold text-white py-3 rounded-full"
                 style={{ background: C.purple }}
               >
@@ -206,56 +219,132 @@ export default function LandingPage() {
               </button>
             </div>
 
-            <div
-              className="rounded-3xl p-8 border-2 shadow-md relative flex flex-col overflow-hidden"
-              style={{ borderColor: C.purple, background: '#fff' }}
-            >
-              <div
-                className="absolute top-0 inset-x-0 h-1.5"
-                style={{ background: `linear-gradient(90deg, ${C.purple}, ${C.teal})` }}
-              />
-              <div
-                className="absolute top-4 right-4 text-[10px] font-bold px-2.5 py-1 rounded-full text-white"
-                style={{ background: C.purple }}
-              >
-                Most popular
+            {/* Small + Enterprise share a monthly/annual toggle */}
+            <div>
+              <div className="flex justify-center lg:justify-end mb-4">
+                <div
+                  className="inline-flex p-1 rounded-full border bg-white shadow-sm"
+                  style={{ borderColor: C.border }}
+                  role="group"
+                  aria-label="Billing cycle"
+                >
+                  {[
+                    { key: 'monthly', label: 'Monthly' },
+                    { key: 'annual', label: 'Annual' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setBillingCycle(opt.key)}
+                      className="text-xs font-bold px-4 py-2 rounded-full transition-colors"
+                      style={{
+                        background: billingCycle === opt.key ? C.purple : 'transparent',
+                        color: billingCycle === opt.key ? '#fff' : C.sub,
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.purple }}>Enterprise</div>
-              <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
-                {TIER2_MONTHLY}<span className="text-base font-medium" style={{ color: C.sub }}>/mo</span>
+
+              <div className="grid md:grid-cols-2 gap-6 items-stretch">
+                <div
+                  className="rounded-3xl p-8 border-2 shadow-md relative flex flex-col overflow-hidden bg-white"
+                  style={{ borderColor: C.purple }}
+                >
+                  <div
+                    className="absolute top-0 inset-x-0 h-1.5"
+                    style={{ background: `linear-gradient(90deg, ${C.purple}, ${C.teal})` }}
+                  />
+                  <div
+                    className="absolute top-4 right-4 text-[10px] font-bold px-2.5 py-1 rounded-full text-white"
+                    style={{ background: C.purple }}
+                  >
+                    Most popular
+                  </div>
+                  <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.purple }}>Small</div>
+                  <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
+                    {formatUsd(annual ? PRICING.small.annual : PRICING.small.monthly)}
+                    <span className="text-base font-medium" style={{ color: C.sub }}>
+                      {annual ? '/yr' : '/mo'}
+                    </span>
+                  </div>
+                  {annual ? (
+                    <p className="text-sm mb-6" style={{ color: C.sub }}>
+                      <span className="font-semibold" style={{ color: C.green }}>2 months free</span>
+                      {' · '}
+                      Save {formatUsd(PRICING.small.save)} vs monthly
+                    </p>
+                  ) : (
+                    <p className="text-sm mb-6" style={{ color: C.sub }}>
+                      Or {formatUsd(PRICING.small.annual)}/yr (2 months free)
+                    </p>
+                  )}
+                  <ul className="space-y-2.5 mb-8 flex-1">
+                    {[
+                      'Everything in Solo',
+                      'Tasks, Schedule & Reports',
+                      'Invite Users & assign workspaces',
+                      'Multi-user collaboration',
+                    ].map((f) => (
+                      <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>
+                        <Check size={14} style={{ color: C.green }} /> {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => startCheckout('small', billingCycle)}
+                    className="w-full text-sm font-bold text-white py-3 rounded-full"
+                    style={{ background: C.purple }}
+                  >
+                    {annual ? 'Get Small annually' : 'Get Small'}
+                  </button>
+                </div>
+
+                <div className="bg-white rounded-3xl p-8 border shadow-sm flex flex-col" style={{ borderColor: C.border }}>
+                  <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>Enterprise</div>
+                  <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
+                    {formatUsd(annual ? PRICING.enterprise.annual : PRICING.enterprise.monthly)}
+                    <span className="text-base font-medium" style={{ color: C.sub }}>
+                      {annual ? '/yr' : '/mo'}
+                    </span>
+                  </div>
+                  {annual ? (
+                    <p className="text-sm mb-6" style={{ color: C.sub }}>
+                      <span className="font-semibold" style={{ color: C.green }}>2 months free</span>
+                      {' · '}
+                      Save {formatUsd(PRICING.enterprise.save)} vs monthly
+                    </p>
+                  ) : (
+                    <p className="text-sm mb-6" style={{ color: C.sub }}>
+                      Or {formatUsd(PRICING.enterprise.annual)}/yr (2 months free)
+                    </p>
+                  )}
+                  <ul className="space-y-2.5 mb-8 flex-1">
+                    {[
+                      'Everything in Small',
+                      'Unlimited Workspaces',
+                      'Schedule (Gantt)',
+                      'Reports hub (requirements, CIA, heat map)',
+                      'Priority support',
+                    ].map((f) => (
+                      <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>
+                        <Check size={14} style={{ color: C.green }} /> {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => startCheckout('enterprise', billingCycle)}
+                    className="w-full text-sm font-bold text-white py-3 rounded-full"
+                    style={{ background: C.ink }}
+                  >
+                    {annual ? 'Get Enterprise annually' : 'Get Enterprise'}
+                  </button>
+                </div>
               </div>
-              <p className="text-sm mb-1" style={{ color: C.sub }}>or {TIER2_ANNUAL}/yr (annual discount)</p>
-              <p className="text-sm mb-6" style={{ color: C.sub }}>Unlimited workspaces, team access, Schedule & Reports.</p>
-              <ul className="space-y-2.5 mb-8 flex-1">
-                {[
-                  'Everything in Sole Practitioner',
-                  'Unlimited Workspaces',
-                  'Invite Users & assign workspaces',
-                  'Schedule (Gantt)',
-                  'Reports (requirements, CIA, heat map)',
-                  'Monthly or annual billing',
-                ].map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>
-                    <Check size={14} style={{ color: C.green }} /> {f}
-                  </li>
-                ))}
-              </ul>
-              <button
-                type="button"
-                onClick={() => startCheckout('tier_2', 'monthly')}
-                className="w-full text-sm font-bold text-white py-3 rounded-full mb-2"
-                style={{ background: C.purple }}
-              >
-                Monthly billing
-              </button>
-              <button
-                type="button"
-                onClick={() => startCheckout('tier_2', 'annual')}
-                className="w-full text-sm font-bold py-3 rounded-full border"
-                style={{ color: C.purple, borderColor: C.purple }}
-              >
-                Annual billing
-              </button>
             </div>
           </div>
         </div>
