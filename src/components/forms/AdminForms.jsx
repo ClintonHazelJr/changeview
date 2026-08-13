@@ -424,6 +424,7 @@ export function FormImpact({ departments, initial, onSave, onDelete, onComplete 
   const [futureSystem, setFutureSystem] = useState(initial?.future_state_system || '');
   const [futureProcess, setFutureProcess] = useState(initial?.future_state_process || '');
   const [description, setDescription] = useState(initial?.impact_description || '');
+  const [status, setStatus] = useState(initial?.status || 'draft');
   const [severity, setSeverity] = useState({
     org: initial?.severity_org || 'none',
     people: initial?.severity_people || 'none',
@@ -496,7 +497,7 @@ export function FormImpact({ departments, initial, onSave, onDelete, onComplete 
       try {
         const saved = await onSave({
           departmentId, headcount: Number(headcount) || 0, currentSystem, currentProcess,
-          futureSystem, futureProcess, description, severity, tags,
+          futureSystem, futureProcess, description, severity, tags, status,
         });
         const impactId = saved?.id || initial?.id;
         if (!impactId) throw new Error('Impact was saved but no id was returned.');
@@ -519,6 +520,13 @@ export function FormImpact({ departments, initial, onSave, onDelete, onComplete 
         </Field>
         <Field label="# Impacted"><input type="number" className={inputClass} style={inputStyle} value={headcount} onChange={(e) => setHeadcount(e.target.value)} placeholder="e.g. 30" /></Field>
       </div>
+      <Field label="Status">
+        <select className={inputClass} style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="draft">Draft</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </Field>
       <div className="grid grid-cols-2 gap-4">
         <Field label="Current State — System"><input className={inputClass} style={inputStyle} value={currentSystem} onChange={(e) => setCurrentSystem(e.target.value)} /></Field>
         <Field label="Future State — System"><input className={inputClass} style={inputStyle} value={futureSystem} onChange={(e) => setFutureSystem(e.target.value)} /></Field>
@@ -636,6 +644,7 @@ export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete,
   const [type, setType] = useState(initial?.type || 'Training');
   const [sessions, setSessions] = useState(initial?.session_count ?? 1);
   const [hours, setHours] = useState(initial?.time_hours ?? 0.5);
+  const [status, setStatus] = useState(initial?.status || 'draft');
   const [materials, setMaterials] = useState([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -670,7 +679,7 @@ export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete,
       setError('');
       try {
         const saved = await onSave({
-          impactId, team, goal, headcount: Number(headcount) || 0, type, sessions: Number(sessions), hours: Number(hours),
+          impactId, team, goal, headcount: Number(headcount) || 0, type, sessions: Number(sessions), hours: Number(hours), status,
         });
         const learningNeedId = saved?.id || initial?.id;
         if (!learningNeedId) throw new Error('Learning Need was saved but no id was returned.');
@@ -709,6 +718,13 @@ export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete,
         <Field label="# Sessions"><input type="number" className={inputClass} style={inputStyle} value={sessions} onChange={(e) => setSessions(e.target.value)} /></Field>
       </div>
       <Field label="Time (hrs)"><input type="number" step="0.5" className={inputClass} style={inputStyle} value={hours} onChange={(e) => setHours(e.target.value)} /></Field>
+      <Field label="Status">
+        <select className={inputClass} style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="draft">Draft</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </Field>
       <FieldWithAttach
         label="Training Material"
         onFiles={(files) => setMaterials((prev) => [...prev, ...makePending(files)])}
@@ -722,6 +738,97 @@ export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete,
       </FieldWithAttach>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
       <SaveRow label={saving ? 'Saving…' : (editing ? 'Save changes' : 'Save')} onDelete={onDelete} disabled={saving} />
+    </form>
+  );
+}
+
+export function FormHypercare({ initiative, hypercare, onSave }) {
+  const [proposedGoLiveDate, setProposedGoLiveDate] = useState(
+    initiative?.proposed_go_live_date || '',
+  );
+  const [pilot, setPilot] = useState(Boolean(hypercare?.pilot));
+  const [pilotSuccessCriteria, setPilotSuccessCriteria] = useState(hypercare?.pilot_success_criteria || '');
+  const [assumptions, setAssumptions] = useState(hypercare?.assumptions || '');
+  const [duration, setDuration] = useState(hypercare?.duration || '');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setProposedGoLiveDate(initiative?.proposed_go_live_date || '');
+    setPilot(Boolean(hypercare?.pilot));
+    setPilotSuccessCriteria(hypercare?.pilot_success_criteria || '');
+    setAssumptions(hypercare?.assumptions || '');
+    setDuration(hypercare?.duration || '');
+  }, [initiative?.id, initiative?.proposed_go_live_date, hypercare?.id]);
+
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        setError('');
+        try {
+          await onSave({
+            proposedGoLiveDate: proposedGoLiveDate || null,
+            pilot,
+            pilotSuccessCriteria,
+            assumptions,
+            duration,
+          });
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setSaving(false);
+        }
+      }}
+    >
+      <Field label="Proposed Go Live Date">
+        <input
+          type="date"
+          className={inputClass}
+          style={inputStyle}
+          value={proposedGoLiveDate || ''}
+          onChange={(e) => setProposedGoLiveDate(e.target.value)}
+        />
+      </Field>
+      <Field label="Pilot">
+        <label className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>
+          <input type="checkbox" checked={pilot} onChange={(e) => setPilot(e.target.checked)} />
+          This initiative includes a pilot
+        </label>
+      </Field>
+      <Field label="Pilot Success Criteria">
+        <textarea
+          rows={3}
+          className={inputClass}
+          style={inputStyle}
+          value={pilotSuccessCriteria}
+          onChange={(e) => setPilotSuccessCriteria(e.target.value)}
+          placeholder="What does a successful pilot look like?"
+          disabled={!pilot}
+        />
+      </Field>
+      <Field label="Assumptions">
+        <textarea
+          rows={3}
+          className={inputClass}
+          style={inputStyle}
+          value={assumptions}
+          onChange={(e) => setAssumptions(e.target.value)}
+          placeholder="Key assumptions for hypercare"
+        />
+      </Field>
+      <Field label="Duration">
+        <input
+          className={inputClass}
+          style={inputStyle}
+          value={duration}
+          onChange={(e) => setDuration(e.target.value)}
+          placeholder="e.g. 2 weeks"
+        />
+      </Field>
+      {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
+      <SaveRow label={saving ? 'Saving…' : 'Save Hypercare'} disabled={saving} />
     </form>
   );
 }

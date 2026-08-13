@@ -1,8 +1,8 @@
 import {
   LayoutDashboard, Layers, LayoutGrid, ClipboardList,
-  CalendarRange, BarChart3, Settings, Users,
+  CalendarRange, BarChart3, Settings, Users, CheckSquare,
 } from 'lucide-react';
-import { C, HEAD, tint } from '../../lib/constants';
+import { C, HEAD, tint, hasPaidPlanFeatures } from '../../lib/constants';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -11,14 +11,15 @@ const NAV = [
   { key: 'program', label: 'Program', icon: Layers },
   { key: 'initiatives', label: 'Initiatives', icon: LayoutGrid },
   { key: 'requirements', label: 'Requirements', icon: ClipboardList },
-  { key: 'schedule', label: 'Schedule', icon: CalendarRange, enterprise: true },
-  { key: 'reports', label: 'Reports', icon: BarChart3, enterprise: true },
+  { key: 'tasks', label: 'Tasks', icon: CheckSquare, paid: true },
+  { key: 'schedule', label: 'Schedule', icon: CalendarRange, paid: true },
+  { key: 'reports', label: 'Reports', icon: BarChart3, paid: true },
 ];
 
 export default function AppSidebar({ section, setSection }) {
   const { planTier } = useWorkspace();
   const { profile } = useAuth();
-  const isEnterprise = planTier === 'tier_2';
+  const paid = hasPaidPlanFeatures(planTier);
   const isOwner = profile?.role === 'owner';
 
   return (
@@ -32,7 +33,7 @@ export default function AppSidebar({ section, setSection }) {
       <nav className="flex-1 px-2 space-y-0.5 overflow-y-auto">
         {NAV.map((item) => {
           const active = section === item.key;
-          const locked = item.enterprise && !isEnterprise;
+          const locked = item.paid && !paid;
           return (
             <button
               key={item.key}
@@ -69,9 +70,9 @@ export default function AppSidebar({ section, setSection }) {
         >
           <Users size={16} style={{ color: section === 'users' ? C.purple : C.sub }} />
           <span className="flex-1" style={HEAD}>Users</span>
-          {(!isEnterprise || !isOwner) && (
+          {(!paid || !isOwner) && (
             <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: tint(C.purple, '14'), color: C.purple }}>
-              {!isEnterprise ? 'Pro' : 'Owner'}
+              {!paid ? 'Pro' : 'Owner'}
             </span>
           )}
         </button>

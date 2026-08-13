@@ -323,6 +323,7 @@ create table impacts (
   severity_system text check (severity_system in ('none', 'low', 'medium', 'high')),
   severity_environment text check (severity_environment in ('none', 'low', 'medium', 'high')),
   intervention_tags text[] default '{}', -- e.g. {training, huddle}
+  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -370,6 +371,7 @@ create table learning_needs (
   type text, -- training, huddle
   session_count int default 1,
   time_hours numeric(5,2) default 0,
+  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected')),
   created_at timestamptz not null default now()
 );
 

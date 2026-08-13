@@ -82,6 +82,7 @@ export function useInitiativeDetail(initiativeId) {
   const [stakeholders, setStakeholders] = useState([]);
   const [learningNeeds, setLearningNeeds] = useState([]);
   const [comms, setComms] = useState([]);
+  const [hypercare, setHypercare] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -90,12 +91,13 @@ export function useInitiativeDetail(initiativeId) {
       return;
     }
     setLoading(true);
-    const [init, imp, stk, ln, cm] = await Promise.all([
+    const [init, imp, stk, ln, cm, hc] = await Promise.all([
       supabase.from('initiatives').select('*').eq('id', initiativeId).single(),
       supabase.from('impacts').select('*').eq('initiative_id', initiativeId).order('created_at'),
       supabase.from('stakeholders').select('*').eq('initiative_id', initiativeId).order('created_at'),
       supabase.from('learning_needs').select('*').eq('workspace_id', activeWorkspaceId).order('created_at'),
       supabase.from('comms').select('*').eq('initiative_id', initiativeId).order('created_at'),
+      supabase.from('hypercare').select('*').eq('initiative_id', initiativeId).maybeSingle(),
     ]);
     setInitiative(init.data);
     setImpacts(imp.data || []);
@@ -103,6 +105,7 @@ export function useInitiativeDetail(initiativeId) {
     const impactIds = new Set((imp.data || []).map((x) => x.id));
     setLearningNeeds((ln.data || []).filter((x) => impactIds.has(x.impact_id)));
     setComms(cm.data || []);
+    setHypercare(hc.data || null);
     setLoading(false);
   }, [initiativeId, activeWorkspaceId]);
 
@@ -125,6 +128,7 @@ export function useInitiativeDetail(initiativeId) {
     severity_system: vals.severity.system,
     severity_environment: vals.severity.environment,
     intervention_tags: vals.tags.map((t) => t.toLowerCase()),
+    status: vals.status || 'draft',
   });
 
   const addImpact = async (vals) => {
@@ -192,6 +196,7 @@ export function useInitiativeDetail(initiativeId) {
     type: vals.type,
     session_count: vals.sessions,
     time_hours: vals.hours,
+    status: vals.status || 'draft',
   });
 
   const addLearningNeed = async (vals) => {
@@ -253,11 +258,39 @@ export function useInitiativeDetail(initiativeId) {
     await load();
   };
 
+  const saveHypercare = async (vals) => {
+    const payload = {
+      account_id: accountId,
+      workspace_id: workspaceId,
+      initiative_id: initiativeId,
+      pilot: Boolean(vals.pilot),
+      pilot_success_criteria: vals.pilotSuccessCriteria || null,
+      assumptions: vals.assumptions || null,
+      duration: vals.duration || null,
+    };
+    let error;
+    if (hypercare?.id) {
+      ({ error } = await supabase.from('hypercare').update(payload).eq('id', hypercare.id));
+    } else {
+      ({ error } = await supabase.from('hypercare').insert(payload));
+    }
+    if (error) throw new Error(parseDbError(error));
+
+    // Proposed go-live lives on the Initiative (shared date field).
+    const { error: initErr } = await supabase
+      .from('initiatives')
+      .update({ proposed_go_live_date: vals.proposedGoLiveDate || null })
+      .eq('id', initiativeId);
+    if (initErr) throw new Error(parseDbError(initErr));
+    await load();
+  };
+
   return {
-    initiative, impacts, stakeholders, learningNeeds, comms, loading, reload: load,
+    initiative, impacts, stakeholders, learningNeeds, comms, hypercare, loading, reload: load,
     addImpact, updateImpact, deleteImpact,
     addStakeholder, updateStakeholder, deleteStakeholder,
     addLearningNeed, updateLearningNeed, deleteLearningNeed,
     addComms, updateComms, deleteComms,
+    saveHypercare,
   };
 }

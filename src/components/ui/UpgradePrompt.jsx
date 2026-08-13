@@ -16,14 +16,14 @@ export default function UpgradePrompt({
           <Sparkles size={22} style={{ color: C.purple }} />
         </div>
         <h2 className="text-xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>
-          {title || `${feature} is an Enterprise feature`}
+          {title || `${feature} is on Small and Enterprise`}
         </h2>
         <p className="text-sm mb-6" style={{ color: C.sub }}>
           {body || (
             <>
               Your plan is <strong style={{ color: C.ink }}>{PLAN_LABELS.tier_1}</strong>.
-              Upgrade to <strong style={{ color: C.ink }}>{PLAN_LABELS.tier_2}</strong> for unlimited
-              workspaces, Schedule, Reports, and multi-user access.
+              Upgrade to Small or <strong style={{ color: C.ink }}>{PLAN_LABELS.tier_2}</strong> for
+              Tasks, Schedule, Reports, unlimited workspaces, and multi-user access.
             </>
           )}
         </p>
@@ -32,7 +32,7 @@ export default function UpgradePrompt({
           className="inline-flex text-sm font-bold text-white px-6 py-3 rounded-full no-underline"
           style={{ background: C.purple }}
         >
-          View Enterprise pricing
+          View pricing
         </a>
       </div>
     </div>

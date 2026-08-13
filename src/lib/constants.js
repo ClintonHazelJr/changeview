@@ -41,12 +41,15 @@ export const STATUS_COLOR = {
 };
 export const TAG_OPTIONS = ['Training', 'Huddle', 'Email', 'Documentation'];
 
-/** DB keys stay tier_1 / tier_2; labels are product names. */
+/** DB keys stay tier_1 / tier_2; product names: Solo / Enterprise (Small shares paid access). */
 export const PLAN_LABELS = {
-  tier_1: 'Sole Practitioner',
+  tier_1: 'Solo',
   tier_2: 'Enterprise',
 };
+export const isSoloPlan = (tier) => tier === 'tier_1';
 export const isEnterprisePlan = (tier) => tier === 'tier_2';
+/** Schedule, Reports, Tasks, multi-user — not available on Solo. */
+export const hasPaidPlanFeatures = (tier) => !isSoloPlan(tier);
 
 export const inputClass = 'w-full border rounded-2xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent';
 export const inputStyle = { borderColor: C.border, color: C.ink };

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { C, BODY, PLAN_LABELS, isEnterprisePlan } from '../lib/constants';
+import { C, BODY, PLAN_LABELS, hasPaidPlanFeatures } from '../lib/constants';
 import { useAuth } from '../contexts/AuthContext';
 import { WorkspaceProvider, useWorkspace } from '../contexts/WorkspaceContext';
 import TopNav from '../components/layout/TopNav';
@@ -14,12 +14,13 @@ import SchedulePanel from '../components/schedule/SchedulePanel';
 import ReportsPanel from '../components/reports/ReportsPanel';
 import ProfilePanel from '../components/profile/ProfilePanel';
 import UsersPanel from '../components/users/UsersPanel';
+import TasksPanel from '../components/tasks/TasksPanel';
 import UpgradePrompt from '../components/ui/UpgradePrompt';
 
 function AppShell() {
   const { profile } = useAuth();
   const { planTier } = useWorkspace();
-  const enterprise = isEnterprisePlan(planTier);
+  const paid = hasPaidPlanFeatures(planTier);
   const isOwner = profile?.role === 'owner';
 
   const [section, setSection] = useState('dashboard');
@@ -50,23 +51,27 @@ function AppShell() {
       />
     );
   } else if (section === 'requirements') body = <RequirementsPanel />;
-  else if (section === 'schedule') {
-    body = enterprise
+  else if (section === 'tasks') {
+    body = paid
+      ? <TasksPanel />
+      : <UpgradePrompt feature="Tasks" />;
+  } else if (section === 'schedule') {
+    body = paid
       ? <SchedulePanel />
       : <UpgradePrompt feature="Schedule" />;
   } else if (section === 'reports') {
-    body = enterprise
+    body = paid
       ? <ReportsPanel />
       : <UpgradePrompt feature="Reports" />;
   } else if (section === 'users') {
-    if (!enterprise) {
+    if (!paid) {
       body = (
         <UpgradePrompt
           feature="Users"
-          title="Multi-user access is Enterprise"
+          title="Multi-user access requires a paid plan"
           body={(
             <>
-              {PLAN_LABELS.tier_1} is single-user. Upgrade to {PLAN_LABELS.tier_2} to invite
+              {PLAN_LABELS.tier_1} is single-user. Upgrade to Small or {PLAN_LABELS.tier_2} to invite
               colleagues and assign them to workspaces.
             </>
           )}

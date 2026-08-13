@@ -3,13 +3,13 @@ import {
   ChevronLeft, FileText, AlertTriangle, Users, GraduationCap, MessageSquare,
   CircleDot, Rocket, HeartPulse, CheckCircle2,
 } from 'lucide-react';
-import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, isRatedSeverity, parseInitiativeMeta } from '../../lib/constants';
+import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, STATUS_COLOR, isRatedSeverity, parseInitiativeMeta } from '../../lib/constants';
 import { useInitiatives, useInitiativeDetail } from '../../hooks/useInitiatives';
 import { useAdminData } from '../../hooks/useAdminData';
 import { TabSection } from '../ui/shared';
 import Modal from '../ui/Modal';
 import {
-  FormInitiative, FormImpact, FormStakeholder, FormLearningNeed, FormComms,
+  FormInitiative, FormImpact, FormStakeholder, FormLearningNeed, FormComms, FormHypercare,
 } from '../forms/AdminForms';
 import {
   ListPageShell, ListTopBar, StatusFilterRow, GroupSection, CompactListCard,
@@ -29,7 +29,7 @@ function formatDate(value) {
 }
 
 export default function InitiativesPanel({ initialSelectedId = null, onSelectedConsumed }) {
-  const { initiatives, programs, addInitiative } = useInitiatives();
+  const { initiatives, programs, addInitiative, reload: reloadInitiatives } = useInitiatives();
   const { departments, people } = useAdminData();
   const [selectedInitId, setSelectedInitId] = useState(initialSelectedId);
   const [initTab, setInitTab] = useState('details');
@@ -74,6 +74,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
     stakeholders: detail.stakeholders,
     learningNeeds: detail.learningNeeds,
     comms: detail.comms,
+    hypercare: detail.hypercare,
   };
 
   const initTabs = [
@@ -82,6 +83,13 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
     { key: 'stakeholders', label: 'Stakeholders', icon: Users, color: C.teal, count: initData.stakeholders.length },
     { key: 'learning', label: 'Learning Needs', icon: GraduationCap, color: C.amber, count: initData.learningNeeds.length },
     { key: 'comms', label: 'Comms', icon: MessageSquare, color: C.green, count: initData.comms.length },
+    {
+      key: 'hypercare',
+      label: 'Hypercare',
+      icon: HeartPulse,
+      color: C.amber,
+      highlight: selectedInit?.status === 'hypercare',
+    },
   ];
 
   const getStatus = (i) => i.status || 'planning';
@@ -192,6 +200,13 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                 {t.count}
               </span>
             )}
+            {t.highlight && !t.count && (
+              <span
+                className="ml-auto w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ background: t.color }}
+                title="Initiative is in Hypercare"
+              />
+            )}
           </button>
         ))}
       </div>
@@ -246,7 +261,18 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                     className="w-full text-left bg-white rounded-2xl p-4 shadow-sm border hover:shadow-md transition-shadow"
                     style={{ borderColor: C.border }}
                   >
-                    <div className="text-sm font-bold mb-2" style={{ color: C.ink }}>{deptName(imp.department_id)} · {imp.headcount_impacted} impacted</div>
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <div className="text-sm font-bold" style={{ color: C.ink }}>{deptName(imp.department_id)} · {imp.headcount_impacted} impacted</div>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize"
+                        style={{
+                          background: tint(STATUS_COLOR[imp.status || 'draft'], '22'),
+                          color: STATUS_COLOR[imp.status || 'draft'],
+                        }}
+                      >
+                        {imp.status || 'draft'}
+                      </span>
+                    </div>
                     <div className="flex flex-wrap gap-2 mb-2">
                       {Object.entries(severity).map(([k, v]) => isRatedSeverity(v) && (
                         <span key={k} className="text-[10px] font-semibold px-2 py-1 rounded-full capitalize" style={{ background: tint(SEVERITY_COLOR[v], '22'), color: SEVERITY_COLOR[v] }}>{k}: {v}</span>
@@ -299,11 +325,22 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                   className="w-full text-left bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between hover:shadow-md transition-shadow"
                   style={{ borderColor: C.border }}
                 >
-                  <div>
-                    <div className="text-sm font-bold" style={{ color: C.ink }}>{ln.team} <span className="font-normal text-xs" style={{ color: C.sub }}>· {impactLabel(ln.impact_id)}</span></div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <div className="text-sm font-bold" style={{ color: C.ink }}>{ln.team} <span className="font-normal text-xs" style={{ color: C.sub }}>· {impactLabel(ln.impact_id)}</span></div>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize"
+                        style={{
+                          background: tint(STATUS_COLOR[ln.status || 'draft'], '22'),
+                          color: STATUS_COLOR[ln.status || 'draft'],
+                        }}
+                      >
+                        {ln.status || 'draft'}
+                      </span>
+                    </div>
                     <div className="text-xs" style={{ color: C.sub }}>{ln.goal}</div>
                   </div>
-                  <div className="text-right text-xs" style={{ color: C.sub }}>
+                  <div className="text-right text-xs shrink-0" style={{ color: C.sub }}>
                     <div className="font-semibold" style={{ color: C.amber }}>{ln.type}</div>
                     {ln.headcount} people · {ln.session_count} session · {ln.time_hours}h
                   </div>
@@ -311,6 +348,25 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
               ))}
             </div>
           </TabSection>
+        )}
+
+        {initTab === 'hypercare' && selectedInit && (
+          <div>
+            <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Hypercare</h2>
+            <p className="text-sm mb-5" style={{ color: C.sub }}>
+              One hypercare plan per Initiative — pilot criteria, assumptions, and go-live timing.
+            </p>
+            <div className="bg-white rounded-3xl border shadow-sm p-5 max-w-xl" style={{ borderColor: C.border }}>
+              <FormHypercare
+                initiative={selectedInit}
+                hypercare={initData.hypercare}
+                onSave={async (vals) => {
+                  await detail.saveHypercare(vals);
+                  await reloadInitiatives();
+                }}
+              />
+            </div>
+          </div>
         )}
 
         {initTab === 'comms' && (
