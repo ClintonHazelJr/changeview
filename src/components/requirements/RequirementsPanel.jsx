@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { FilePenLine, BadgeCheck, Ban } from 'lucide-react';
 import { SEVERITY_COLOR } from '../../lib/constants';
 import { useRequirements } from '../../hooks/useRequirements';
+import { useAdminData } from '../../hooks/useAdminData';
 import Modal from '../ui/Modal';
 import { FormRequirement } from '../forms/AdminForms';
 import {
@@ -17,6 +18,7 @@ const STATUSES = [
 
 export default function RequirementsPanel() {
   const { requirements, initiatives, people, impacts, tasks, saveRequirement } = useRequirements();
+  const { departments } = useAdminData();
   const [modal, setModal] = useState(null);
   const [editing, setEditing] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
@@ -100,6 +102,7 @@ export default function RequirementsPanel() {
           <FormRequirement
             initiatives={initiatives}
             people={people}
+            departments={departments}
             impacts={impacts}
             tasks={tasks}
             initial={editing}

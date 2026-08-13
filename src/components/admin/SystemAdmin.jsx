@@ -153,7 +153,11 @@ export default function SystemAdmin({ initialTab = null, onInitialTabConsumed })
       {modal === 'team' && <Modal title="Add Project Team" onClose={() => setModal(null)}><FormTeam onSave={async (n) => { await addTeam(n); setModal(null); }} /></Modal>}
       {modal?.type === 'teamMember' && (
         <Modal title="Add Team Member" onClose={() => setModal(null)}>
-          <FormTeamMember people={people} onSave={async (personId, role) => { await addTeamMember(modal.teamId, personId, role); setModal(null); }} />
+          <FormTeamMember
+            people={people}
+            departments={departments}
+            onSave={async (personId, role) => { await addTeamMember(modal.teamId, personId, role); setModal(null); }}
+          />
         </Modal>
       )}
     </div>

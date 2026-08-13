@@ -17,6 +17,7 @@ import {
   deleteLearningNeedAttachmentRow,
 } from '../../lib/attachments';
 import { Field, Pill, SaveRow } from '../ui/shared';
+import PersonSelect from '../ui/PersonSelect';
 import { AttachmentList, FieldWithAttach } from '../ui/AttachmentField';
 
 export function FormOrg({ onSave }) {
@@ -99,20 +100,27 @@ export function FormTeam({ onSave }) {
   );
 }
 
-export function FormTeamMember({ people, onSave }) {
-  const [personId, setPersonId] = useState(people[0]?.id || '');
+export function FormTeamMember({ people, departments = [], onSave }) {
+  const [personId, setPersonId] = useState('');
   const [role, setRole] = useState('');
   const [error, setError] = useState('');
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
-      try { if (personId && role) await onSave(personId, role); } catch (err) { setError(err.message); }
+      try {
+        if (!personId) throw new Error('Select a Person.');
+        if (!role.trim()) throw new Error('Role is required.');
+        await onSave(personId, role);
+      } catch (err) { setError(err.message); }
     }}>
-      <Field label="Person">
-        <select className={inputClass} style={inputStyle} value={personId} onChange={(e) => setPersonId(e.target.value)}>
-          {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      </Field>
+      <PersonSelect
+        label="Person"
+        people={people}
+        departments={departments}
+        value={personId}
+        onChange={(e) => setPersonId(e.target.value)}
+        allowEmpty={false}
+      />
       <Field label="Role on this team"><input className={inputClass} style={inputStyle} value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Project Manager" /></Field>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
       <SaveRow />
@@ -135,41 +143,16 @@ export function FormWorkspace({ onSave }) {
   );
 }
 
-function PersonSelect({ label, people, loading, value, onChange }) {
-  if (loading) {
-    return (
-      <Field label={label}>
-        <p className="text-xs" style={{ color: C.sub }}>Loading people…</p>
-      </Field>
-    );
-  }
-  if (people.length === 0) {
-    return (
-      <Field label={label}>
-        <p className="text-xs" style={{ color: C.sub }}>Add People in Settings first.</p>
-      </Field>
-    );
-  }
-  return (
-    <Field label={label}>
-      <select className={inputClass} style={inputStyle} value={value} onChange={onChange}>
-        <option value="">Select</option>
-        {people.map((p) => (
-          <option key={p.id} value={p.id}>{p.name}</option>
-        ))}
-      </select>
-    </Field>
-  );
-}
-
 export function FormInitiative({ onSave }) {
   const { activeWorkspaceId } = useWorkspace();
   const [people, setPeople] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [programs, setPrograms] = useState([]);
   const [loadingPeople, setLoadingPeople] = useState(true);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
   const [vals, setVals] = useState({
-    name: '', description: '', programId: '', startDate: '', goLiveDate: '', budget: '', useCase: '', expectedBenefits: '', changeOwnerId: '', projectManagerId: '',
+    name: '', description: '', programId: '', startDate: '', goLiveDate: '', budget: '', useCase: '', expectedBenefits: '',
+    changeOwnerId: '', productOwnerId: '', businessOwnerId: '', projectManagerId: '',
   });
   const [error, setError] = useState('');
   const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
@@ -181,6 +164,7 @@ export function FormInitiative({ onSave }) {
       if (!activeWorkspaceId) {
         if (!cancelled) {
           setPeople([]);
+          setDepartments([]);
           setPrograms([]);
           setLoadingPeople(false);
           setLoadingPrograms(false);
@@ -189,13 +173,15 @@ export function FormInitiative({ onSave }) {
       }
       setLoadingPeople(true);
       setLoadingPrograms(true);
-      const [peopleRes, programsRes] = await Promise.all([
-        supabase.from('people').select('id, name').eq('workspace_id', activeWorkspaceId).order('name'),
+      const [peopleRes, deptRes, programsRes] = await Promise.all([
+        supabase.from('people').select('id, name, title, email, department_id').eq('workspace_id', activeWorkspaceId).order('name'),
+        supabase.from('departments').select('id, name').eq('workspace_id', activeWorkspaceId),
         supabase.from('programs').select('id, name').eq('workspace_id', activeWorkspaceId).order('name'),
       ]);
       if (cancelled) return;
       if (peopleRes.error) setError(peopleRes.error.message);
       setPeople(peopleRes.data || []);
+      setDepartments(deptRes.data || []);
       setPrograms(programsRes.data || []);
       setLoadingPeople(false);
       setLoadingPrograms(false);
@@ -215,6 +201,8 @@ export function FormInitiative({ onSave }) {
           await onSave({
             ...vals,
             changeOwner: personName(vals.changeOwnerId),
+            productOwner: personName(vals.productOwnerId),
+            businessOwner: personName(vals.businessOwnerId),
             projectManager: personName(vals.projectManagerId),
           });
         }
@@ -241,20 +229,42 @@ export function FormInitiative({ onSave }) {
       <Field label="Budget"><input type="number" className={inputClass} style={inputStyle} value={vals.budget} onChange={set('budget')} placeholder="e.g. 45000" /></Field>
       <Field label="Use Case"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.useCase} onChange={set('useCase')} /></Field>
       <Field label="Expected Benefits"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.expectedBenefits} onChange={set('expectedBenefits')} /></Field>
-      <PersonSelect
-        label="Change Owner"
-        people={people}
-        loading={loadingPeople}
-        value={vals.changeOwnerId}
-        onChange={set('changeOwnerId')}
-      />
-      <PersonSelect
-        label="Project Manager"
-        people={people}
-        loading={loadingPeople}
-        value={vals.projectManagerId}
-        onChange={set('projectManagerId')}
-      />
+      <div className="grid grid-cols-2 gap-4">
+        <PersonSelect
+          label="Change Owner"
+          people={people}
+          departments={departments}
+          loading={loadingPeople}
+          value={vals.changeOwnerId}
+          onChange={set('changeOwnerId')}
+        />
+        <PersonSelect
+          label="Product Owner"
+          people={people}
+          departments={departments}
+          loading={loadingPeople}
+          value={vals.productOwnerId}
+          onChange={set('productOwnerId')}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <PersonSelect
+          label="Business Owner"
+          people={people}
+          departments={departments}
+          loading={loadingPeople}
+          value={vals.businessOwnerId}
+          onChange={set('businessOwnerId')}
+        />
+        <PersonSelect
+          label="Project Manager"
+          people={people}
+          departments={departments}
+          loading={loadingPeople}
+          value={vals.projectManagerId}
+          onChange={set('projectManagerId')}
+        />
+      </div>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
       <SaveRow disabled={programs.length === 0} />
     </form>
@@ -314,7 +324,7 @@ export function FormProgram({ orgs, initial, onSave }) {
   );
 }
 
-export function FormRequirement({ initiatives, people, impacts, tasks = [], initial, onSave }) {
+export function FormRequirement({ initiatives, people, departments = [], impacts, tasks = [], initial, onSave }) {
   const [vals, setVals] = useState({
     initiativeId: initial?.initiative_id || initiatives[0]?.id || '',
     description: initial?.description || '',
@@ -380,8 +390,8 @@ export function FormRequirement({ initiatives, people, impacts, tasks = [], init
           </select>
         </Field>
       </div>
-      <PersonSelect label="Author" people={people} loading={false} value={vals.authorId} onChange={set('authorId')} />
-      <PersonSelect label="Business Approver" people={people} loading={false} value={vals.approverId} onChange={set('approverId')} />
+      <PersonSelect label="Author" people={people} departments={departments} value={vals.authorId} onChange={set('authorId')} />
+      <PersonSelect label="Business Approver" people={people} departments={departments} value={vals.approverId} onChange={set('approverId')} />
       <Field label="Linked Impacts">
         {initiativeImpacts.length === 0 ? (
           <p className="text-xs" style={{ color: C.sub }}>No impacts on this Initiative yet.</p>
@@ -427,7 +437,7 @@ export function FormRequirement({ initiatives, people, impacts, tasks = [], init
 }
 
 export function FormTask({
-  initiatives, people, teams, requirements, initial, onSave, onDelete,
+  initiatives, people, departments = [], teams, requirements, initial, onSave, onDelete,
 }) {
   const [vals, setVals] = useState({
     initiativeId: initial?.initiative_id || initiatives[0]?.id || '',
@@ -490,7 +500,7 @@ export function FormTask({
         <textarea rows={2} className={inputClass} style={inputStyle} value={vals.description} onChange={set('description')} />
       </Field>
       <div className="grid grid-cols-2 gap-4">
-        <PersonSelect label="Assignee" people={people} loading={false} value={vals.assigneeId} onChange={set('assigneeId')} />
+        <PersonSelect label="Assignee" people={people} departments={departments} value={vals.assigneeId} onChange={set('assigneeId')} />
         <Field label="Project Team">
           {teams.length === 0 ? (
             <p className="text-xs" style={{ color: C.sub }}>Add Project Teams in Settings.</p>
@@ -748,9 +758,9 @@ export function FormImpact({ departments, initial, onSave, onDelete, onComplete 
   );
 }
 
-export function FormStakeholder({ people, initial, onSave, onDelete }) {
+export function FormStakeholder({ people, departments = [], initial, onSave, onDelete }) {
   const editing = Boolean(initial?.id);
-  const [personId, setPersonId] = useState(initial?.person_id || people[0]?.id || '');
+  const [personId, setPersonId] = useState(initial?.person_id || '');
   const [role, setRole] = useState(initial?.project_role || '');
   const [raci, setRaci] = useState({
     r: Boolean(initial?.raci_responsible),
@@ -762,17 +772,19 @@ export function FormStakeholder({ people, initial, onSave, onDelete }) {
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
-      try { await onSave({ personId, role, raci }); } catch (err) { setError(err.message); }
+      try {
+        if (!personId) throw new Error('Select a Person.');
+        await onSave({ personId, role, raci });
+      } catch (err) { setError(err.message); }
     }}>
-      <Field label="Person">
-        {people.length === 0 ? (
-          <p className="text-xs" style={{ color: C.sub }}>Add People in Settings first.</p>
-        ) : (
-          <select className={inputClass} style={inputStyle} value={personId} onChange={(e) => setPersonId(e.target.value)}>
-            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        )}
-      </Field>
+      <PersonSelect
+        label="Person"
+        people={people}
+        departments={departments}
+        value={personId}
+        onChange={(e) => setPersonId(e.target.value)}
+        allowEmpty={false}
+      />
       <Field label="Project Role"><input className={inputClass} style={inputStyle} value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. SME" /></Field>
       <Field label="RACI">
         <div className="flex gap-4">

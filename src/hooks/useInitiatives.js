@@ -46,6 +46,8 @@ export function useInitiatives() {
 
     const description = packInitiativeMeta(vals.description, {
       changeOwner: vals.changeOwner || '',
+      productOwner: vals.productOwner || '',
+      businessOwner: vals.businessOwner || '',
       projectManager: vals.projectManager || '',
     });
 

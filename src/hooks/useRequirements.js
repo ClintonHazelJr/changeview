@@ -33,7 +33,7 @@ export function useRequirements() {
         .eq('workspace_id', ws)
         .order('created_at', { ascending: false }),
       supabase.from('initiatives').select('id, name').eq('workspace_id', ws).order('name'),
-      supabase.from('people').select('id, name').eq('workspace_id', ws).order('name'),
+      supabase.from('people').select('id, name, title, email, department_id').eq('workspace_id', ws).order('name'),
       supabase.from('impacts').select('id, initiative_id, reference_number, impact_description, department_id').eq('workspace_id', ws).order('created_at', { ascending: false }),
       supabase.from('tasks').select('id, name, status, initiative_id').eq('workspace_id', ws).order('created_at', { ascending: false }),
     ]);

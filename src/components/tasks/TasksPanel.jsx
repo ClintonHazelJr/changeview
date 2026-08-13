@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { CircleDot, Play, Loader, Ban, CheckCircle2 } from 'lucide-react';
 import { C, HEAD, BODY, SEVERITY_COLOR, TASK_STATUSES, tint } from '../../lib/constants';
 import { useTasks } from '../../hooks/useTasks';
+import { useAdminData } from '../../hooks/useAdminData';
 import Modal from '../ui/Modal';
 import { FormTask } from '../forms/AdminForms';
 import {
@@ -22,6 +23,7 @@ export default function TasksPanel() {
     tasks, initiatives, people, teams, requirements,
     saveTask, updateTaskStatus, deleteTask,
   } = useTasks();
+  const { departments } = useAdminData();
   const [view, setView] = useState('list');
   const [modal, setModal] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -189,6 +191,7 @@ export default function TasksPanel() {
           <FormTask
             initiatives={initiatives}
             people={people}
+            departments={departments}
             teams={teams}
             requirements={requirements}
             initial={editing}

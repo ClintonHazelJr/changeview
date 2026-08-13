@@ -149,7 +149,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                     title={i.name}
                     subtitle={formatDate(i.proposed_go_live_date) ? `Go live ${formatDate(i.proposed_go_live_date)}` : 'No go-live date'}
                     tags={[{ label: getStatus(i), color: statusColor(getStatus(i)) }]}
-                    avatars={[meta.changeOwner, meta.projectManager].filter(Boolean)}
+                    avatars={[meta.changeOwner, meta.productOwner, meta.businessOwner, meta.projectManager].filter(Boolean)}
                     onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
                   />
                 );
@@ -225,6 +225,8 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                 ['Go Live Date', selectedInit.proposed_go_live_date || '—'],
                 ['Budget', selectedInit.budget ? `$${Number(selectedInit.budget).toLocaleString()}` : '—'],
                 ['Change Owner', meta.changeOwner || '—'],
+                ['Product Owner', meta.productOwner || '—'],
+                ['Business Owner', meta.businessOwner || '—'],
                 ['Project Manager', meta.projectManager || '—'],
               ].map(([label, val]) => (
                 <div key={label} className="bg-white rounded-2xl p-4 shadow-sm border" style={{ borderColor: C.border }}>
@@ -414,6 +416,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
         <Modal title={editingRecord ? 'Edit Stakeholder' : 'Add Stakeholder'} onClose={closeModal}>
           <FormStakeholder
             people={people}
+            departments={departments}
             initial={editingRecord}
             onSave={async (v) => {
               if (editingRecord) await detail.updateStakeholder(editingRecord.id, v);
