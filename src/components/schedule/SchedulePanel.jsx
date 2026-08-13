@@ -128,15 +128,24 @@ export default function SchedulePanel() {
   return (
     <div className="flex-1 p-6 max-w-[1400px] w-full mx-auto overflow-hidden flex flex-col" style={BODY}>
       <div className="mb-4 shrink-0">
-        <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
-          Schedule — {activeWorkspace?.name}
-        </h2>
-        <p className="text-sm mb-3" style={{ color: C.sub }}>
-          Gantt view of Program and Initiative timelines (start → go-live). Display only.
-        </p>
-        <div className="flex gap-4 text-xs font-semibold" style={{ color: C.sub }}>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm" style={{ background: C.teal }} /> Programs</span>
-          <span className="flex items-center gap-1.5"><span className="w-3 h-2 rounded-sm" style={{ background: C.coral }} /> Initiatives</span>
+        <div
+          className="rounded-3xl p-5 mb-3"
+          style={{ background: `linear-gradient(120deg, ${tint(C.teal, '16')}, ${tint(C.coral, '12')})` }}
+        >
+          <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
+            Schedule — {activeWorkspace?.name}
+          </h2>
+          <p className="text-sm" style={{ color: C.sub }}>
+            Gantt view of Program and Initiative timelines (start → go-live). Display only.
+          </p>
+        </div>
+        <div className="flex gap-3 text-xs font-semibold">
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: tint(C.teal, '18'), color: C.teal }}>
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: C.teal }} /> Programs
+          </span>
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: tint(C.coral, '18'), color: C.coral }}>
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: C.coral }} /> Initiatives
+          </span>
         </div>
       </div>
 

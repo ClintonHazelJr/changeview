@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ClipboardList, FileText, Grid3X3 } from 'lucide-react';
-import { C, HEAD, BODY, SEVERITY_COLOR, tint, isRatedSeverity } from '../../lib/constants';
+import { C, HEAD, BODY, SEVERITY_COLOR, STATUS_COLOR, tint, isRatedSeverity } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 
@@ -106,17 +106,31 @@ function RequirementsReport({ workspaceId }) {
           <tbody>
             {filtered.length === 0 ? (
               <tr><td colSpan={7} className="px-3 py-6 text-center" style={{ color: C.sub }}>No requirements match.</td></tr>
-            ) : filtered.map((r) => (
-              <tr key={r.id} className="border-b align-top" style={{ borderColor: C.border }}>
-                <td className="px-3 py-2.5 font-semibold" style={{ color: C.ink }}>{initName(r.initiative_id)}</td>
-                <td className="px-3 py-2.5" style={{ color: C.sub }}>{r.reference_number || '—'}</td>
-                <td className="px-3 py-2.5" style={{ color: C.ink }}>{r.description || '—'}</td>
-                <td className="px-3 py-2.5 capitalize" style={{ color: C.ink }}>{r.status}</td>
-                <td className="px-3 py-2.5 capitalize" style={{ color: SEVERITY_COLOR[r.priority] || C.sub }}>{r.priority || '—'}</td>
-                <td className="px-3 py-2.5" style={{ color: C.ink }}>{personName(r.author_id)}</td>
-                <td className="px-3 py-2.5" style={{ color: C.ink }}>{personName(r.business_approver_id)}</td>
-              </tr>
-            ))}
+            ) : filtered.map((r) => {
+              const statusColor = STATUS_COLOR[r.status] || C.sub;
+              const priorityColor = SEVERITY_COLOR[r.priority] || C.sub;
+              return (
+                <tr key={r.id} className="border-b align-top" style={{ borderColor: C.border }}>
+                  <td className="px-3 py-2.5 font-semibold" style={{ color: C.ink }}>{initName(r.initiative_id)}</td>
+                  <td className="px-3 py-2.5" style={{ color: C.sub }}>{r.reference_number || '—'}</td>
+                  <td className="px-3 py-2.5" style={{ color: C.ink }}>{r.description || '—'}</td>
+                  <td className="px-3 py-2.5">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize" style={{ background: tint(statusColor, '22'), color: statusColor }}>
+                      {r.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {r.priority ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize" style={{ background: tint(priorityColor, '22'), color: priorityColor }}>
+                        {r.priority}
+                      </span>
+                    ) : '—'}
+                  </td>
+                  <td className="px-3 py-2.5" style={{ color: C.ink }}>{personName(r.author_id)}</td>
+                  <td className="px-3 py-2.5" style={{ color: C.ink }}>{personName(r.business_approver_id)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -385,22 +399,27 @@ export default function ReportsPanel() {
     <div className="flex-1 p-8 max-w-6xl w-full mx-auto overflow-y-auto" style={BODY}>
       {!active ? (
         <>
-          <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Reports — {activeWorkspace?.name}</h2>
-          <p className="text-sm mb-6" style={{ color: C.sub }}>Choose a report to run for this workspace.</p>
+          <div
+            className="rounded-3xl p-6 mb-7"
+            style={{ background: `linear-gradient(120deg, ${tint(C.purple, '14')}, ${tint(C.teal, '12')})` }}
+          >
+            <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Reports — {activeWorkspace?.name}</h2>
+            <p className="text-sm" style={{ color: C.sub }}>Choose a report to run for this workspace.</p>
+          </div>
           <div className="grid md:grid-cols-3 gap-4">
             {REPORTS.map((r) => (
               <button
                 key={r.key}
                 type="button"
                 onClick={() => setActive(r.key)}
-                className="text-left bg-white rounded-3xl border p-5 shadow-sm hover:shadow-md transition-shadow"
-                style={{ borderColor: C.border }}
+                className="text-left rounded-3xl p-5 text-white shadow-sm hover:opacity-95 transition-opacity"
+                style={{ background: r.color }}
               >
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center mb-3" style={{ background: tint(r.color, '18') }}>
-                  <r.icon size={18} style={{ color: r.color }} />
+                <div className="w-10 h-10 rounded-full bg-white/25 flex items-center justify-center mb-3">
+                  <r.icon size={18} />
                 </div>
-                <div className="text-sm font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>{r.title}</div>
-                <p className="text-xs" style={{ color: C.sub }}>{r.desc}</p>
+                <div className="text-sm font-extrabold mb-1" style={HEAD}>{r.title}</div>
+                <p className="text-xs opacity-90">{r.desc}</p>
               </button>
             ))}
           </div>

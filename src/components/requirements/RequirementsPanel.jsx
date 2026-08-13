@@ -85,8 +85,8 @@ export default function RequirementsPanel() {
                 ].filter(Boolean).join(' · ') || 'No linked impacts'}
                 tags={[
                   { label: getStatus(r), color: statusColor(getStatus(r)) },
-                  r.priority ? { label: r.priority, color: SEVERITY_COLOR[r.priority] || statusColor(r.priority) } : null,
-                ]}
+                  r.priority ? { label: String(r.priority), color: SEVERITY_COLOR[r.priority] || statusColor(r.priority) } : null,
+                ].filter(Boolean)}
                 avatars={[personName(r.author_id)].filter(Boolean)}
                 onClick={() => { setEditing(r); setModal('req'); }}
               />

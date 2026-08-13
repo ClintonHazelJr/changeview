@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Mail } from 'lucide-react';
 import { C, HEAD, BODY, inputClass, inputStyle, tint, initials } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { Field, SaveRow } from '../ui/shared';
 import Modal from '../ui/Modal';
+
+const ROLE_COLOR = { owner: C.purple, member: C.teal };
 
 export default function UsersPanel() {
   const { profile, session } = useAuth();
@@ -98,50 +100,74 @@ export default function UsersPanel() {
         <button
           type="button"
           onClick={() => { setModal(true); setError(''); setSelectedWs(workspaces[0] ? [workspaces[0].id] : []); }}
-          className="flex items-center gap-2 text-sm font-bold text-white px-4 py-2.5 rounded-full"
+          className="flex items-center gap-2 text-sm font-bold text-white px-4 py-2.5 rounded-full shadow-sm"
           style={{ background: C.purple }}
         >
           <UserPlus size={15} /> Invite user
         </button>
       </div>
 
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
+        <div className="rounded-3xl p-4 text-white" style={{ background: C.purple }}>
+          <div className="text-2xl font-extrabold" style={HEAD}>{rows.length}</div>
+          <div className="text-xs font-medium opacity-90">Total users</div>
+        </div>
+        <div className="rounded-3xl p-4 text-white" style={{ background: C.teal }}>
+          <div className="text-2xl font-extrabold" style={HEAD}>{rows.filter((u) => u.role === 'member').length}</div>
+          <div className="text-xs font-medium opacity-90">Members</div>
+        </div>
+      </div>
+
       {loading ? (
         <p className="text-sm" style={{ color: C.sub }}>Loading…</p>
+      ) : rows.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-3xl border border-dashed" style={{ borderColor: C.border }}>
+          <div className="text-sm" style={{ color: C.sub }}>No users yet.</div>
+        </div>
       ) : (
-        <div className="bg-white rounded-3xl border shadow-sm overflow-hidden" style={{ borderColor: C.border }}>
-          <div className="grid grid-cols-[1fr_120px_1.2fr] gap-3 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide border-b" style={{ color: C.sub, borderColor: C.border, background: C.bg }}>
-            <div>User</div>
-            <div>Role</div>
-            <div>Workspaces</div>
-          </div>
-          {rows.map((u) => (
-            <div
-              key={u.id}
-              className="grid grid-cols-[1fr_120px_1.2fr] gap-3 px-4 py-3 border-b items-center"
-              style={{ borderColor: C.border }}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0" style={{ background: C.purple }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {rows.map((u) => {
+            const roleColor = ROLE_COLOR[u.role] || C.sub;
+            return (
+              <div
+                key={u.id}
+                className="bg-white rounded-2xl p-4 shadow-sm border flex items-start gap-3"
+                style={{ borderColor: C.border }}
+              >
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                  style={{ background: roleColor }}
+                >
                   {initials(u.full_name || u.email)}
                 </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold truncate" style={{ color: C.ink }}>{u.full_name || '—'}</div>
-                  <div className="text-xs truncate" style={{ color: C.sub }}>{u.email}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <div className="text-sm font-bold truncate" style={{ color: C.ink }}>{u.full_name || '—'}</div>
+                    <span
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize shrink-0"
+                      style={{ background: tint(roleColor, '20'), color: roleColor }}
+                    >
+                      {u.role}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs truncate mb-1.5" style={{ color: C.sub }}>
+                    <Mail size={11} />{u.email}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {(u.workspaceNames || []).map((name) => (
+                      <span
+                        key={name}
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: tint(C.teal, '16'), color: C.teal }}
+                      >
+                        {name}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <div>
-                <span
-                  className="text-[11px] font-bold px-2 py-1 rounded-full capitalize"
-                  style={{ background: tint(u.role === 'owner' ? C.purple : C.teal, '18'), color: u.role === 'owner' ? C.purple : C.teal }}
-                >
-                  {u.role}
-                </span>
-              </div>
-              <div className="text-xs" style={{ color: C.ink }}>
-                {(u.workspaceNames || []).join(', ') || '—'}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
