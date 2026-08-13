@@ -31,30 +31,37 @@ export default function AuthCallbackPage() {
         const typeFromHash = hash.get('type');
         const type = typeFromQuery || typeFromHash || '';
         const next = params.get('next') || '';
+        const access_token = hash.get('access_token');
+        const refresh_token = hash.get('refresh_token');
 
-        if (code) {
-          const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeErr) throw exchangeErr;
+        // Prefer implicit-flow hash tokens (works across browsers/devices).
+        if (access_token && refresh_token) {
+          const { error: sessionErr } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+          if (sessionErr) throw sessionErr;
         } else if (tokenHash && type) {
           const { error: otpErr } = await supabase.auth.verifyOtp({
             token_hash: tokenHash,
             type,
           });
           if (otpErr) throw otpErr;
+        } else if (code) {
+          // Legacy PKCE links may still arrive; try exchange, then fail clearly.
+          const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeErr) {
+            throw new Error(
+              exchangeErr.message?.includes('PKCE') || exchangeErr.message?.includes('verifier')
+                ? 'This confirmation link needs to be opened again. Request a new email, or use the link in the same browser where you signed up.'
+                : exchangeErr.message,
+            );
+          }
         } else {
-          const access_token = hash.get('access_token');
-          const refresh_token = hash.get('refresh_token');
-          if (access_token && refresh_token) {
-            const { error: sessionErr } = await supabase.auth.setSession({
-              access_token,
-              refresh_token,
-            });
-            if (sessionErr) throw sessionErr;
-          } else {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-              throw new Error('This link is invalid or has expired. Try signing in again.');
-            }
+          // detectSessionInUrl may already have established a session from the hash
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            throw new Error('This link is invalid or has expired. Try signing in again.');
           }
         }
 

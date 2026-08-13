@@ -12,6 +12,8 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    flowType: 'pkce',
+    // SPA: email links often open in a different browser/device than signup.
+    // Implicit puts tokens in the URL hash (same pattern as /accept-invite).
+    flowType: 'implicit',
   },
 });
