@@ -41,6 +41,13 @@ export const STATUS_COLOR = {
 };
 export const TAG_OPTIONS = ['Training', 'Huddle', 'Email', 'Documentation'];
 
+/** DB keys stay tier_1 / tier_2; labels are product names. */
+export const PLAN_LABELS = {
+  tier_1: 'Sole Practitioner',
+  tier_2: 'Enterprise',
+};
+export const isEnterprisePlan = (tier) => tier === 'tier_2';
+
 export const inputClass = 'w-full border rounded-2xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent';
 export const inputStyle = { borderColor: C.border, color: C.ink };
 
@@ -51,7 +58,7 @@ export function formatReference(num) {
 export function parseDbError(err) {
   const msg = err?.message || err?.error_description || 'Something went wrong';
   if (msg.includes('Tier 1 accounts are limited')) {
-    return 'Tier 1 accounts are limited to a single Workspace. Upgrade to Tier 2 to add more.';
+    return 'Sole Practitioner plans are limited to a single Workspace. Upgrade to Enterprise to add more.';
   }
   return msg;
 }

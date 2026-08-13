@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Briefcase, ChevronDown, Check, Plus, Pencil,
 } from 'lucide-react';
-import { C, HEAD, BODY, tint, initials } from '../../lib/constants';
+import { C, HEAD, BODY, tint, initials, PLAN_LABELS } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import Modal from '../ui/Modal';
@@ -55,12 +55,12 @@ export default function TopNav({ onNavigate }) {
 
   return (
     <>
-      <div className="flex items-center gap-4 px-6 py-3.5 bg-white border-b shrink-0" style={{ ...BODY, borderColor: C.border }}>
-        <Link to="/app" className="font-extrabold tracking-tight text-lg no-underline" style={{ ...HEAD, color: C.ink }}>
+      <div className="relative flex items-center gap-4 px-6 py-3.5 bg-white border-b shrink-0" style={{ ...BODY, borderColor: C.border }}>
+        <Link to="/app" className="font-extrabold tracking-tight text-lg no-underline shrink-0" style={{ ...HEAD, color: C.ink }}>
           ChangeView
         </Link>
 
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             type="button"
             onClick={() => { setPickerOpen(!pickerOpen); setRenamingId(null); }}
@@ -77,10 +77,7 @@ export default function TopNav({ onNavigate }) {
                 Your Workspaces
               </div>
               {workspaces.map((w) => (
-                <div
-                  key={w.id}
-                  className="flex items-center gap-1 px-2 py-1 hover:bg-gray-50"
-                >
+                <div key={w.id} className="flex items-center gap-1 px-2 py-1 hover:bg-gray-50">
                   {renamingId === w.id ? (
                     <input
                       autoFocus
@@ -142,20 +139,24 @@ export default function TopNav({ onNavigate }) {
               )}
               {planTier === 'tier_1' && (
                 <div className="px-4 py-2 text-[11px] border-t" style={{ color: C.sub, borderColor: C.border }}>
-                  Tier 1 includes 1 workspace. Upgrade for unlimited.
+                  {PLAN_LABELS.tier_1} includes 1 workspace. Upgrade to {PLAN_LABELS.tier_2} for unlimited.
                 </div>
               )}
             </div>
           )}
         </div>
 
-        <GlobalSearch onNavigate={onNavigate} />
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4 pointer-events-none">
+          <div className="pointer-events-auto">
+            <GlobalSearch onNavigate={onNavigate} />
+          </div>
+        </div>
 
         <button
           type="button"
           onClick={() => onNavigate?.({ section: 'profile' })}
           title="Profile"
-          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+          className="ml-auto w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 relative z-10"
           style={{ background: C.purple }}
         >
           {initials(profile?.full_name || activeWorkspace?.name)}

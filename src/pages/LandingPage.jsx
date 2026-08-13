@@ -71,16 +71,16 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section className="px-8 py-16 max-w-4xl mx-auto">
+      <section id="pricing" className="px-8 py-16 max-w-4xl mx-auto">
         <h2 className="text-2xl font-extrabold text-center mb-3" style={{ ...HEAD, color: C.ink }}>Simple pricing</h2>
-        <p className="text-sm text-center mb-10" style={{ color: C.sub }}>Pick the tier that fits how you work.</p>
+        <p className="text-sm text-center mb-10" style={{ color: C.sub }}>Pick the plan that fits how you work.</p>
         <div className="grid md:grid-cols-2 gap-6">
           <div className="bg-white rounded-3xl p-8 border shadow-sm" style={{ borderColor: C.border }}>
-            <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>Tier 1</div>
+            <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>Sole Practitioner</div>
             <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>{TIER1_PRICE}<span className="text-base font-medium" style={{ color: C.sub }}>/mo</span></div>
-            <p className="text-sm mb-6" style={{ color: C.sub }}>One workspace, month-to-month.</p>
+            <p className="text-sm mb-6" style={{ color: C.sub }}>One workspace, one user, month-to-month.</p>
             <ul className="space-y-2 mb-8">
-              {['1 Workspace', 'System Admin & Initiatives', 'AI Comms Generator', 'Month-to-month billing'].map((f) => (
+              {['1 Workspace', '1 user (you)', 'System Admin & Initiatives', 'AI Comms Generator', 'Month-to-month billing'].map((f) => (
                 <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}><Check size={14} style={{ color: C.green }} /> {f}</li>
               ))}
             </ul>
@@ -88,12 +88,12 @@ export default function LandingPage() {
           </div>
           <div className="rounded-3xl p-8 border shadow-sm relative overflow-hidden" style={{ borderColor: C.purple, background: `linear-gradient(135deg, ${tint(C.purple, '08')}, #fff)` }}>
             <div className="absolute top-4 right-4 text-[10px] font-bold px-2 py-1 rounded-full text-white" style={{ background: C.purple }}>POPULAR</div>
-            <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>Tier 2</div>
+            <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>Enterprise</div>
             <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>{TIER2_MONTHLY}<span className="text-base font-medium" style={{ color: C.sub }}>/mo</span></div>
             <p className="text-sm mb-1" style={{ color: C.sub }}>or {TIER2_ANNUAL}/yr (save with annual)</p>
-            <p className="text-sm mb-6" style={{ color: C.sub }}>Unlimited workspaces. Unlocks Reports & Schedule.</p>
+            <p className="text-sm mb-6" style={{ color: C.sub }}>Unlimited workspaces, multi-user, Schedule & Reports.</p>
             <ul className="space-y-2 mb-8">
-              {['Unlimited Workspaces', 'Everything in Tier 1', 'Reports & Schedule', 'Monthly or annual billing'].map((f) => (
+              {['Unlimited Workspaces', 'Invite users & assign workspaces', 'Schedule (Gantt) & Reports', 'Everything in Sole Practitioner', 'Monthly or annual billing'].map((f) => (
                 <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}><Check size={14} style={{ color: C.green }} /> {f}</li>
               ))}
             </ul>

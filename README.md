@@ -24,6 +24,8 @@ npm install
 6. For severity “No Impact” + file attachments: run
    `supabase/migrations/004_severity_none_and_attachments.sql`, create a private Storage
    bucket named `attachments`, run `storage_policies.sql`, then re-run `rls_policies.sql`.
+7. For inviting Enterprise members into an existing account (instead of creating a new
+   tenancy): run `supabase/migrations/005_invite_member_provisioning.sql`.
 
 Without the signup trigger, Supabase Auth still creates `auth.users`, but the app tables stay
 empty and new users cannot load a workspace.
@@ -35,6 +37,7 @@ Copy `.env.example` to `.env.local` and fill in values:
 ```
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 ANTHROPIC_API_KEY=
 STRIPE_SECRET_KEY=
 STRIPE_PUBLISHABLE_KEY=

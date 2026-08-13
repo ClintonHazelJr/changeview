@@ -28,7 +28,7 @@ export default async function handler(req, res) {
   const { tier, billingCycle = 'monthly' } = req.body;
 
   if (tier === 'tier_1' && billingCycle !== 'monthly') {
-    return res.status(400).json({ error: 'Tier 1 is month-to-month only' });
+    return res.status(400).json({ error: 'Sole Practitioner is month-to-month only' });
   }
 
   const priceKey = tier === 'tier_1' ? 'tier_1_monthly' : `tier_2_${billingCycle}`;

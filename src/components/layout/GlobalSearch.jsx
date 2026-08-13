@@ -124,15 +124,15 @@ export default function GlobalSearch({ onNavigate }) {
   const showDropdown = open && query.trim().length >= 2;
 
   return (
-    <div className="flex-1 max-w-md ml-2 relative" ref={wrapRef} style={BODY}>
+    <div className="relative w-full" ref={wrapRef} style={BODY}>
       <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 z-10" style={{ color: C.sub }} />
       <input
         value={query}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         placeholder="Search initiatives, programs, people…"
-        className="w-full rounded-full text-sm pl-9 pr-3 py-1.5 outline-none"
-        style={{ background: C.bg, color: C.ink }}
+        className="w-full rounded-full text-sm pl-9 pr-3 py-1.5 outline-none border"
+        style={{ background: C.bg, color: C.ink, borderColor: C.border }}
       />
       {showDropdown && (
         <div

@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { C, BODY } from '../lib/constants';
+import { C, BODY, PLAN_LABELS, isEnterprisePlan } from '../lib/constants';
 import { useAuth } from '../contexts/AuthContext';
-import { WorkspaceProvider } from '../contexts/WorkspaceContext';
+import { WorkspaceProvider, useWorkspace } from '../contexts/WorkspaceContext';
 import TopNav from '../components/layout/TopNav';
 import AppSidebar from '../components/layout/AppSidebar';
 import SystemAdmin from '../components/admin/SystemAdmin';
@@ -13,8 +13,15 @@ import RequirementsPanel from '../components/requirements/RequirementsPanel';
 import SchedulePanel from '../components/schedule/SchedulePanel';
 import ReportsPanel from '../components/reports/ReportsPanel';
 import ProfilePanel from '../components/profile/ProfilePanel';
+import UsersPanel from '../components/users/UsersPanel';
+import UpgradePrompt from '../components/ui/UpgradePrompt';
 
 function AppShell() {
+  const { profile } = useAuth();
+  const { planTier } = useWorkspace();
+  const enterprise = isEnterprisePlan(planTier);
+  const isOwner = profile?.role === 'owner';
+
   const [section, setSection] = useState('dashboard');
   const [initiativeFocusId, setInitiativeFocusId] = useState(null);
   const [adminTabFocus, setAdminTabFocus] = useState(null);
@@ -43,9 +50,39 @@ function AppShell() {
       />
     );
   } else if (section === 'requirements') body = <RequirementsPanel />;
-  else if (section === 'schedule') body = <SchedulePanel />;
-  else if (section === 'reports') body = <ReportsPanel />;
-  else if (section === 'profile') body = <ProfilePanel />;
+  else if (section === 'schedule') {
+    body = enterprise
+      ? <SchedulePanel />
+      : <UpgradePrompt feature="Schedule" />;
+  } else if (section === 'reports') {
+    body = enterprise
+      ? <ReportsPanel />
+      : <UpgradePrompt feature="Reports" />;
+  } else if (section === 'users') {
+    if (!enterprise) {
+      body = (
+        <UpgradePrompt
+          feature="Users"
+          title="Multi-user access is Enterprise"
+          body={(
+            <>
+              {PLAN_LABELS.tier_1} is single-user. Upgrade to {PLAN_LABELS.tier_2} to invite
+              colleagues and assign them to workspaces.
+            </>
+          )}
+        />
+      );
+    } else if (!isOwner) {
+      body = (
+        <UpgradePrompt
+          title="Owners only"
+          body="Only the account owner can manage users and invitations on this account."
+        />
+      );
+    } else {
+      body = <UsersPanel />;
+    }
+  } else if (section === 'profile') body = <ProfilePanel />;
   else if (section === 'settings') {
     body = (
       <SystemAdmin
