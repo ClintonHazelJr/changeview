@@ -70,6 +70,12 @@ export default function ProfilePanel() {
   const [dangerError, setDangerError] = useState('');
   const [showCreateWs, setShowCreateWs] = useState(false);
   const [wipeNotice, setWipeNotice] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [passwordBusy, setPasswordBusy] = useState(false);
   const isOwner = profile?.role === 'owner';
   const accountName = profile?.accounts?.name || '';
 
@@ -106,6 +112,54 @@ export default function ProfilePanel() {
   const handleSignOut = async () => {
     await signOut();
     window.location.href = '/';
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    const email = profile?.email || session?.user?.email;
+    if (!email) {
+      setPasswordError('Could not determine your email.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New password and confirmation do not match.');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setPasswordError('New password must be different from your current password.');
+      return;
+    }
+
+    setPasswordBusy(true);
+    try {
+      const { error: verifyErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+      if (verifyErr) {
+        setPasswordError('Current password is incorrect');
+        return;
+      }
+
+      const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateErr) throw updateErr;
+
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordSuccess('Password updated successfully.');
+    } catch (err) {
+      setPasswordError(err.message || 'Could not update password.');
+    } finally {
+      setPasswordBusy(false);
+    }
   };
 
   const authHeaders = () => {
@@ -272,6 +326,55 @@ export default function ProfilePanel() {
           {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
           {saved && !error && <p className="text-xs mb-2" style={{ color: C.green }}>Saved.</p>}
           <SaveRow label="Save name" />
+        </form>
+      </div>
+
+      <div className="bg-white rounded-3xl border shadow-sm p-5 mb-4" style={{ borderColor: C.border }}>
+        <h3 className="text-sm font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Change password</h3>
+        <p className="text-xs mb-4" style={{ color: C.sub }}>
+          Enter your current password, then choose a new one (at least 8 characters).
+        </p>
+        <form onSubmit={handleChangePassword}>
+          <Field label="Current password">
+            <input
+              type="password"
+              required
+              autoComplete="current-password"
+              className={inputClass}
+              style={inputStyle}
+              value={currentPassword}
+              onChange={(e) => { setCurrentPassword(e.target.value); setPasswordError(''); setPasswordSuccess(''); }}
+            />
+          </Field>
+          <Field label="New password">
+            <input
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              className={inputClass}
+              style={inputStyle}
+              value={newPassword}
+              onChange={(e) => { setNewPassword(e.target.value); setPasswordError(''); setPasswordSuccess(''); }}
+            />
+          </Field>
+          <Field label="Confirm new password">
+            <input
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              className={inputClass}
+              style={inputStyle}
+              value={confirmPassword}
+              onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(''); setPasswordSuccess(''); }}
+            />
+          </Field>
+          {passwordError && <p className="text-xs mb-2" style={{ color: C.coral }}>{passwordError}</p>}
+          {passwordSuccess && !passwordError && (
+            <p className="text-xs mb-2" style={{ color: C.green }}>{passwordSuccess}</p>
+          )}
+          <SaveRow label={passwordBusy ? 'Updating…' : 'Update password'} disabled={passwordBusy} />
         </form>
       </div>
 
