@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, Target, MessageSquare, TrendingUp, Check, GraduationCap,
+  RefreshCw, Building2, Sparkles, Network, X,
 } from 'lucide-react';
 import { C, HEAD, BODY, tint } from '../lib/constants';
 
@@ -181,6 +182,59 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Built for — example scenarios, not testimonials */}
+      <section className="px-6 md:px-10 py-20" style={{ background: '#fff' }}>
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-2xl md:text-3xl font-extrabold text-center mb-3" style={{ ...HEAD, color: C.ink }}>
+            Built for
+          </h2>
+          <p className="text-sm text-center mb-12 max-w-xl mx-auto" style={{ color: C.sub }}>
+            A few situations ChangeView is built for:
+          </p>
+          <div className="grid md:grid-cols-2 gap-8">
+            {[
+              {
+                icon: RefreshCw,
+                color: C.coral,
+                title: 'New system rollout',
+                body: 'Migrating from one CRM, ERP, or collaboration suite to another? Scope who\'s affected, plan training by department, and draft comms in minutes instead of hours.',
+              },
+              {
+                icon: Building2,
+                color: C.purple,
+                title: 'Mergers and acquisitions',
+                body: 'Integration always means change. Track impact across every team the deal touches, on a deadline you don\'t control.',
+              },
+              {
+                icon: Sparkles,
+                color: C.teal,
+                title: 'AI tool adoption',
+                body: 'Rolling out a new AI tool across the org? Structure the training plan and the comms before resistance sets in.',
+              },
+              {
+                icon: Network,
+                color: C.amber,
+                title: 'Restructures and new operating models',
+                body: 'When reporting lines and processes shift, give every impacted team a clear picture of what\'s changing and why.',
+              },
+            ].map(({ icon: Icon, color, title, body }) => (
+              <div key={title} className="flex gap-4">
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ background: tint(color, '20') }}
+                >
+                  <Icon size={22} style={{ color }} />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold mb-1.5" style={{ ...HEAD, color: C.ink }}>{title}</h3>
+                  <p className="text-sm leading-relaxed" style={{ color: C.sub }}>{body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Pricing */}
       <section id="pricing" className="px-6 md:px-10 py-20" style={{ background: `linear-gradient(180deg, ${C.bg}, ${tint(C.purple, '08')})` }}>
         <div className="max-w-6xl mx-auto">
@@ -198,14 +252,19 @@ export default function LandingPage() {
               <p className="text-sm mb-6" style={{ color: C.sub }}>Billed monthly. One workspace, one user.</p>
               <ul className="space-y-2.5 mb-8 flex-1">
                 {[
-                  '1 Workspace',
-                  'Initiatives & Impacts',
-                  'Stakeholders & Learning Needs',
-                  'AI Comms Generator',
-                  'System Admin',
+                  { ok: true, text: '1 Workspace' },
+                  { ok: true, text: '1 User' },
+                  { ok: true, text: 'Reports' },
+                  { ok: true, text: 'Initiatives, Impacts & Requirements' },
+                  { ok: true, text: 'Stakeholders, Learning Needs & AI Comms' },
+                  { ok: false, text: 'Schedule' },
+                  { ok: false, text: 'Tasks' },
                 ].map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>
-                    <Check size={14} style={{ color: C.green }} /> {f}
+                  <li key={f.text} className="flex items-center gap-2 text-sm" style={{ color: f.ok ? C.ink : C.sub }}>
+                    {f.ok
+                      ? <Check size={14} style={{ color: C.green }} />
+                      : <X size={14} style={{ color: C.sub }} />}
+                    {f.text}
                   </li>
                 ))}
               </ul>
@@ -283,10 +342,11 @@ export default function LandingPage() {
                   )}
                   <ul className="space-y-2.5 mb-8 flex-1">
                     {[
+                      'Unlimited Workspaces',
+                      'Up to 5 Users',
+                      'Reports',
+                      'Tasks & Schedule',
                       'Everything in Solo',
-                      'Tasks, Schedule & Reports',
-                      'Invite Users & assign workspaces',
-                      'Multi-user collaboration',
                     ].map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>
                         <Check size={14} style={{ color: C.green }} /> {f}
@@ -324,10 +384,11 @@ export default function LandingPage() {
                   )}
                   <ul className="space-y-2.5 mb-8 flex-1">
                     {[
-                      'Everything in Small',
                       'Unlimited Workspaces',
-                      'Schedule (Gantt)',
-                      'Reports hub (requirements, CIA, heat map)',
+                      'Unlimited Users',
+                      'Reports',
+                      'Tasks & Schedule',
+                      'Everything in Small',
                       'Priority support',
                     ].map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>

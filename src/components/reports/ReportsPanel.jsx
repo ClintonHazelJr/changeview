@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ClipboardList, FileText, Grid3X3 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, ClipboardList, FileText, Grid3X3, Download, Loader2 } from 'lucide-react';
 import { C, HEAD, BODY, SEVERITY_COLOR, STATUS_COLOR, tint, isRatedSeverity } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { exportElementToPdf } from '../../lib/exportReportPdf';
 
 const SEV_SCORE = { none: 0, low: 1, medium: 2, high: 3 };
 const SEV_COLS = [
@@ -20,6 +21,7 @@ const REPORTS = [
     desc: 'Every requirement in this workspace, filterable by initiative and status.',
     icon: ClipboardList,
     color: C.amber,
+    file: 'requirements-list.pdf',
   },
   {
     key: 'cia',
@@ -27,6 +29,7 @@ const REPORTS = [
     desc: 'Document-style assessment of impacts and learning needs for one initiative.',
     icon: FileText,
     color: C.coral,
+    file: 'change-impact-assessment.pdf',
   },
   {
     key: 'heatmap',
@@ -34,18 +37,44 @@ const REPORTS = [
     desc: 'Departments × severity categories — where change pressure concentrates.',
     icon: Grid3X3,
     color: C.teal,
+    file: 'impact-heat-map.pdf',
   },
 ];
 
 function cellColor(score, max) {
   if (!score || !max) return C.bg;
   const t = Math.min(1, score / max);
-  // Mix white toward coral based on intensity
   const a = Math.round(18 + t * 70).toString(16).padStart(2, '0');
   return `${C.coral}${a}`;
 }
 
-function RequirementsReport({ workspaceId }) {
+function ExportBar({ exportRef, filename, disabled }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      type="button"
+      disabled={disabled || busy}
+      onClick={async () => {
+        if (!exportRef?.current) return;
+        setBusy(true);
+        try {
+          await exportElementToPdf(exportRef.current, filename);
+        } catch (err) {
+          alert(err.message || 'Export failed');
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="inline-flex items-center gap-1.5 text-sm font-bold text-white px-4 py-2 rounded-full disabled:opacity-50"
+      style={{ background: C.purple }}
+    >
+      {busy ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+      {busy ? 'Exporting…' : 'Export PDF'}
+    </button>
+  );
+}
+
+function RequirementsReport({ workspaceId, exportRef }) {
   const [rows, setRows] = useState([]);
   const [initiatives, setInitiatives] = useState([]);
   const [people, setPeople] = useState([]);
@@ -94,7 +123,11 @@ function RequirementsReport({ workspaceId }) {
           {['draft', 'approved', 'rejected'].map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
-      <div className="bg-white rounded-2xl border overflow-x-auto" style={{ borderColor: C.border }}>
+      <div ref={exportRef} className="bg-white rounded-2xl border overflow-x-auto p-4" style={{ borderColor: C.border }}>
+        <div className="mb-3 px-1">
+          <div className="text-[11px] font-bold uppercase tracking-wide" style={{ color: C.sub }}>ChangeView</div>
+          <h3 className="text-lg font-extrabold" style={{ ...HEAD, color: C.ink }}>Requirements list</h3>
+        </div>
         <table className="w-full text-sm text-left min-w-[900px]">
           <thead>
             <tr className="text-[11px] uppercase tracking-wide border-b" style={{ color: C.sub, borderColor: C.border, background: C.bg }}>
@@ -138,7 +171,7 @@ function RequirementsReport({ workspaceId }) {
   );
 }
 
-function CiaReport({ workspaceId }) {
+function CiaReport({ workspaceId, exportRef }) {
   const [initiatives, setInitiatives] = useState([]);
   const [initiativeId, setInitiativeId] = useState('');
   const [impacts, setImpacts] = useState([]);
@@ -149,7 +182,7 @@ function CiaReport({ workspaceId }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data } = await supabase.from('initiatives').select('id, name, description').eq('workspace_id', workspaceId).order('name');
+      const { data } = await supabase.from('initiatives').select('id, name, description, status, proposed_go_live_date').eq('workspace_id', workspaceId).order('name');
       if (cancelled) return;
       setInitiatives(data || []);
       if (data?.[0] && !initiativeId) setInitiativeId(data[0].id);
@@ -204,37 +237,67 @@ function CiaReport({ workspaceId }) {
       ) : !initiative ? (
         <p className="text-sm" style={{ color: C.sub }}>No initiatives in this workspace.</p>
       ) : (
-        <article className="bg-white rounded-3xl border shadow-sm p-8 max-w-3xl print:shadow-none" style={{ borderColor: C.border }}>
-          <header className="border-b pb-4 mb-6" style={{ borderColor: C.border }}>
-            <div className="text-[11px] font-bold uppercase tracking-wide mb-1" style={{ color: C.sub }}>Change Impact Assessment</div>
+        <article
+          ref={exportRef}
+          className="bg-white rounded-3xl border shadow-sm p-10 max-w-3xl"
+          style={{ borderColor: C.border }}
+        >
+          <header className="border-b pb-5 mb-8" style={{ borderColor: C.border }}>
+            <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: C.sub }}>
+              ChangeView · Change Impact Assessment
+            </div>
             <h3 className="text-2xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>{initiative.name}</h3>
+            <div className="flex flex-wrap gap-3 text-xs mb-3" style={{ color: C.sub }}>
+              {initiative.status && <span className="capitalize">Status: {initiative.status}</span>}
+              {initiative.proposed_go_live_date && (
+                <span>Proposed go-live: {initiative.proposed_go_live_date}</span>
+              )}
+              <span>Prepared {new Date().toLocaleDateString()}</span>
+            </div>
             {initiative.description && (
-              <p className="text-sm" style={{ color: C.sub }}>{initiative.description}</p>
+              <p className="text-sm leading-relaxed" style={{ color: C.ink }}>{initiative.description}</p>
             )}
           </header>
+
+          <section className="mb-8">
+            <h4 className="text-sm font-extrabold uppercase tracking-wide mb-2" style={{ ...HEAD, color: C.ink }}>
+              Executive summary
+            </h4>
+            <p className="text-sm leading-relaxed" style={{ color: C.sub }}>
+              This assessment covers {impacts.length} impact area{impacts.length === 1 ? '' : 's'} and {learning.length} learning need{learning.length === 1 ? '' : 's'}
+              {' '}for {initiative.name}. Use it to brief stakeholders on who is affected, how severely, and what training is planned.
+            </p>
+          </section>
 
           {impacts.length === 0 ? (
             <p className="text-sm" style={{ color: C.sub }}>No impacts recorded for this initiative.</p>
           ) : impacts.map((imp, idx) => {
             const linked = learning.filter((l) => l.impact_id === imp.id);
             return (
-              <section key={imp.id} className={`${idx > 0 ? 'border-t pt-6 mt-6' : ''}`} style={{ borderColor: C.border }}>
+              <section key={imp.id} className={`${idx > 0 ? 'border-t pt-7 mt-7' : ''}`} style={{ borderColor: C.border }}>
                 <h4 className="text-base font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
                   {idx + 1}. {deptName(imp.department_id)}
                   {imp.headcount_impacted != null && (
                     <span className="text-sm font-semibold ml-2" style={{ color: C.sub }}>· {imp.headcount_impacted} impacted</span>
                   )}
                 </h4>
+                {imp.status && (
+                  <div className="mb-2">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize" style={{ background: tint(STATUS_COLOR[imp.status] || C.sub, '22'), color: STATUS_COLOR[imp.status] || C.sub }}>
+                      {imp.status}
+                    </span>
+                  </div>
+                )}
                 {imp.impact_description && (
-                  <p className="text-sm mb-4" style={{ color: C.ink }}>{imp.impact_description}</p>
+                  <p className="text-sm mb-4 leading-relaxed" style={{ color: C.ink }}>{imp.impact_description}</p>
                 )}
                 <div className="grid md:grid-cols-2 gap-4 mb-4">
-                  <div>
+                  <div className="rounded-2xl p-3" style={{ background: C.bg }}>
                     <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Current state</div>
                     <p className="text-sm mb-1" style={{ color: C.ink }}><span style={{ color: C.sub }}>System:</span> {imp.current_state_system || '—'}</p>
                     <p className="text-sm" style={{ color: C.ink }}><span style={{ color: C.sub }}>Process:</span> {imp.current_state_process || '—'}</p>
                   </div>
-                  <div>
+                  <div className="rounded-2xl p-3" style={{ background: C.bg }}>
                     <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Future state</div>
                     <p className="text-sm mb-1" style={{ color: C.ink }}><span style={{ color: C.sub }}>System:</span> {imp.future_state_system || '—'}</p>
                     <p className="text-sm" style={{ color: C.ink }}><span style={{ color: C.sub }}>Process:</span> {imp.future_state_process || '—'}</p>
@@ -292,7 +355,7 @@ function CiaReport({ workspaceId }) {
   );
 }
 
-function HeatMapReport({ workspaceId }) {
+function HeatMapReport({ workspaceId, exportRef }) {
   const [cells, setCells] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -343,7 +406,11 @@ function HeatMapReport({ workspaceId }) {
   if (cells.length === 0) return <p className="text-sm" style={{ color: C.sub }}>No impacts to map yet.</p>;
 
   return (
-    <div className="bg-white rounded-2xl border overflow-x-auto" style={{ borderColor: C.border }}>
+    <div ref={exportRef} className="bg-white rounded-2xl border overflow-x-auto p-4" style={{ borderColor: C.border }}>
+      <div className="mb-3 px-1">
+        <div className="text-[11px] font-bold uppercase tracking-wide" style={{ color: C.sub }}>ChangeView</div>
+        <h3 className="text-lg font-extrabold" style={{ ...HEAD, color: C.ink }}>Impact heat map</h3>
+      </div>
       <table className="w-full text-sm min-w-[700px]">
         <thead>
           <tr className="border-b" style={{ borderColor: C.border, background: C.bg }}>
@@ -386,6 +453,8 @@ function HeatMapReport({ workspaceId }) {
 export default function ReportsPanel() {
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const [active, setActive] = useState(null);
+  const exportRef = useRef(null);
+  const meta = REPORTS.find((r) => r.key === active);
 
   if (!activeWorkspaceId) {
     return (
@@ -426,20 +495,24 @@ export default function ReportsPanel() {
         </>
       ) : (
         <>
-          <button
-            type="button"
-            onClick={() => setActive(null)}
-            className="flex items-center gap-1.5 text-xs font-semibold mb-4"
-            style={{ color: C.purple }}
-          >
-            <ArrowLeft size={14} /> All reports
-          </button>
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <button
+              type="button"
+              onClick={() => setActive(null)}
+              className="flex items-center gap-1.5 text-xs font-semibold"
+              style={{ color: C.purple }}
+            >
+              <ArrowLeft size={14} /> All reports
+            </button>
+            <div className="flex-1" />
+            <ExportBar exportRef={exportRef} filename={meta?.file || 'report.pdf'} />
+          </div>
           <h2 className="text-xl font-extrabold mb-4" style={{ ...HEAD, color: C.ink }}>
-            {REPORTS.find((r) => r.key === active)?.title}
+            {meta?.title}
           </h2>
-          {active === 'requirements' && <RequirementsReport workspaceId={activeWorkspaceId} />}
-          {active === 'cia' && <CiaReport workspaceId={activeWorkspaceId} />}
-          {active === 'heatmap' && <HeatMapReport workspaceId={activeWorkspaceId} />}
+          {active === 'requirements' && <RequirementsReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
+          {active === 'cia' && <CiaReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
+          {active === 'heatmap' && <HeatMapReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
         </>
       )}
     </div>

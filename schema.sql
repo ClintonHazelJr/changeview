@@ -425,6 +425,37 @@ create table hypercare (
   created_at timestamptz not null default now()
 );
 
+-- ---------- Tasks (belongs to Initiative; Kanban / Planning) ----------
+
+create table tasks (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  initiative_id uuid not null references initiatives(id) on delete cascade,
+  name text not null,
+  description text,
+  assignee_id uuid references people(id),
+  project_team_id uuid references project_teams(id),
+  status text not null default 'backlog'
+    check (status in ('backlog', 'ready', 'in_progress', 'blocked', 'done')),
+  priority text check (priority in ('low', 'medium', 'high')),
+  effort_estimate text,
+  start_date date,
+  finish_date date,
+  sprint text,
+  pi text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table task_requirements (
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  task_id uuid not null references tasks(id) on delete cascade,
+  requirement_id uuid not null references requirements(id) on delete cascade,
+  primary key (task_id, requirement_id)
+);
+
 -- ============================================================
 -- Indexes (query patterns: always filtered by account_id first,
 -- then usually by initiative_id or impact_id)
@@ -463,6 +494,11 @@ create index idx_programs_workspace on programs(workspace_id);
 create index idx_initiatives_workspace on initiatives(workspace_id);
 create index idx_impacts_workspace on impacts(workspace_id);
 create index idx_comms_workspace on comms(workspace_id);
+create index idx_tasks_workspace on tasks(workspace_id);
+create index idx_tasks_initiative on tasks(initiative_id);
+create index idx_tasks_status on tasks(status);
+create index idx_task_requirements_task on task_requirements(task_id);
+create index idx_task_requirements_requirement on task_requirements(requirement_id);
 
 -- ============================================================
 -- Row Level Security (Supabase)
@@ -482,6 +518,8 @@ alter table comms enable row level security;
 alter table hypercare enable row level security;
 alter table requirements enable row level security;
 alter table requirement_impacts enable row level security;
+alter table tasks enable row level security;
+alter table task_requirements enable row level security;
 alter table cost_entries enable row level security;
 alter table programs enable row level security;
 alter table organizations enable row level security;

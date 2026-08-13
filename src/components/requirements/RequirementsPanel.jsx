@@ -16,7 +16,7 @@ const STATUSES = [
 ];
 
 export default function RequirementsPanel() {
-  const { requirements, initiatives, people, impacts, saveRequirement } = useRequirements();
+  const { requirements, initiatives, people, impacts, tasks, saveRequirement } = useRequirements();
   const [modal, setModal] = useState(null);
   const [editing, setEditing] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
@@ -101,6 +101,7 @@ export default function RequirementsPanel() {
             initiatives={initiatives}
             people={people}
             impacts={impacts}
+            tasks={tasks}
             initial={editing}
             onSave={async (vals) => {
               await saveRequirement(vals, editing?.id || null);

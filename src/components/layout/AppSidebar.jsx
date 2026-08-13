@@ -13,7 +13,7 @@ const NAV = [
   { key: 'requirements', label: 'Requirements', icon: ClipboardList },
   { key: 'tasks', label: 'Tasks', icon: CheckSquare, paid: true },
   { key: 'schedule', label: 'Schedule', icon: CalendarRange, paid: true },
-  { key: 'reports', label: 'Reports', icon: BarChart3, paid: true },
+  { key: 'reports', label: 'Reports', icon: BarChart3 },
 ];
 
 export default function AppSidebar({ section, setSection }) {

@@ -7,8 +7,9 @@ export function statusColor(status) {
   return STATUS_COLOR[status] || C.sub;
 }
 
-export function ListTopBar({ title, addLabel, onAdd, addDisabled }) {
+export function ListTopBar({ title, addLabel, onAdd, addDisabled, viewMode = 'list', onViewChange }) {
   const { profile } = useAuth();
+  const boardEnabled = typeof onViewChange === 'function';
   return (
     <div
       className="flex items-center gap-3 px-6 py-3 bg-white border-b shrink-0"
@@ -18,18 +19,28 @@ export function ListTopBar({ title, addLabel, onAdd, addDisabled }) {
       <div className="flex items-center gap-0.5 rounded-lg p-0.5" style={{ background: C.bg }}>
         <button
           type="button"
+          onClick={() => onViewChange?.('list')}
           className="p-1.5 rounded-md"
-          style={{ background: '#fff', color: C.ink, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}
+          style={
+            viewMode === 'list'
+              ? { background: '#fff', color: C.ink, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
+              : { color: C.sub }
+          }
           title="List view"
         >
           <List size={15} />
         </button>
         <button
           type="button"
+          onClick={() => boardEnabled && onViewChange('board')}
           className="p-1.5 rounded-md"
-          style={{ color: C.sub }}
-          title="Board view (coming soon)"
-          disabled
+          style={
+            viewMode === 'board'
+              ? { background: '#fff', color: C.ink, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
+              : { color: C.sub }
+          }
+          title={boardEnabled ? 'Board view' : 'Board view (coming soon)'}
+          disabled={!boardEnabled}
         >
           <Columns3 size={15} />
         </button>
@@ -77,8 +88,8 @@ export function StatusFilterRow({ statuses, counts, active, onSelect, onAddStatu
         All · {Object.values(counts).reduce((a, b) => a + b, 0)}
       </button>
       {statuses.map((status) => {
-        const color = statusColor(status);
-        const selected = active === status;
+        const color = statusColor(status.key || status);
+        const selected = active === status.key;
         const Icon = status.icon;
         return (
           <button

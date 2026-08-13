@@ -60,9 +60,7 @@ function AppShell() {
       ? <SchedulePanel />
       : <UpgradePrompt feature="Schedule" />;
   } else if (section === 'reports') {
-    body = paid
-      ? <ReportsPanel />
-      : <UpgradePrompt feature="Reports" />;
+    body = <ReportsPanel />;
   } else if (section === 'users') {
     if (!paid) {
       body = (

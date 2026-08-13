@@ -314,7 +314,7 @@ export function FormProgram({ orgs, initial, onSave }) {
   );
 }
 
-export function FormRequirement({ initiatives, people, impacts, initial, onSave }) {
+export function FormRequirement({ initiatives, people, impacts, tasks = [], initial, onSave }) {
   const [vals, setVals] = useState({
     initiativeId: initial?.initiative_id || initiatives[0]?.id || '',
     description: initial?.description || '',
@@ -323,16 +323,26 @@ export function FormRequirement({ initiatives, people, impacts, initial, onSave 
     authorId: initial?.author_id || '',
     approverId: initial?.business_approver_id || '',
     impactIds: initial?.impactIds || [],
+    taskIds: initial?.taskIds || [],
   });
   const [error, setError] = useState('');
   const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
   const initiativeImpacts = impacts.filter((i) => i.initiative_id === vals.initiativeId);
+  const initiativeTasks = tasks.filter((t) => t.initiative_id === vals.initiativeId);
   const toggleImpact = (id) => {
     setVals((prev) => ({
       ...prev,
       impactIds: prev.impactIds.includes(id)
         ? prev.impactIds.filter((x) => x !== id)
         : [...prev.impactIds, id],
+    }));
+  };
+  const toggleTask = (id) => {
+    setVals((prev) => ({
+      ...prev,
+      taskIds: prev.taskIds.includes(id)
+        ? prev.taskIds.filter((x) => x !== id)
+        : [...prev.taskIds, id],
     }));
   };
   return (
@@ -391,8 +401,157 @@ export function FormRequirement({ initiatives, people, impacts, initial, onSave 
           </div>
         )}
       </Field>
+      <Field label="Linked Tasks">
+        {initiativeTasks.length === 0 ? (
+          <p className="text-xs" style={{ color: C.sub }}>No tasks on this Initiative yet.</p>
+        ) : (
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {initiativeTasks.map((task) => (
+              <label key={task.id} className="flex items-start gap-2 text-sm" style={{ color: C.ink }}>
+                <input
+                  type="checkbox"
+                  checked={vals.taskIds.includes(task.id)}
+                  onChange={() => toggleTask(task.id)}
+                  className="mt-1"
+                />
+                <span>{task.name} <span style={{ color: C.sub }}>({task.status?.replace('_', ' ') || 'backlog'})</span></span>
+              </label>
+            ))}
+          </div>
+        )}
+      </Field>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
       <SaveRow disabled={initiatives.length === 0} />
+    </form>
+  );
+}
+
+export function FormTask({
+  initiatives, people, teams, requirements, initial, onSave, onDelete,
+}) {
+  const [vals, setVals] = useState({
+    initiativeId: initial?.initiative_id || initiatives[0]?.id || '',
+    name: initial?.name || '',
+    description: initial?.description || '',
+    assigneeId: initial?.assignee_id || '',
+    projectTeamId: initial?.project_team_id || '',
+    status: initial?.status || 'backlog',
+    priority: initial?.priority || 'medium',
+    effortEstimate: initial?.effort_estimate || '',
+    startDate: initial?.start_date || '',
+    finishDate: initial?.finish_date || '',
+    sprint: initial?.sprint || '',
+    pi: initial?.pi || '',
+    requirementIds: initial?.requirementIds || [],
+  });
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
+  const initiativeReqs = requirements.filter((r) => r.initiative_id === vals.initiativeId);
+  const toggleReq = (id) => {
+    setVals((prev) => ({
+      ...prev,
+      requirementIds: prev.requirementIds.includes(id)
+        ? prev.requirementIds.filter((x) => x !== id)
+        : [...prev.requirementIds, id],
+    }));
+  };
+
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        setError('');
+        try {
+          if (!vals.initiativeId) throw new Error('Select an Initiative.');
+          if (!vals.name.trim()) throw new Error('Name is required.');
+          await onSave(vals);
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setSaving(false);
+        }
+      }}
+    >
+      <Field label="Initiative">
+        {initiatives.length === 0 ? (
+          <p className="text-xs" style={{ color: C.sub }}>Create an Initiative first.</p>
+        ) : (
+          <select className={inputClass} style={inputStyle} value={vals.initiativeId} onChange={set('initiativeId')} required>
+            {initiatives.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+          </select>
+        )}
+      </Field>
+      <Field label="Name">
+        <input className={inputClass} style={inputStyle} value={vals.name} onChange={set('name')} placeholder="e.g. Draft go-live comms" autoFocus />
+      </Field>
+      <Field label="Description">
+        <textarea rows={2} className={inputClass} style={inputStyle} value={vals.description} onChange={set('description')} />
+      </Field>
+      <div className="grid grid-cols-2 gap-4">
+        <PersonSelect label="Assignee" people={people} loading={false} value={vals.assigneeId} onChange={set('assigneeId')} />
+        <Field label="Project Team">
+          {teams.length === 0 ? (
+            <p className="text-xs" style={{ color: C.sub }}>Add Project Teams in Settings.</p>
+          ) : (
+            <select className={inputClass} style={inputStyle} value={vals.projectTeamId} onChange={set('projectTeamId')}>
+              <option value="">None</option>
+              {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Status">
+          <select className={inputClass} style={inputStyle} value={vals.status} onChange={set('status')}>
+            <option value="backlog">Backlog</option>
+            <option value="ready">Ready</option>
+            <option value="in_progress">In Progress</option>
+            <option value="blocked">Blocked</option>
+            <option value="done">Done</option>
+          </select>
+        </Field>
+        <Field label="Priority">
+          <select className={inputClass} style={inputStyle} value={vals.priority} onChange={set('priority')}>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </Field>
+      </div>
+      <Field label="Effort Estimate">
+        <input className={inputClass} style={inputStyle} value={vals.effortEstimate} onChange={set('effortEstimate')} placeholder="e.g. 3 points or 2 days" />
+      </Field>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Start Date"><input type="date" className={inputClass} style={inputStyle} value={vals.startDate} onChange={set('startDate')} /></Field>
+        <Field label="Finish Date"><input type="date" className={inputClass} style={inputStyle} value={vals.finishDate} onChange={set('finishDate')} /></Field>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Sprint"><input className={inputClass} style={inputStyle} value={vals.sprint} onChange={set('sprint')} placeholder="e.g. Sprint 12" /></Field>
+        <Field label="PI"><input className={inputClass} style={inputStyle} value={vals.pi} onChange={set('pi')} placeholder="e.g. PI 3" /></Field>
+      </div>
+      <Field label="Linked Requirements">
+        {initiativeReqs.length === 0 ? (
+          <p className="text-xs" style={{ color: C.sub }}>No requirements on this Initiative yet.</p>
+        ) : (
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {initiativeReqs.map((r) => (
+              <label key={r.id} className="flex items-start gap-2 text-sm" style={{ color: C.ink }}>
+                <input
+                  type="checkbox"
+                  checked={vals.requirementIds.includes(r.id)}
+                  onChange={() => toggleReq(r.id)}
+                  className="mt-1"
+                />
+                <span>{r.reference_number || 'Req'} — {r.description}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </Field>
+      {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
+      <SaveRow label={saving ? 'Saving…' : (initial?.id ? 'Save changes' : 'Save')} onDelete={onDelete} disabled={saving || initiatives.length === 0} />
     </form>
   );
 }

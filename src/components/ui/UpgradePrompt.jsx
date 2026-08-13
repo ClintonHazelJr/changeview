@@ -23,7 +23,7 @@ export default function UpgradePrompt({
             <>
               Your plan is <strong style={{ color: C.ink }}>{PLAN_LABELS.tier_1}</strong>.
               Upgrade to Small or <strong style={{ color: C.ink }}>{PLAN_LABELS.tier_2}</strong> for
-              Tasks, Schedule, Reports, unlimited workspaces, and multi-user access.
+              Tasks, Schedule, unlimited workspaces, and multi-user access.
             </>
           )}
         </p>

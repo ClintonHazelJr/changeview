@@ -38,6 +38,11 @@ export const STATUS_COLOR = {
   low: C.green,
   medium: C.amber,
   high: C.coral,
+  backlog: C.sub,
+  ready: C.purple,
+  in_progress: C.teal,
+  blocked: C.coral,
+  done: C.green,
 };
 export const TAG_OPTIONS = ['Training', 'Huddle', 'Email', 'Documentation'];
 
@@ -48,8 +53,16 @@ export const PLAN_LABELS = {
 };
 export const isSoloPlan = (tier) => tier === 'tier_1';
 export const isEnterprisePlan = (tier) => tier === 'tier_2';
-/** Schedule, Reports, Tasks, multi-user — not available on Solo. */
+/** Tasks, Schedule, multi-user — not available on Solo. Reports is on all tiers. */
 export const hasPaidPlanFeatures = (tier) => !isSoloPlan(tier);
+
+export const TASK_STATUSES = [
+  { key: 'backlog', label: 'Backlog' },
+  { key: 'ready', label: 'Ready' },
+  { key: 'in_progress', label: 'In Progress' },
+  { key: 'blocked', label: 'Blocked' },
+  { key: 'done', label: 'Done' },
+];
 
 export const inputClass = 'w-full border rounded-2xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent';
 export const inputStyle = { borderColor: C.border, color: C.ink };
