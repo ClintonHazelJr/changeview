@@ -12,7 +12,8 @@ function readHashParams() {
 
 /**
  * Handles Supabase Auth email redirects (confirm signup, recovery, etc.).
- * Invites should use /accept-invite directly; this still routes invite type there.
+ * Implicit flow: tokens arrive in the URL hash (same as /accept-invite).
+ * Never call exchangeCodeForSession — that requires a same-browser PKCE verifier.
  */
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -25,7 +26,6 @@ export default function AuthCallbackPage() {
     (async () => {
       try {
         const hash = readHashParams();
-        const code = params.get('code');
         const tokenHash = params.get('token_hash');
         const typeFromQuery = params.get('type');
         const typeFromHash = hash.get('type');
@@ -33,8 +33,8 @@ export default function AuthCallbackPage() {
         const next = params.get('next') || '';
         const access_token = hash.get('access_token');
         const refresh_token = hash.get('refresh_token');
+        const hasPkceCode = Boolean(params.get('code'));
 
-        // Prefer implicit-flow hash tokens (works across browsers/devices).
         if (access_token && refresh_token) {
           const { error: sessionErr } = await supabase.auth.setSession({
             access_token,
@@ -47,18 +47,11 @@ export default function AuthCallbackPage() {
             type,
           });
           if (otpErr) throw otpErr;
-        } else if (code) {
-          // Legacy PKCE links may still arrive; try exchange, then fail clearly.
-          const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeErr) {
-            throw new Error(
-              exchangeErr.message?.includes('PKCE') || exchangeErr.message?.includes('verifier')
-                ? 'This confirmation link needs to be opened again. Request a new email, or use the link in the same browser where you signed up.'
-                : exchangeErr.message,
-            );
-          }
+        } else if (hasPkceCode) {
+          throw new Error(
+            'This confirmation link is from an older signup format and cannot be completed in this browser. Sign up again (or request a new confirmation email) so a fresh link is sent.',
+          );
         } else {
-          // detectSessionInUrl may already have established a session from the hash
           const { data: { session } } = await supabase.auth.getSession();
           if (!session) {
             throw new Error('This link is invalid or has expired. Try signing in again.');

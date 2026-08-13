@@ -11,9 +11,10 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-    // SPA: email links often open in a different browser/device than signup.
-    // Implicit puts tokens in the URL hash (same pattern as /accept-invite).
+    // Do not auto-parse URL: with a leftover ?code= PKCE link, detectSessionInUrl
+    // calls exchangeCodeForSession and throws "PKCE code verifier not found".
+    // AuthCallback / AcceptInvite read hash tokens explicitly (implicit style).
+    detectSessionInUrl: false,
     flowType: 'implicit',
   },
 });
