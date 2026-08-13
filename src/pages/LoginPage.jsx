@@ -35,7 +35,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ ...BODY, background: C.bg }}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ ...BODY, background: C.bg }}>
+      <Link
+        to="/"
+        className="font-extrabold text-xl tracking-tight no-underline mb-5"
+        style={{ ...HEAD, color: C.ink }}
+      >
+        ChangeView
+      </Link>
       <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md border" style={{ borderColor: C.border }}>
         <h1 className="text-2xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
           {mode === 'reset' ? 'Reset password' : 'Welcome back'}

@@ -41,9 +41,20 @@ export default function SignupPage() {
     }
   };
 
+  const brandLink = (
+    <Link
+      to="/"
+      className="font-extrabold text-xl tracking-tight no-underline mb-5"
+      style={{ ...HEAD, color: C.ink }}
+    >
+      ChangeView
+    </Link>
+  );
+
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ ...BODY, background: C.bg }}>
+      <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ ...BODY, background: C.bg }}>
+        {brandLink}
         <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md border text-center" style={{ borderColor: C.border }}>
           <h1 className="text-xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>Check your email</h1>
           <p className="text-sm mb-4" style={{ color: C.sub }}>We sent a confirmation link to {email}. Once confirmed, log in to start your trial.</p>
@@ -54,7 +65,8 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ ...BODY, background: C.bg }}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ ...BODY, background: C.bg }}>
+      {brandLink}
       <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md border" style={{ borderColor: C.border }}>
         <h1 className="text-2xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Start your 7-day free trial</h1>
         <p className="text-sm mb-2" style={{ color: C.sub }}>
