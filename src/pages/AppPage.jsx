@@ -28,6 +28,7 @@ function AppShell() {
   const isOwner = profile?.role === 'owner';
   const [params, setParams] = useSearchParams();
   const [checkoutMsg, setCheckoutMsg] = useState('');
+  const [showPlanPicker, setShowPlanPicker] = useState(false);
 
   const [section, setSection] = useState('dashboard');
   const [initiativeFocusId, setInitiativeFocusId] = useState(null);
@@ -139,7 +140,10 @@ function AppShell() {
   return (
     <div className="min-h-screen w-full flex flex-col" style={{ ...BODY, background: C.bg }}>
       {trialExpired && <TrialEndedGate />}
-      <TopNav onNavigate={handleNavigate} />
+      {!trialExpired && showPlanPicker && (
+        <TrialEndedGate dismissible onClose={() => setShowPlanPicker(false)} />
+      )}
+      <TopNav onNavigate={handleNavigate} onChoosePlan={() => setShowPlanPicker(true)} />
       {checkoutMsg && (
         <div
           className="px-6 py-2 text-xs font-semibold text-center"

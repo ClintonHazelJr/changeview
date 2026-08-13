@@ -15,7 +15,8 @@ function formatUsd(n) {
   return `$${n.toLocaleString('en-US')}`;
 }
 
-export default function TrialEndedGate() {
+/** @param {{ dismissible?: boolean, onClose?: () => void }} props */
+export default function TrialEndedGate({ dismissible = false, onClose }) {
   const { session } = useAuth();
   const { planTier, reload } = useWorkspace();
   const [billingCycle, setBillingCycle] = useState('monthly');
@@ -40,12 +41,24 @@ export default function TrialEndedGate() {
 
   return (
     <div className="fixed inset-0 z-[100] overflow-y-auto" style={{ ...BODY, background: `linear-gradient(180deg, ${C.bg}, ${tint(C.purple, '12')})` }}>
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div className="max-w-5xl mx-auto px-6 py-12 relative">
+        {dismissible && onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-4 right-4 text-sm font-bold px-3 py-1.5 rounded-full"
+            style={{ color: C.sub, background: '#fff', border: `1px solid ${C.border}` }}
+          >
+            Back to app
+          </button>
+        )}
         <h1 className="text-2xl md:text-3xl font-extrabold text-center mb-2" style={{ ...HEAD, color: C.ink }}>
-          Your trial has ended
+          {dismissible ? 'Choose a plan to continue' : 'Your trial has ended'}
         </h1>
         <p className="text-sm text-center mb-2 max-w-lg mx-auto" style={{ color: C.sub }}>
-          Your data is safe. Choose a plan to keep working — pick up right where you left off.
+          {dismissible
+            ? 'You currently have full Enterprise-level access during your trial. After you subscribe, your selected plan limits apply.'
+            : 'Your data is safe. Choose a plan to keep working — pick up right where you left off.'}
         </p>
         <p className="text-xs text-center mb-8 font-semibold" style={{ color: C.purple }}>
           You started on {PLAN_LABELS[planTier] || planTier}

@@ -10,7 +10,7 @@ import Modal from '../ui/Modal';
 import { FormWorkspace } from '../forms/AdminForms';
 import GlobalSearch from './GlobalSearch';
 
-export default function TopNav({ onNavigate }) {
+export default function TopNav({ onNavigate, onChoosePlan }) {
   const { profile } = useAuth();
   const {
     workspaces, activeWorkspace, activeWorkspaceId, planTier,
@@ -24,6 +24,21 @@ export default function TopNav({ onNavigate }) {
   const [renameError, setRenameError] = useState('');
   const isOwner = profile?.role === 'owner';
   const trialUrgent = trialActive && trialDaysLeft <= 2;
+  const selectedPlanLabel = PLAN_LABELS[planTier] || planTier || 'your plan';
+
+  const trialBannerText = (() => {
+    if (!trialActive) return '';
+    if (trialDaysLeft === 0) {
+      return 'Trial ends today — choose a plan to keep your access.';
+    }
+    if (trialDaysLeft === 1) {
+      return 'Trial ends tomorrow — choose a plan to keep your access.';
+    }
+    if (trialUrgent) {
+      return `Trial: ${trialDaysLeft} days left — choose a plan soon to keep your access. You're currently on full Enterprise access; ${selectedPlanLabel} limits apply once you subscribe.`;
+    }
+    return `Trial: ${trialDaysLeft} days left — you're experiencing full Enterprise access (unlimited Workspaces, Schedule, Tasks, Reports). Your selected ${selectedPlanLabel} plan applies once you subscribe.`;
+  })();
 
   const handleCreateWorkspace = async (name) => {
     await createWorkspace(name);
@@ -59,7 +74,7 @@ export default function TopNav({ onNavigate }) {
     <>
       {trialActive && (
         <div
-          className="px-6 py-2 text-xs font-semibold text-center border-b shrink-0"
+          className="px-6 py-2.5 text-xs font-semibold text-center border-b shrink-0"
           style={{
             ...BODY,
             borderColor: trialUrgent ? tint(C.amber, '55') : C.border,
@@ -67,18 +82,19 @@ export default function TopNav({ onNavigate }) {
             color: trialUrgent ? C.ink : C.purple,
           }}
         >
-          {trialDaysLeft === 0
-            ? 'Your trial ends today'
-            : trialDaysLeft === 1
-              ? '1 day left in your trial'
-              : `${trialDaysLeft} days left in your trial`}
-          {' · '}
-          Full access while you evaluate ChangeView
-          {isOwner && (
-            <a href="/#pricing" className="ml-2 font-bold underline" style={{ color: 'inherit' }}>
-              View plans
-            </a>
-          )}
+          <span className="inline-block max-w-4xl leading-relaxed">
+            {trialBannerText}
+            {isOwner && onChoosePlan && (
+              <button
+                type="button"
+                onClick={onChoosePlan}
+                className="ml-2 font-bold underline whitespace-nowrap"
+                style={{ color: 'inherit' }}
+              >
+                {trialUrgent ? 'Choose a plan' : 'View plans'}
+              </button>
+            )}
+          </span>
         </div>
       )}
       <div className="relative flex items-center gap-4 px-6 py-3.5 bg-white border-b shrink-0" style={{ ...BODY, borderColor: C.border }}>
