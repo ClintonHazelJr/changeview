@@ -68,6 +68,18 @@ export function isTrialingActive(subscription) {
   return subscription?.status === 'trialing' && !isTrialExpired(subscription);
 }
 
+export function isPastDue(subscription) {
+  return subscription?.status === 'past_due';
+}
+
+/** Owner still needs Stripe Checkout (card for trial) before the sub exists. */
+export function needsCheckout(subscription) {
+  if (!subscription) return true;
+  if (subscription.status === 'incomplete') return true;
+  if (!subscription.stripe_subscription_id && subscription.status !== 'cancelled') return true;
+  return false;
+}
+
 export function trialDaysLeft(subscription) {
   if (!subscription?.trial_ends_at) return 0;
   const ms = new Date(subscription.trial_ends_at).getTime() - Date.now();
@@ -76,11 +88,13 @@ export function trialDaysLeft(subscription) {
 
 /**
  * Tasks, Schedule, multi-user — not on Solo when paid.
- * Active trials get full Enterprise-level access regardless of picked tier.
+ * Active Stripe trials get full Enterprise-level access regardless of picked tier.
  */
 export const hasPaidPlanFeatures = (tier, subscription = null) => {
   if (isTrialingActive(subscription)) return true;
-  if (subscription && isTrialExpired(subscription)) return false;
+  if (!subscription || subscription.status === 'incomplete' || isPastDue(subscription)) return false;
+  if (subscription.status === 'cancelled') return false;
+  if (isTrialExpired(subscription)) return false;
   return !isSoloPlan(tier);
 };
 

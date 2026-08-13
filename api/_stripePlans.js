@@ -76,9 +76,17 @@ export function mapStripeSubscriptionStatus(stripeStatus) {
       return 'cancelled';
     case 'trialing':
       return 'trialing';
+    case 'incomplete':
+      return 'incomplete';
     default:
       return null;
   }
+}
+
+/** Unix seconds → timestamptz ISO string (for trial_ends_at). */
+export function unixToIso(unixSeconds) {
+  if (!unixSeconds && unixSeconds !== 0) return null;
+  return new Date(Number(unixSeconds) * 1000).toISOString();
 }
 
 export function unixToDateString(unixSeconds) {

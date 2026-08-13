@@ -1,4 +1,4 @@
-/** Start Stripe Checkout for a marketing tier (solo | small | enterprise). */
+﻿/** Start Stripe Checkout for a marketing tier (solo | small | enterprise). */
 export async function startCheckout(tier, billingCycle = 'monthly', { accessToken } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
@@ -11,6 +11,22 @@ export async function startCheckout(tier, billingCycle = 'monthly', { accessToke
   const data = await res.json();
   if (!res.ok || !data.url) {
     throw new Error(data.error || 'Could not start checkout');
+  }
+  window.location.href = data.url;
+}
+
+/** Stripe Customer Portal for updating payment method. */
+export async function startBillingPortal({ accessToken } = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  const res = await fetch('/api/create-portal-session', {
+    method: 'POST',
+    headers,
+  });
+  const data = await res.json();
+  if (!res.ok || !data.url) {
+    throw new Error(data.error || 'Could not open billing portal');
   }
   window.location.href = data.url;
 }

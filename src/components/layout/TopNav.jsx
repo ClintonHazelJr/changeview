@@ -10,7 +10,7 @@ import Modal from '../ui/Modal';
 import { FormWorkspace } from '../forms/AdminForms';
 import GlobalSearch from './GlobalSearch';
 
-export default function TopNav({ onNavigate, onChoosePlan }) {
+export default function TopNav({ onNavigate }) {
   const { profile } = useAuth();
   const {
     workspaces, activeWorkspace, activeWorkspaceId, planTier,
@@ -29,15 +29,15 @@ export default function TopNav({ onNavigate, onChoosePlan }) {
   const trialBannerText = (() => {
     if (!trialActive) return '';
     if (trialDaysLeft === 0) {
-      return 'Trial ends today — choose a plan to keep your access.';
+      return `Trial ends today — your card will be charged for ${selectedPlanLabel} automatically.`;
     }
     if (trialDaysLeft === 1) {
-      return 'Trial ends tomorrow — choose a plan to keep your access.';
+      return `Trial ends tomorrow — your card will be charged for ${selectedPlanLabel} automatically.`;
     }
     if (trialUrgent) {
-      return `Trial: ${trialDaysLeft} days left — choose a plan soon to keep your access. You're currently on full Enterprise access; ${selectedPlanLabel} limits apply once you subscribe.`;
+      return `Trial: ${trialDaysLeft} days left — you're on full Enterprise access. ${selectedPlanLabel} billing starts when the trial ends (card already on file).`;
     }
-    return `Trial: ${trialDaysLeft} days left — you're experiencing full Enterprise access (unlimited Workspaces, Schedule, Tasks, Reports). Your selected ${selectedPlanLabel} plan applies once you subscribe.`;
+    return `Trial: ${trialDaysLeft} days left — you're experiencing full Enterprise access (unlimited Workspaces, Schedule, Tasks, Reports). Your selected ${selectedPlanLabel} plan applies when the trial ends.`;
   })();
 
   const handleCreateWorkspace = async (name) => {
@@ -84,16 +84,6 @@ export default function TopNav({ onNavigate, onChoosePlan }) {
         >
           <span className="inline-block max-w-4xl leading-relaxed">
             {trialBannerText}
-            {isOwner && onChoosePlan && (
-              <button
-                type="button"
-                onClick={onChoosePlan}
-                className="ml-2 font-bold underline whitespace-nowrap"
-                style={{ color: 'inherit' }}
-              >
-                {trialUrgent ? 'Choose a plan' : 'View plans'}
-              </button>
-            )}
           </span>
         </div>
       )}

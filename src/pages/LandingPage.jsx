@@ -246,7 +246,7 @@ export default function LandingPage() {
           <h2 className="text-2xl md:text-3xl font-extrabold text-center mb-3" style={{ ...HEAD, color: C.ink }}>Simple pricing</h2>
           <p className="text-sm text-center mb-2" style={{ color: C.sub }}>Start alone. Scale to your whole change practice.</p>
           <p className="text-xs text-center font-semibold mb-10" style={{ color: C.purple }}>
-            7-day free trial · No credit card required
+            7-day free trial · Card required · Charged only when the trial ends
           </p>
 
           <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-6 items-start">
@@ -283,7 +283,7 @@ export default function LandingPage() {
               >
                 Start your 7-day free trial
               </Link>
-              <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>No credit card required</p>
+              <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>Card required · $0 today</p>
             </div>
 
             {/* Small + Enterprise share a monthly/annual toggle */}
@@ -368,7 +368,7 @@ export default function LandingPage() {
                   >
                     Start your 7-day free trial
                   </Link>
-                  <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>No credit card required</p>
+                  <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>Card required · $0 today</p>
                 </div>
 
                 <div className="bg-white rounded-3xl p-8 border shadow-sm flex flex-col" style={{ borderColor: C.border }}>
@@ -411,7 +411,7 @@ export default function LandingPage() {
                   >
                     Start your 7-day free trial
                   </Link>
-                  <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>No credit card required</p>
+                  <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>Card required · $0 today</p>
                 </div>
               </div>
             </div>

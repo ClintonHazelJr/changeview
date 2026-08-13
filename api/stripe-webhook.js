@@ -4,6 +4,7 @@ import {
   planFromPriceId,
   mapStripeSubscriptionStatus,
   unixToDateString,
+  unixToIso,
   MARKETING_TO_DB,
 } from './_stripePlans.js';
 
@@ -80,6 +81,32 @@ async function applySubscriptionUpdate(admin, accountId, patch) {
   if (error) throw new Error(error.message);
 }
 
+/** Sync DB subscription fields from a Stripe Subscription object (source of truth). */
+function patchFromStripeSubscription(subscription, extras = {}) {
+  const fromPrice = planFromPriceId(priceIdFromSubscription(subscription));
+  const mappedStatus = mapStripeSubscriptionStatus(subscription.status);
+  const patch = {
+    stripe_subscription_id: subscription.id,
+    stripe_customer_id: customerIdFrom(subscription) || extras.stripeCustomerId || null,
+    current_period_end: unixToDateString(subscription.current_period_end),
+    trial_ends_at: subscription.trial_end ? unixToIso(subscription.trial_end) : null,
+    ...extras.extraPatch,
+  };
+  if (mappedStatus) patch.status = mappedStatus;
+  if (mappedStatus === 'active') {
+    // Trial converted successfully — clear trial end for banner logic.
+    patch.trial_ends_at = null;
+  }
+  if (fromPrice) {
+    patch.plan_tier = fromPrice.planTier;
+    patch.billing_cycle = fromPrice.planTier === 'tier_1' ? 'monthly' : fromPrice.billingCycle;
+  } else if (extras.planTier) {
+    patch.plan_tier = extras.planTier;
+    patch.billing_cycle = extras.billingCycle || 'monthly';
+  }
+  return patch;
+}
+
 async function handleCheckoutCompleted(admin, session) {
   const accountId = session.metadata?.account_id || session.client_reference_id;
   if (!accountId) {
@@ -93,31 +120,26 @@ async function handleCheckoutCompleted(admin, session) {
     const subId = typeof subRef === 'string' ? subRef : subRef.id;
     stripeSub = await stripe.subscriptions.retrieve(subId);
   }
+  if (!stripeSub) {
+    console.warn('checkout.session.completed missing subscription', session.id);
+    return;
+  }
 
-  const priceId = priceIdFromSubscription(stripeSub);
-  const fromPrice = planFromPriceId(priceId);
-  const marketingTier = session.metadata?.tier || fromPrice?.marketingTier || 'solo';
-  const planTier = fromPrice?.planTier
-    || MARKETING_TO_DB[marketingTier]
-    || MARKETING_TO_DB[session.metadata?.plan_tier]
-    || 'tier_1';
-  let billingCycle = fromPrice?.billingCycle
-    || session.metadata?.billing_cycle
-    || 'monthly';
+  const marketingTier = session.metadata?.tier;
+  const planTier = MARKETING_TO_DB[marketingTier] || MARKETING_TO_DB[session.metadata?.plan_tier];
+  let billingCycle = session.metadata?.billing_cycle || 'monthly';
   if (planTier === 'tier_1') billingCycle = 'monthly';
 
-  await applySubscriptionUpdate(admin, accountId, {
-    status: 'active',
-    trial_ends_at: null,
-    plan_tier: planTier,
-    billing_cycle: billingCycle,
-    stripe_customer_id: customerIdFrom(session) || customerIdFrom(stripeSub),
-    stripe_subscription_id: stripeSub?.id || subscriptionIdFrom(session),
-    current_period_end: unixToDateString(stripeSub?.current_period_end),
+  const patch = patchFromStripeSubscription(stripeSub, {
+    stripeCustomerId: customerIdFrom(session),
+    planTier,
+    billingCycle,
   });
+
+  await applySubscriptionUpdate(admin, accountId, patch);
 }
 
-async function handleSubscriptionUpdated(admin, subscription) {
+async function handleSubscriptionSync(admin, subscription) {
   const accountId = subscription.metadata?.account_id || null;
   const row = await findSubscriptionRow(admin, {
     accountId,
@@ -125,24 +147,11 @@ async function handleSubscriptionUpdated(admin, subscription) {
     stripeCustomerId: customerIdFrom(subscription),
   });
   if (!row) {
-    console.warn('customer.subscription.updated: no matching subscriptions row', subscription.id);
+    console.warn('subscription sync: no matching subscriptions row', subscription.id);
     return;
   }
 
-  const fromPrice = planFromPriceId(priceIdFromSubscription(subscription));
-  const mappedStatus = mapStripeSubscriptionStatus(subscription.status);
-  const patch = {
-    stripe_subscription_id: subscription.id,
-    stripe_customer_id: customerIdFrom(subscription) || row.stripe_customer_id,
-    current_period_end: unixToDateString(subscription.current_period_end),
-  };
-  if (mappedStatus) patch.status = mappedStatus;
-  if (mappedStatus === 'active') patch.trial_ends_at = null;
-  if (fromPrice) {
-    patch.plan_tier = fromPrice.planTier;
-    patch.billing_cycle = fromPrice.planTier === 'tier_1' ? 'monthly' : fromPrice.billingCycle;
-  }
-
+  const patch = patchFromStripeSubscription(subscription);
   await applySubscriptionUpdate(admin, row.account_id, patch);
 }
 
@@ -161,6 +170,7 @@ async function handleSubscriptionDeleted(admin, subscription) {
     stripe_subscription_id: subscription.id,
     stripe_customer_id: customerIdFrom(subscription) || row.stripe_customer_id,
     current_period_end: unixToDateString(subscription.current_period_end) || row.current_period_end,
+    trial_ends_at: null,
   });
 }
 
@@ -222,8 +232,9 @@ export default async function handler(req, res) {
       case 'checkout.session.completed':
         await handleCheckoutCompleted(admin, event.data.object);
         break;
+      case 'customer.subscription.created':
       case 'customer.subscription.updated':
-        await handleSubscriptionUpdated(admin, event.data.object);
+        await handleSubscriptionSync(admin, event.data.object);
         break;
       case 'customer.subscription.deleted':
         await handleSubscriptionDeleted(admin, event.data.object);

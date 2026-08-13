@@ -42,7 +42,7 @@ create table subscriptions (
   -- Solo=tier_1, Small=small, Enterprise=tier_2
   plan_tier text not null check (plan_tier in ('tier_1', 'small', 'tier_2')),
   billing_cycle text not null default 'monthly' check (billing_cycle in ('monthly', 'annual')),
-  status text not null default 'trialing' check (status in ('trialing', 'active', 'cancelled', 'past_due')),
+  status text not null default 'incomplete' check (status in ('incomplete', 'trialing', 'active', 'cancelled', 'past_due')),
   trial_ends_at timestamptz,
   current_period_end date,
   stripe_customer_id text,

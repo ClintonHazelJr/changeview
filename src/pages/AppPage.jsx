@@ -16,19 +16,19 @@ import ProfilePanel from '../components/profile/ProfilePanel';
 import UsersPanel from '../components/users/UsersPanel';
 import TasksPanel from '../components/tasks/TasksPanel';
 import UpgradePrompt from '../components/ui/UpgradePrompt';
-import TrialEndedGate from '../components/ui/TrialEndedGate';
+import BillingGate from '../components/ui/BillingGate';
 
 function AppShell() {
   const { profile, session } = useAuth();
   const {
     hasPaidFeatures: paid,
-    trialExpired,
+    pastDue,
+    needsCheckout: checkoutNeeded,
     reload,
   } = useWorkspace();
   const isOwner = profile?.role === 'owner';
   const [params, setParams] = useSearchParams();
   const [checkoutMsg, setCheckoutMsg] = useState('');
-  const [showPlanPicker, setShowPlanPicker] = useState(false);
 
   const [section, setSection] = useState('dashboard');
   const [initiativeFocusId, setInitiativeFocusId] = useState(null);
@@ -37,7 +37,7 @@ function AppShell() {
   useEffect(() => {
     const checkout = params.get('checkout');
     if (checkout === 'cancelled') {
-      setCheckoutMsg('Checkout cancelled — your trial status is unchanged.');
+      setCheckoutMsg('Checkout cancelled — add a card to start your trial.');
       params.delete('checkout');
       setParams(params, { replace: true });
       return undefined;
@@ -60,7 +60,11 @@ function AppShell() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Could not activate plan');
         if (!cancelled) {
-          setCheckoutMsg('Subscription activated. Welcome back.');
+          setCheckoutMsg(
+            data.status === 'trialing'
+              ? 'Trial started — you will not be charged until it ends.'
+              : 'Subscription activated. Welcome back.',
+          );
           await reload();
         }
       } catch (err) {
@@ -144,13 +148,14 @@ function AppShell() {
     );
   }
 
+  const showIncompleteGate = isOwner && checkoutNeeded && !pastDue;
+  const showPastDueGate = isOwner && pastDue;
+
   return (
     <div className="min-h-screen w-full flex flex-col" style={{ ...BODY, background: C.bg }}>
-      {trialExpired && <TrialEndedGate />}
-      {!trialExpired && showPlanPicker && (
-        <TrialEndedGate dismissible onClose={() => setShowPlanPicker(false)} />
-      )}
-      <TopNav onNavigate={handleNavigate} onChoosePlan={() => setShowPlanPicker(true)} />
+      {showIncompleteGate && <BillingGate mode="incomplete" />}
+      {showPastDueGate && <BillingGate mode="past_due" />}
+      <TopNav onNavigate={handleNavigate} />
       {checkoutMsg && (
         <div
           className="px-6 py-2 text-xs font-semibold text-center"

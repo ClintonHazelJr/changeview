@@ -5,7 +5,8 @@ import {
   parseDbError,
   hasPaidPlanFeatures,
   isTrialingActive,
-  isTrialExpired,
+  isPastDue,
+  needsCheckout,
   trialDaysLeft,
 } from '../lib/constants';
 
@@ -40,7 +41,7 @@ export function WorkspaceProvider({ children }) {
 
     const { data: sub } = await supabase
       .from('subscriptions')
-      .select('plan_tier, billing_cycle, status, trial_ends_at, stripe_subscription_id, current_period_end')
+      .select('plan_tier, billing_cycle, status, trial_ends_at, stripe_subscription_id, stripe_customer_id, current_period_end')
       .eq('account_id', profile.account_id)
       .maybeSingle();
 
@@ -99,7 +100,8 @@ export function WorkspaceProvider({ children }) {
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
 
   const trialActive = isTrialingActive(subscription);
-  const trialExpired = isTrialExpired(subscription);
+  const pastDue = isPastDue(subscription);
+  const checkoutNeeded = needsCheckout(subscription);
   const daysLeft = trialDaysLeft(subscription);
   const paidFeatures = hasPaidPlanFeatures(planTier, subscription);
 
@@ -111,7 +113,8 @@ export function WorkspaceProvider({ children }) {
       planTier,
       subscription,
       trialActive,
-      trialExpired,
+      pastDue,
+      needsCheckout: checkoutNeeded,
       trialDaysLeft: daysLeft,
       hasPaidFeatures: paidFeatures,
       loading,

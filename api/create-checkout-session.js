@@ -51,6 +51,7 @@ export default async function handler(req, res) {
   let accountId = null;
   let customerEmail = null;
   let stripeCustomerId = null;
+  let addTrial = true;
 
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
@@ -69,10 +70,12 @@ export default async function handler(req, res) {
           accountId = caller.account_id;
           const { data: sub } = await admin
             .from('subscriptions')
-            .select('stripe_customer_id')
+            .select('stripe_customer_id, stripe_subscription_id, status')
             .eq('account_id', accountId)
             .maybeSingle();
           stripeCustomerId = sub?.stripe_customer_id || null;
+          // Only first Checkout gets a trial; existing Stripe subs are plan changes.
+          if (sub?.stripe_subscription_id) addTrial = false;
         }
       }
     }
@@ -94,8 +97,11 @@ export default async function handler(req, res) {
       cancel_url: accountId ? `${origin}/app?checkout=cancelled` : `${origin}/?checkout=cancelled`,
       client_reference_id: accountId || undefined,
       metadata: meta,
+      // Always collect a card, even when the subscription starts with a $0 trial.
+      payment_method_collection: 'always',
       subscription_data: {
         metadata: meta,
+        ...(addTrial ? { trial_period_days: 7 } : {}),
       },
     };
 
@@ -110,6 +116,7 @@ export default async function handler(req, res) {
       url: session.url,
       plan: DB_TO_MARKETING[planTier] || tier,
       billingCycle,
+      trial: addTrial,
     });
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Checkout failed' });

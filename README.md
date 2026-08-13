@@ -55,9 +55,11 @@ STRIPE_PRICE_ENTERPRISE_ANNUAL=     # $2,990 / year
 ```
 
 Webhook endpoint (Stripe Dashboard → Developers → Webhooks): `https://<your-domain>/api/stripe-webhook`  
-Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`.
+Events: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`.
 
-Add the same variable names in Vercel project settings for deployment. Also apply migration `010_stripe_customer_id.sql` so Checkout can store `stripe_customer_id`, and `011_account_deleted_at.sql` for account soft-delete.
+Signup goes through Stripe Checkout with `trial_period_days: 7` (card on file, $0 today). Enable the Stripe Customer Portal for payment-method updates (`/api/create-portal-session`).
+
+Also apply: `010_stripe_customer_id.sql`, `011_account_deleted_at.sql`, and `012_stripe_managed_trials.sql` (new accounts start as `incomplete` until Checkout completes).
 
 ### Auth redirect URLs (Supabase Dashboard → Authentication → URL Configuration)
 

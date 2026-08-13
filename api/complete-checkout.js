@@ -1,14 +1,15 @@
 import Stripe from 'stripe';
 import { adminClient, setCors, requireAccountOwner } from './_adminAuth.js';
 import {
-  planFromPriceId, MARKETING_TO_DB, unixToDateString,
+  planFromPriceId, MARKETING_TO_DB, unixToDateString, unixToIso, mapStripeSubscriptionStatus,
 } from './_stripePlans.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 /**
- * Optimistic activation after Checkout redirect.
- * The Stripe webhook is the source of truth; this endpoint unblocks the UI quickly.
+ * Optimistic sync after Checkout redirect.
+ * Webhook remains source of truth; this unblocks the UI quickly.
+ * Trial checkouts often have payment_status = no_payment_required.
  */
 export default async function handler(req, res) {
   setCors(res);
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: err.message || 'Invalid checkout session' });
   }
 
-  if (session.payment_status !== 'paid' && session.status !== 'complete') {
+  if (session.status !== 'complete') {
     return res.status(400).json({ error: 'Checkout is not complete yet' });
   }
 
@@ -47,7 +48,18 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Checkout session does not belong to this account' });
   }
 
-  const stripeSub = typeof session.subscription === 'object' ? session.subscription : null;
+  let stripeSub = typeof session.subscription === 'object' ? session.subscription : null;
+  if (!stripeSub && typeof session.subscription === 'string') {
+    try {
+      stripeSub = await stripe.subscriptions.retrieve(session.subscription);
+    } catch (err) {
+      return res.status(400).json({ error: err.message || 'Could not load subscription' });
+    }
+  }
+  if (!stripeSub) {
+    return res.status(400).json({ error: 'Checkout session has no subscription' });
+  }
+
   const priceId = stripeSub?.items?.data?.[0]?.price?.id || null;
   const fromPrice = planFromPriceId(priceId);
   const marketingTier = session.metadata?.tier || fromPrice?.marketingTier || 'solo';
@@ -58,27 +70,27 @@ export default async function handler(req, res) {
   const stripeCustomerId = typeof session.customer === 'string'
     ? session.customer
     : session.customer?.id || null;
-  const stripeSubscriptionId = typeof session.subscription === 'string'
-    ? session.subscription
-    : stripeSub?.id || null;
+  const mappedStatus = mapStripeSubscriptionStatus(stripeSub.status) || 'trialing';
 
   const { error: updateErr } = await admin
     .from('subscriptions')
     .update({
       plan_tier: planTier,
       billing_cycle: billingCycle,
-      status: 'active',
-      trial_ends_at: null,
+      status: mappedStatus,
+      trial_ends_at: mappedStatus === 'active'
+        ? null
+        : (stripeSub.trial_end ? unixToIso(stripeSub.trial_end) : null),
       stripe_customer_id: stripeCustomerId,
-      stripe_subscription_id: stripeSubscriptionId,
-      current_period_end: unixToDateString(stripeSub?.current_period_end),
+      stripe_subscription_id: stripeSub.id,
+      current_period_end: unixToDateString(stripeSub.current_period_end),
       updated_at: new Date().toISOString(),
     })
     .eq('account_id', caller.account_id);
 
   if (updateErr) {
-    return res.status(500).json({ error: updateErr.message || 'Failed to activate subscription' });
+    return res.status(500).json({ error: updateErr.message || 'Failed to sync subscription' });
   }
 
-  return res.status(200).json({ ok: true, planTier, billingCycle });
+  return res.status(200).json({ ok: true, planTier, billingCycle, status: mappedStatus });
 }
