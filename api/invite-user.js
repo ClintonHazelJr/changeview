@@ -73,15 +73,19 @@ export default async function handler(req, res) {
 
   const defaultWorkspaceId = workspaceIds[0];
   const fullName = email.split('@')[0];
+  const origin = req.headers.origin
+    || (req.headers.referer ? String(req.headers.referer).replace(/\/$/, '') : '')
+    || 'http://localhost:5173';
+  const redirectTo = `${origin.replace(/\/$/, '')}/accept-invite`;
 
   const { data: invited, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
+    redirectTo,
     data: {
       full_name: fullName,
       invited_to_account_id: caller.account_id,
       default_workspace_id: defaultWorkspaceId,
     },
   });
-
   if (inviteErr) {
     return res.status(400).json({ error: inviteErr.message || 'Invite failed' });
   }
