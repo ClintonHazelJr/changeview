@@ -1,4 +1,4 @@
-import { adminClient, setCors, requireAccountOwner, LONG_BAN } from './_adminAuth.js';
+import { adminClient, setCors, requireAccountOwner, banAuthUser, unbanAuthUser } from './_adminAuth.js';
 
 export default async function handler(req, res) {
   setCors(res);
@@ -34,17 +34,9 @@ export default async function handler(req, res) {
   }
 
   // 1) Ban Auth login (blocks new sessions / refresh once ban is applied).
-  const { error: banErr } = await admin.auth.admin.updateUserById(userId, {
-    ban_duration: LONG_BAN,
-  });
+  const { error: banErr } = await banAuthUser(admin, userId);
   if (banErr) {
     return res.status(500).json({ error: banErr.message || 'Failed to ban auth user' });
-  }
-
-  try {
-    await admin.auth.admin.signOut(userId, 'global');
-  } catch {
-    // Optional — ban is enough if signOut is unavailable.
   }
 
   // 2) Soft-deactivate (DB may reject if this is the only owner).
@@ -56,7 +48,7 @@ export default async function handler(req, res) {
 
   if (updateErr) {
     // Roll back ban so they are not stuck banned while still "active" in app data.
-    await admin.auth.admin.updateUserById(userId, { ban_duration: 'none' });
+    await unbanAuthUser(admin, userId);
     return res.status(400).json({ error: updateErr.message || 'Could not deactivate user' });
   }
 

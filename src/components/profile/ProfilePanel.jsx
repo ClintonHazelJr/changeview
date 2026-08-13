@@ -204,7 +204,12 @@ export default function ProfilePanel() {
         body: JSON.stringify({ confirm }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not delete account');
+      if (!res.ok) {
+        const detail = Array.isArray(data.banFailures) && data.banFailures.length
+          ? ` (${data.banFailures.map((f) => f.message).join('; ')})`
+          : '';
+        throw new Error(`${data.error || 'Could not delete account'}${detail}`);
+      }
       await signOut();
       window.location.href = '/?account=deleted';
     } catch (err) {

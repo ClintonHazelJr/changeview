@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { adminClient, setCors, requireAccountOwner, LONG_BAN } from './_adminAuth.js';
+import { adminClient, setCors, requireAccountOwner, banAuthUser } from './_adminAuth.js';
 import { wipeAccountWorkspaces } from './_accountWipe.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
@@ -7,6 +7,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 /**
  * Owner-only: cancel Stripe, ban all users, soft-delete account, wipe workspaces.
  * Body: { confirm: 'DELETE' }
+ *
+ * Auth bans must succeed before soft-delete. The Admin API returns { error }
+ * rather than throwing — always check that field.
  */
 export default async function handler(req, res) {
   setCors(res);
@@ -47,7 +50,6 @@ export default async function handler(req, res) {
     try {
       await stripe.subscriptions.cancel(sub.stripe_subscription_id);
     } catch (err) {
-      // Already cancelled in Stripe is fine; other errors should block.
       const msg = String(err?.message || '');
       const code = err?.code || err?.raw?.code;
       if (code !== 'resource_missing' && !/no such subscription/i.test(msg) && !/already canceled/i.test(msg)) {
@@ -57,7 +59,7 @@ export default async function handler(req, res) {
   }
 
   if (sub) {
-    await admin
+    const { error: subErr } = await admin
       .from('subscriptions')
       .update({
         status: 'cancelled',
@@ -65,36 +67,69 @@ export default async function handler(req, res) {
         updated_at: new Date().toISOString(),
       })
       .eq('account_id', caller.account_id);
+    if (subErr) {
+      console.error('[delete-account] subscription status update failed', subErr.message);
+    }
   }
 
-  // 2) Ban every user on the account in Auth + mark inactive.
+  // 2) Ban every Auth user on the account — must succeed before soft-delete.
   const { data: users, error: usersErr } = await admin
     .from('users')
-    .select('id')
+    .select('id, email')
     .eq('account_id', caller.account_id);
   if (usersErr) {
     return res.status(500).json({ error: usersErr.message || 'Could not list users' });
   }
-
-  for (const u of users || []) {
-    try {
-      await admin.auth.admin.updateUserById(u.id, { ban_duration: LONG_BAN });
-    } catch (err) {
-      console.error('Failed to ban user', u.id, err?.message);
-    }
-    try {
-      await admin.auth.admin.signOut(u.id, 'global');
-    } catch {
-      // optional
-    }
+  if (!users?.length) {
+    console.error('[delete-account] no users found for account', caller.account_id);
+    return res.status(500).json({ error: 'No users found on this account to ban' });
   }
 
-  await admin
+  const banFailures = [];
+  for (const u of users) {
+    const { error: banErr, bannedUntil } = await banAuthUser(admin, u.id);
+    if (banErr) {
+      banFailures.push({
+        userId: u.id,
+        email: u.email,
+        message: banErr.message || 'Failed to ban auth user',
+      });
+      continue;
+    }
+    console.info('[delete-account] banned auth user', {
+      userId: u.id,
+      email: u.email,
+      bannedUntil,
+    });
+  }
+
+  if (banFailures.length > 0) {
+    console.error('[delete-account] Auth ban step failed; aborting before soft-delete', {
+      accountId: caller.account_id,
+      failures: banFailures,
+    });
+    return res.status(500).json({
+      error: `Could not ban ${banFailures.length} user(s) in Auth. Account was not soft-deleted.`,
+      banFailures,
+    });
+  }
+
+  // 3) Mark app users inactive (after Auth bans succeed).
+  const { error: inactiveErr } = await admin
     .from('users')
     .update({ is_active: false, default_workspace_id: null })
     .eq('account_id', caller.account_id);
+  if (inactiveErr) {
+    console.error('[delete-account] is_active update failed after bans', {
+      accountId: caller.account_id,
+      message: inactiveErr.message,
+    });
+    return res.status(500).json({
+      error: inactiveErr.message || 'Users were banned in Auth but could not be marked inactive',
+    });
+  }
 
-  // 3) Soft-delete the account.
+  // 4) Soft-delete the account.
   const { error: delErr } = await admin
     .from('accounts')
     .update({ deleted_at: new Date().toISOString() })
@@ -103,13 +138,23 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: delErr.message || 'Could not mark account deleted' });
   }
 
-  // 4) Wipe all workspace content.
+  // 5) Wipe all workspace content.
   try {
     await wipeAccountWorkspaces(admin, caller.account_id);
   } catch (err) {
-    // Account is already soft-deleted + users banned; log wipe failures.
-    console.error('Account wipe after delete failed:', err.message);
+    console.error('[delete-account] workspace wipe failed after soft-delete', {
+      accountId: caller.account_id,
+      message: err.message,
+    });
+    return res.status(500).json({
+      error: err.message || 'Account was deleted and users banned, but data wipe failed',
+      banned: true,
+      deleted: true,
+    });
   }
 
-  return res.status(200).json({ ok: true });
+  return res.status(200).json({
+    ok: true,
+    bannedUserIds: users.map((u) => u.id),
+  });
 }

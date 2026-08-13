@@ -47,3 +47,69 @@ export async function requireAccountOwner(admin, req) {
 
 /** ~100 years — Auth only accepts hour (h) units, not years. */
 export const LONG_BAN = '876000h';
+
+/**
+ * Ban a Supabase Auth user (service role).
+ * The Admin API returns { data, error } — it does not throw on Auth failures.
+ */
+export async function banAuthUser(admin, userId) {
+  if (!userId) {
+    return { error: { message: 'userId is required to ban' } };
+  }
+
+  const { data, error } = await admin.auth.admin.updateUserById(userId, {
+    ban_duration: LONG_BAN,
+  });
+
+  if (error) {
+    console.error('[banAuthUser] updateUserById failed', {
+      userId,
+      message: error.message,
+      status: error.status,
+      name: error.name,
+    });
+    return { error };
+  }
+
+  // Confirm the ban stuck — do not trust a quiet { error: null } alone.
+  const { data: verified, error: verifyErr } = await admin.auth.admin.getUserById(userId);
+  if (verifyErr) {
+    console.error('[banAuthUser] getUserById after ban failed', {
+      userId,
+      message: verifyErr.message,
+    });
+    return { error: verifyErr };
+  }
+
+  const bannedUntil = verified?.user?.banned_until || data?.user?.banned_until;
+  if (!bannedUntil) {
+    const message = `Auth ban did not set banned_until for user ${userId}`;
+    console.error('[banAuthUser]', message, {
+      userId,
+      updateUser: data?.user || null,
+      fetchedUser: verified?.user || null,
+    });
+    return { error: { message } };
+  }
+
+  // Optional: revoke refresh tokens. Failure must not undo a successful ban.
+  const { error: signOutErr } = await admin.auth.admin.signOut(userId, 'global');
+  if (signOutErr) {
+    console.warn('[banAuthUser] signOut after ban failed (ban still applied)', {
+      userId,
+      message: signOutErr.message,
+    });
+  }
+
+  return { data: verified || data, bannedUntil };
+}
+
+export async function unbanAuthUser(admin, userId) {
+  const { data, error } = await admin.auth.admin.updateUserById(userId, {
+    ban_duration: 'none',
+  });
+  if (error) {
+    console.error('[unbanAuthUser] failed', { userId, message: error.message });
+  }
+  return { data, error };
+}
