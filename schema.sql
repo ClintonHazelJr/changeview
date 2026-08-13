@@ -14,6 +14,8 @@
 create table accounts (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  -- Soft-delete: blocks access; row kept for a recovery window before hard purge.
+  deleted_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -119,7 +121,7 @@ create trigger check_workspace_tier_limit
 
 -- Now that workspaces exists, add the column on users that couldn't be
 -- declared inline back when users was first created above.
-alter table users add column default_workspace_id uuid references workspaces(id);
+alter table users add column default_workspace_id uuid references workspaces(id) on delete set null;
 -- Reopens here on next login, set whenever the user switches workspace.
 
 -- Grants a member access to one specific Workspace. Owners don't need rows

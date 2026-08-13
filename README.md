@@ -57,7 +57,22 @@ STRIPE_PRICE_ENTERPRISE_ANNUAL=     # $2,990 / year
 Webhook endpoint (Stripe Dashboard → Developers → Webhooks): `https://<your-domain>/api/stripe-webhook`  
 Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`.
 
-Add the same variable names in Vercel project settings for deployment. Also apply migration `010_stripe_customer_id.sql` so Checkout can store `stripe_customer_id`.
+Add the same variable names in Vercel project settings for deployment. Also apply migration `010_stripe_customer_id.sql` so Checkout can store `stripe_customer_id`, and `011_account_deleted_at.sql` for account soft-delete.
+
+### Auth redirect URLs (Supabase Dashboard → Authentication → URL Configuration)
+
+Allow these Redirect URLs (adjust host for local/prod):
+
+```
+http://localhost:5173/auth/callback
+http://localhost:5173/accept-invite
+http://localhost:5173/reset-password
+https://<your-domain>/auth/callback
+https://<your-domain>/accept-invite
+https://<your-domain>/reset-password
+```
+
+Prefer Site URL pointing at your app host. Email templates should use `{{ .ConfirmationURL }}` / `{{ .RedirectTo }}` (not a hard-coded homepage). The app sets `emailRedirectTo` / `redirectTo` for signup, invites, and password reset.
 
 ### 4. Run locally
 

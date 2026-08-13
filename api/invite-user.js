@@ -79,10 +79,14 @@ export default async function handler(req, res) {
 
   const defaultWorkspaceId = workspaceIds[0];
   const fullName = email.split('@')[0];
-  const origin = req.headers.origin
-    || (req.headers.referer ? String(req.headers.referer).replace(/\/$/, '') : '')
-    || 'http://localhost:5173';
-  const redirectTo = `${origin.replace(/\/$/, '')}/accept-invite`;
+  let origin = process.env.APP_ORIGIN || 'http://localhost:5173';
+  if (req.headers.origin) origin = req.headers.origin;
+  else if (req.headers.referer) {
+    try { origin = new URL(req.headers.referer).origin; } catch { /* keep default */ }
+  }
+  origin = String(origin).replace(/\/$/, '');
+  // Invites must land on the accept-invite page, never the marketing homepage.
+  const redirectTo = `${origin}/accept-invite`;
 
   const { data: invited, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo,

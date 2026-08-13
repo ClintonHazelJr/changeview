@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, Target, MessageSquare, TrendingUp, Check, GraduationCap,
   RefreshCw, Building2, Sparkles, Network, X,
 } from 'lucide-react';
 import { C, HEAD, BODY, tint } from '../lib/constants';
+import { hasAuthRedirectParams } from '../lib/authUrls';
 
 const PRICING = {
   solo: { monthly: 59 },
@@ -84,11 +85,25 @@ function HeroMockup() {
 }
 
 export default function LandingPage() {
+  const navigate = useNavigate();
   const [billingCycle, setBillingCycle] = useState('monthly');
   const annual = billingCycle === 'annual';
+  const accountDeleted = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('account') === 'deleted';
+
+  // If an Auth email still points at Site URL (/), forward into the callback handler.
+  useEffect(() => {
+    if (!hasAuthRedirectParams()) return;
+    navigate(`/auth/callback${window.location.search}${window.location.hash}`, { replace: true });
+  }, [navigate]);
 
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ ...BODY, background: C.bg, color: C.ink }}>
+      {accountDeleted && (
+        <div className="px-6 py-2.5 text-xs font-semibold text-center" style={{ background: tint(C.amber, '22'), color: C.ink }}>
+          Your account has been deleted. Billing is cancelled and all data was removed.
+        </div>
+      )}
       {/* Nav */}
       <nav className="relative z-20 flex items-center justify-between px-6 md:px-10 py-5">
         <span className="font-extrabold text-xl tracking-tight" style={{ ...HEAD, color: C.ink }}>ChangeView</span>
