@@ -25,6 +25,9 @@ create table users (
   -- owner: the paying account holder, full access to every Workspace on the account.
   -- member: no access to anything until explicitly granted via workspace_members below.
   role text not null default 'member' check (role in ('owner', 'member')),
+  -- Soft deactivate: frees a seat; login blocked via Auth ban in /api/deactivate-user.
+  -- Do not hard-delete users — their id is referenced as owners/assignees/authors.
+  is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
 

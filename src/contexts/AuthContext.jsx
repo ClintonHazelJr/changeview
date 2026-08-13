@@ -15,6 +15,13 @@ export function AuthProvider({ children }) {
       .eq('id', userId)
       .maybeSingle();
     if (!error && data) {
+      // Soft-deactivated users must not keep a session even if Auth ban lags.
+      if (data.is_active === false) {
+        await supabase.auth.signOut();
+        setProfile(null);
+        setSession(null);
+        return null;
+      }
       setProfile(data);
       return data;
     }
