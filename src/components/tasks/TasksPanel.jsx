@@ -5,6 +5,8 @@ import { useTasks } from '../../hooks/useTasks';
 import { useAdminData } from '../../hooks/useAdminData';
 import Modal from '../ui/Modal';
 import { FormTask } from '../forms/AdminForms';
+import ListTable from '../ui/ListTable';
+import StatusPill from '../ui/StatusPill';
 import {
   ListPageShell, ListTopBar, StatusFilterRow, GroupSection, CompactListCard,
   ListBody, countByStatus, statusColor,
@@ -24,7 +26,7 @@ export default function TasksPanel() {
     saveTask, updateTaskStatus, deleteTask,
   } = useTasks();
   const { departments } = useAdminData();
-  const [view, setView] = useState('list');
+  const [view, setView] = useState('tiles');
   const [modal, setModal] = useState(null);
   const [editing, setEditing] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
@@ -71,6 +73,49 @@ export default function TasksPanel() {
     }
   };
 
+  const columns = [
+    {
+      key: 'name',
+      label: 'Task',
+      sortable: true,
+      render: (t) => <span className="font-semibold">{t.name}</span>,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      sortValue: (t) => getStatus(t),
+      render: (t) => (
+        <StatusPill
+          label={getStatus(t).replace('_', ' ')}
+          color={statusColor(getStatus(t))}
+        />
+      ),
+    },
+    {
+      key: 'priority',
+      label: 'Priority',
+      sortable: true,
+      render: (t) => (t.priority
+        ? <StatusPill label={t.priority} color={SEVERITY_COLOR[t.priority] || C.sub} />
+        : '—'),
+    },
+    {
+      key: 'initiative',
+      label: 'Initiative',
+      sortable: true,
+      sortValue: (t) => initiativeName(t.initiative_id),
+      render: (t) => initiativeName(t.initiative_id),
+    },
+    {
+      key: 'assignee',
+      label: 'Assignee',
+      sortable: true,
+      sortValue: (t) => personName(t.assignee_id),
+      render: (t) => personName(t.assignee_id) || '—',
+    },
+  ];
+
   return (
     <ListPageShell>
       <ListTopBar
@@ -80,8 +125,9 @@ export default function TasksPanel() {
         addDisabled={initiatives.length === 0}
         viewMode={view}
         onViewChange={setView}
+        viewModes={['tiles', 'list', 'board']}
       />
-      {view === 'list' && (
+      {view !== 'board' && (
         <StatusFilterRow
           statuses={STATUS_META}
           counts={counts}
@@ -91,43 +137,7 @@ export default function TasksPanel() {
         />
       )}
 
-      {view === 'list' ? (
-        <ListBody
-          empty={filtered.length === 0}
-          emptyText={initiatives.length === 0 ? 'Create an Initiative first.' : 'No tasks yet.'}
-        >
-          {groups.map((g) => (
-            <GroupSection
-              key={g.key}
-              title={g.label}
-              items={g.items}
-              getStatus={getStatus}
-              addLabel="Add Task"
-              onAdd={initiatives.length ? openAdd : undefined}
-            >
-              {g.items.map((t) => (
-                <CompactListCard
-                  key={t.id}
-                  title={t.name}
-                  subtitle={[
-                    t.requirementIds?.length
-                      ? `${t.requirementIds.length} linked requirement${t.requirementIds.length === 1 ? '' : 's'}`
-                      : null,
-                    t.sprint ? `Sprint ${t.sprint}` : null,
-                    t.pi ? `PI ${t.pi}` : null,
-                  ].filter(Boolean).join(' · ') || t.description || 'No description'}
-                  tags={[
-                    { label: getStatus(t).replace('_', ' '), color: statusColor(getStatus(t)) },
-                    t.priority ? { label: t.priority, color: SEVERITY_COLOR[t.priority] || C.sub } : null,
-                  ].filter(Boolean)}
-                  avatars={[personName(t.assignee_id)].filter(Boolean)}
-                  onClick={() => openEdit(t)}
-                />
-              ))}
-            </GroupSection>
-          ))}
-        </ListBody>
-      ) : (
+      {view === 'board' ? (
         <div className="flex-1 overflow-x-auto p-4" style={BODY}>
           <div className="flex gap-3 min-w-max h-full items-stretch">
             {STATUS_META.map((col) => {
@@ -184,6 +194,51 @@ export default function TasksPanel() {
             })}
           </div>
         </div>
+      ) : (
+        <ListBody
+          empty={filtered.length === 0}
+          emptyText={initiatives.length === 0 ? 'Create an Initiative first.' : 'No tasks yet.'}
+        >
+          {view === 'list' ? (
+            <ListTable
+              columns={columns}
+              rows={filtered}
+              onRowClick={openEdit}
+              initialSortKey="name"
+            />
+          ) : (
+            groups.map((g) => (
+              <GroupSection
+                key={g.key}
+                title={g.label}
+                items={g.items}
+                getStatus={getStatus}
+                addLabel="Add Task"
+                onAdd={initiatives.length ? openAdd : undefined}
+              >
+                {g.items.map((t) => (
+                  <CompactListCard
+                    key={t.id}
+                    title={t.name}
+                    subtitle={[
+                      t.requirementIds?.length
+                        ? `${t.requirementIds.length} linked requirement${t.requirementIds.length === 1 ? '' : 's'}`
+                        : null,
+                      t.sprint ? `Sprint ${t.sprint}` : null,
+                      t.pi ? `PI ${t.pi}` : null,
+                    ].filter(Boolean).join(' · ') || t.description || 'No description'}
+                    tags={[
+                      { label: getStatus(t).replace('_', ' '), color: statusColor(getStatus(t)) },
+                      t.priority ? { label: t.priority, color: SEVERITY_COLOR[t.priority] || C.sub } : null,
+                    ].filter(Boolean)}
+                    avatars={[personName(t.assignee_id)].filter(Boolean)}
+                    onClick={() => openEdit(t)}
+                  />
+                ))}
+              </GroupSection>
+            ))
+          )}
+        </ListBody>
       )}
 
       {modal === 'task' && (

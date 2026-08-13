@@ -70,12 +70,19 @@ export function AuthProvider({ children }) {
     };
   }, [ensureProvisioned]);
 
-  const signUp = async ({ email, password, fullName, accountName }) => {
+  const signUp = async ({
+    email, password, fullName, accountName, planTier = 'solo', billingCycle = 'monthly',
+  }) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName, account_name: accountName || `${fullName}'s Account` },
+        data: {
+          full_name: fullName,
+          account_name: accountName || `${fullName}'s Account`,
+          plan_tier: planTier,
+          billing_cycle: billingCycle,
+        },
       },
     });
     if (error) throw error;

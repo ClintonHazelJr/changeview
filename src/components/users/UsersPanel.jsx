@@ -6,6 +6,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { Field, SaveRow } from '../ui/shared';
 import Modal from '../ui/Modal';
+import ViewToggle from '../ui/ViewToggle';
+import ListTable from '../ui/ListTable';
+import StatusPill from '../ui/StatusPill';
 
 const ROLE_COLOR = { owner: C.purple, member: C.teal };
 
@@ -21,6 +24,7 @@ export default function UsersPanel() {
   const [actionError, setActionError] = useState('');
   const [saving, setSaving] = useState(false);
   const [busyUserId, setBusyUserId] = useState(null);
+  const [viewMode, setViewMode] = useState('tiles');
 
   const load = useCallback(async () => {
     if (!profile?.account_id) {
@@ -144,11 +148,55 @@ export default function UsersPanel() {
   const activeCount = rows.filter((u) => u.is_active).length;
   const inactiveCount = rows.filter((u) => !u.is_active).length;
 
+  const userColumns = [
+    {
+      key: 'full_name',
+      label: 'Name',
+      sortable: true,
+      sortValue: (u) => u.full_name || u.email,
+      render: (u) => (
+        <span className="font-semibold">
+          {u.full_name || '—'}
+          {u.id === profile?.id ? ' (you)' : ''}
+        </span>
+      ),
+    },
+    { key: 'email', label: 'Email', sortable: true },
+    {
+      key: 'role',
+      label: 'Role',
+      sortable: true,
+      render: (u) => <StatusPill label={u.role} color={ROLE_COLOR[u.role] || C.sub} />,
+    },
+    {
+      key: 'is_active',
+      label: 'Status',
+      sortable: true,
+      sortValue: (u) => (u.is_active ? 1 : 0),
+      render: (u) => (
+        <StatusPill
+          label={u.is_active ? 'Active' : 'Inactive'}
+          color={u.is_active ? C.green : C.sub}
+        />
+      ),
+    },
+    {
+      key: 'workspaces',
+      label: 'Workspaces',
+      render: (u) => (u.workspaces || []).map((ws) => ws.name).join(', ') || '—',
+    },
+  ];
+
   return (
     <div className="flex-1 p-8 max-w-4xl w-full mx-auto overflow-y-auto" style={BODY}>
       <div className="flex items-center justify-between gap-3 mb-6">
         <div>
-          <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Users</h2>
+          <div className="flex items-center gap-3 mb-1">
+            <h2 className="text-xl font-extrabold" style={{ ...HEAD, color: C.ink }}>Users</h2>
+            {!loading && rows.length > 0 && (
+              <ViewToggle value={viewMode} onChange={setViewMode} />
+            )}
+          </div>
           <p className="text-sm" style={{ color: C.sub }}>
             People on your account and the workspaces they can access.
           </p>
@@ -197,6 +245,8 @@ export default function UsersPanel() {
         <div className="text-center py-12 bg-white rounded-3xl border border-dashed" style={{ borderColor: C.border }}>
           <div className="text-sm" style={{ color: C.sub }}>No users yet.</div>
         </div>
+      ) : viewMode === 'list' ? (
+        <ListTable columns={userColumns} rows={rows} initialSortKey="full_name" />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {rows.map((u) => {

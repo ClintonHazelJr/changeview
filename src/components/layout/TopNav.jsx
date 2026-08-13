@@ -14,6 +14,7 @@ export default function TopNav({ onNavigate }) {
   const { profile } = useAuth();
   const {
     workspaces, activeWorkspace, activeWorkspaceId, planTier,
+    trialActive, trialDaysLeft, hasPaidFeatures,
     switchWorkspace, createWorkspace, renameWorkspace,
   } = useWorkspace();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -22,6 +23,7 @@ export default function TopNav({ onNavigate }) {
   const [renameValue, setRenameValue] = useState('');
   const [renameError, setRenameError] = useState('');
   const isOwner = profile?.role === 'owner';
+  const trialUrgent = trialActive && trialDaysLeft <= 2;
 
   const handleCreateWorkspace = async (name) => {
     await createWorkspace(name);
@@ -55,6 +57,30 @@ export default function TopNav({ onNavigate }) {
 
   return (
     <>
+      {trialActive && (
+        <div
+          className="px-6 py-2 text-xs font-semibold text-center border-b shrink-0"
+          style={{
+            ...BODY,
+            borderColor: trialUrgent ? tint(C.amber, '55') : C.border,
+            background: trialUrgent ? tint(C.amber, '28') : tint(C.purple, '12'),
+            color: trialUrgent ? C.ink : C.purple,
+          }}
+        >
+          {trialDaysLeft === 0
+            ? 'Your trial ends today'
+            : trialDaysLeft === 1
+              ? '1 day left in your trial'
+              : `${trialDaysLeft} days left in your trial`}
+          {' · '}
+          Full access while you evaluate ChangeView
+          {isOwner && (
+            <a href="/#pricing" className="ml-2 font-bold underline" style={{ color: 'inherit' }}>
+              View plans
+            </a>
+          )}
+        </div>
+      )}
       <div className="relative flex items-center gap-4 px-6 py-3.5 bg-white border-b shrink-0" style={{ ...BODY, borderColor: C.border }}>
         <Link to="/app" className="font-extrabold tracking-tight text-lg no-underline shrink-0" style={{ ...HEAD, color: C.ink }}>
           ChangeView
@@ -137,9 +163,9 @@ export default function TopNav({ onNavigate }) {
                   <Plus size={14} /> New workspace
                 </button>
               )}
-              {planTier === 'tier_1' && (
+              {planTier === 'tier_1' && !hasPaidFeatures && (
                 <div className="px-4 py-2 text-[11px] border-t" style={{ color: C.sub, borderColor: C.border }}>
-                  {PLAN_LABELS.tier_1} includes 1 workspace. Upgrade to {PLAN_LABELS.tier_2} for unlimited.
+                  {PLAN_LABELS.tier_1} includes 1 workspace. Upgrade to Small or {PLAN_LABELS.tier_2} for unlimited.
                 </div>
               )}
             </div>

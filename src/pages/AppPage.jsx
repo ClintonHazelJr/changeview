@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { C, BODY, PLAN_LABELS, hasPaidPlanFeatures } from '../lib/constants';
+import { useCallback, useEffect, useState } from 'react';
+import { Navigate, useSearchParams } from 'react-router-dom';
+import { C, BODY, PLAN_LABELS } from '../lib/constants';
 import { useAuth } from '../contexts/AuthContext';
 import { WorkspaceProvider, useWorkspace } from '../contexts/WorkspaceContext';
 import TopNav from '../components/layout/TopNav';
@@ -16,16 +16,57 @@ import ProfilePanel from '../components/profile/ProfilePanel';
 import UsersPanel from '../components/users/UsersPanel';
 import TasksPanel from '../components/tasks/TasksPanel';
 import UpgradePrompt from '../components/ui/UpgradePrompt';
+import TrialEndedGate from '../components/ui/TrialEndedGate';
 
 function AppShell() {
-  const { profile } = useAuth();
-  const { planTier } = useWorkspace();
-  const paid = hasPaidPlanFeatures(planTier);
+  const { profile, session } = useAuth();
+  const {
+    hasPaidFeatures: paid,
+    trialExpired,
+    reload,
+  } = useWorkspace();
   const isOwner = profile?.role === 'owner';
+  const [params, setParams] = useSearchParams();
+  const [checkoutMsg, setCheckoutMsg] = useState('');
 
   const [section, setSection] = useState('dashboard');
   const [initiativeFocusId, setInitiativeFocusId] = useState(null);
   const [adminTabFocus, setAdminTabFocus] = useState(null);
+
+  useEffect(() => {
+    const checkout = params.get('checkout');
+    const sessionId = params.get('session_id');
+    if (checkout !== 'success' || !sessionId || !session?.access_token) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/complete-checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ sessionId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not activate plan');
+        if (!cancelled) {
+          setCheckoutMsg('Subscription activated. Welcome back.');
+          await reload();
+        }
+      } catch (err) {
+        if (!cancelled) setCheckoutMsg(err.message);
+      } finally {
+        if (!cancelled) {
+          params.delete('checkout');
+          params.delete('session_id');
+          setParams(params, { replace: true });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [params, setParams, session?.access_token, reload]);
 
   const openInitiative = (id) => {
     setInitiativeFocusId(id);
@@ -97,7 +138,17 @@ function AppShell() {
 
   return (
     <div className="min-h-screen w-full flex flex-col" style={{ ...BODY, background: C.bg }}>
+      {trialExpired && <TrialEndedGate />}
       <TopNav onNavigate={handleNavigate} />
+      {checkoutMsg && (
+        <div
+          className="px-6 py-2 text-xs font-semibold text-center"
+          style={{ background: tintSafe(C.green), color: C.ink }}
+        >
+          {checkoutMsg}
+          <button type="button" className="ml-3 underline" onClick={() => setCheckoutMsg('')}>Dismiss</button>
+        </div>
+      )}
       <div className="flex flex-1 min-h-0">
         <AppSidebar section={section} setSection={setSection} />
         <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
@@ -106,6 +157,10 @@ function AppShell() {
       </div>
     </div>
   );
+}
+
+function tintSafe(hex) {
+  return `${hex}22`;
 }
 
 export default function AppPage() {

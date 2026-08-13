@@ -1,50 +1,31 @@
 import { useMemo, useState } from 'react';
-import { Bell, Columns3, List, Plus, ChevronDown } from 'lucide-react';
+import { Bell, Plus, ChevronDown } from 'lucide-react';
 import { C, HEAD, BODY, tint, initials, STATUS_COLOR } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
+import ViewToggle from './ViewToggle';
 
 export function statusColor(status) {
   return STATUS_COLOR[status] || C.sub;
 }
 
-export function ListTopBar({ title, addLabel, onAdd, addDisabled, viewMode = 'list', onViewChange }) {
+/**
+ * viewMode: 'tiles' | 'list' | 'board'
+ * modes: which ViewToggle options to show (default tiles + list)
+ */
+export function ListTopBar({
+  title, addLabel, onAdd, addDisabled,
+  viewMode = 'tiles', onViewChange, viewModes = ['tiles', 'list'],
+}) {
   const { profile } = useAuth();
-  const boardEnabled = typeof onViewChange === 'function';
   return (
     <div
       className="flex items-center gap-3 px-6 py-3 bg-white border-b shrink-0"
       style={{ ...BODY, borderColor: C.border }}
     >
       <h1 className="text-lg font-bold" style={{ ...HEAD, color: C.ink }}>{title}</h1>
-      <div className="flex items-center gap-0.5 rounded-lg p-0.5" style={{ background: C.bg }}>
-        <button
-          type="button"
-          onClick={() => onViewChange?.('list')}
-          className="p-1.5 rounded-md"
-          style={
-            viewMode === 'list'
-              ? { background: '#fff', color: C.ink, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
-              : { color: C.sub }
-          }
-          title="List view"
-        >
-          <List size={15} />
-        </button>
-        <button
-          type="button"
-          onClick={() => boardEnabled && onViewChange('board')}
-          className="p-1.5 rounded-md"
-          style={
-            viewMode === 'board'
-              ? { background: '#fff', color: C.ink, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }
-              : { color: C.sub }
-          }
-          title={boardEnabled ? 'Board view' : 'Board view (coming soon)'}
-          disabled={!boardEnabled}
-        >
-          <Columns3 size={15} />
-        </button>
-      </div>
+      {typeof onViewChange === 'function' && (
+        <ViewToggle value={viewMode} onChange={onViewChange} modes={viewModes} />
+      )}
       <div className="flex-1" />
       <button
         type="button"

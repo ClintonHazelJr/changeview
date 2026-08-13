@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Layers, LayoutGrid, ClipboardList,
   CalendarRange, BarChart3, Settings, Users, CheckSquare,
 } from 'lucide-react';
-import { C, HEAD, tint, hasPaidPlanFeatures } from '../../lib/constants';
+import { C, HEAD, tint } from '../../lib/constants';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -17,9 +17,8 @@ const NAV = [
 ];
 
 export default function AppSidebar({ section, setSection }) {
-  const { planTier } = useWorkspace();
+  const { hasPaidFeatures: paid } = useWorkspace();
   const { profile } = useAuth();
-  const paid = hasPaidPlanFeatures(planTier);
   const isOwner = profile?.role === 'owner';
 
   return (

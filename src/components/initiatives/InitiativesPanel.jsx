@@ -11,6 +11,8 @@ import Modal from '../ui/Modal';
 import {
   FormInitiative, FormImpact, FormStakeholder, FormLearningNeed, FormComms, FormHypercare,
 } from '../forms/AdminForms';
+import ListTable from '../ui/ListTable';
+import StatusPill from '../ui/StatusPill';
 import {
   ListPageShell, ListTopBar, StatusFilterRow, GroupSection, CompactListCard,
   ListBody, countByStatus, statusColor,
@@ -36,6 +38,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
   const [modal, setModal] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
+  const [viewMode, setViewMode] = useState('tiles');
 
   const openCreate = (type) => {
     setEditingRecord(null);
@@ -113,6 +116,35 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
   }, [filtered, programs]);
 
   if (!selectedInitId) {
+    const columns = [
+      {
+        key: 'name',
+        label: 'Name',
+        sortable: true,
+        render: (i) => <span className="font-semibold">{i.name}</span>,
+      },
+      {
+        key: 'status',
+        label: 'Status',
+        sortable: true,
+        sortValue: (i) => getStatus(i),
+        render: (i) => <StatusPill label={getStatus(i)} color={statusColor(getStatus(i))} />,
+      },
+      {
+        key: 'program',
+        label: 'Program',
+        sortable: true,
+        sortValue: (i) => programName(i.program_id),
+        render: (i) => programName(i.program_id),
+      },
+      {
+        key: 'proposed_go_live_date',
+        label: 'Go live',
+        sortable: true,
+        render: (i) => formatDate(i.proposed_go_live_date) || '—',
+      },
+    ];
+
     return (
       <ListPageShell>
         <ListTopBar
@@ -120,6 +152,8 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
           addLabel="Add Initiative"
           onAdd={() => setModal('initiative')}
           addDisabled={programs.length === 0}
+          viewMode={viewMode}
+          onViewChange={setViewMode}
         />
         <StatusFilterRow
           statuses={INIT_STATUSES}
@@ -132,30 +166,39 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
           empty={filtered.length === 0}
           emptyText={programs.length === 0 ? 'Create a Program first, then add Initiatives.' : 'No initiatives yet.'}
         >
-          {groups.map((g) => (
-            <GroupSection
-              key={g.key}
-              title={g.label}
-              items={g.items}
-              getStatus={getStatus}
-              addLabel="Add Initiative"
-              onAdd={programs.length ? () => setModal('initiative') : undefined}
-            >
-              {g.items.map((i) => {
-                const meta = parseInitiativeMeta(i.description);
-                return (
-                  <CompactListCard
-                    key={i.id}
-                    title={i.name}
-                    subtitle={formatDate(i.proposed_go_live_date) ? `Go live ${formatDate(i.proposed_go_live_date)}` : 'No go-live date'}
-                    tags={[{ label: getStatus(i), color: statusColor(getStatus(i)) }]}
-                    avatars={[meta.changeOwner, meta.productOwner, meta.businessOwner, meta.projectManager].filter(Boolean)}
-                    onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
-                  />
-                );
-              })}
-            </GroupSection>
-          ))}
+          {viewMode === 'list' ? (
+            <ListTable
+              columns={columns}
+              rows={filtered}
+              onRowClick={(i) => { setSelectedInitId(i.id); setInitTab('details'); }}
+              initialSortKey="name"
+            />
+          ) : (
+            groups.map((g) => (
+              <GroupSection
+                key={g.key}
+                title={g.label}
+                items={g.items}
+                getStatus={getStatus}
+                addLabel="Add Initiative"
+                onAdd={programs.length ? () => setModal('initiative') : undefined}
+              >
+                {g.items.map((i) => {
+                  const meta = parseInitiativeMeta(i.description);
+                  return (
+                    <CompactListCard
+                      key={i.id}
+                      title={i.name}
+                      subtitle={formatDate(i.proposed_go_live_date) ? `Go live ${formatDate(i.proposed_go_live_date)}` : 'No go-live date'}
+                      tags={[{ label: getStatus(i), color: statusColor(getStatus(i)) }]}
+                      avatars={[meta.changeOwner, meta.productOwner, meta.businessOwner, meta.projectManager].filter(Boolean)}
+                      onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
+                    />
+                  );
+                })}
+              </GroupSection>
+            ))
+          )}
         </ListBody>
         {modal === 'initiative' && (
           <Modal title="Add Initiative" onClose={() => setModal(null)}>

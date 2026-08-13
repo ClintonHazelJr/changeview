@@ -42,11 +42,17 @@ export default async function handler(req, res) {
 
   const { data: sub } = await admin
     .from('subscriptions')
-    .select('plan_tier')
+    .select('plan_tier, status, trial_ends_at')
     .eq('account_id', caller.account_id)
     .maybeSingle();
-  if (sub?.plan_tier !== 'tier_2') {
-    return res.status(403).json({ error: 'Inviting users requires an Enterprise plan' });
+  const trialActive = sub?.status === 'trialing'
+    && sub?.trial_ends_at
+    && new Date(sub.trial_ends_at).getTime() > Date.now();
+  const canInvite = trialActive
+    || sub?.plan_tier === 'small'
+    || sub?.plan_tier === 'tier_2';
+  if (!canInvite) {
+    return res.status(403).json({ error: 'Inviting users requires Small, Enterprise, or an active trial' });
   }
 
   const email = String(req.body?.email || '').trim().toLowerCase();

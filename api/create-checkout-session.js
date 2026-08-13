@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
@@ -28,10 +29,19 @@ const TIER_ALIASES = {
   tier_2: 'enterprise',
 };
 
+function adminClient() {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -71,13 +81,40 @@ export default async function handler(req, res) {
 
   const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, '') || 'http://localhost:5173';
 
+  // Optional: attach account when converting a trial (authenticated owner).
+  let accountId = null;
+  let customerEmail = null;
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (token) {
+    const admin = adminClient();
+    if (admin) {
+      const { data: authData } = await admin.auth.getUser(token);
+      if (authData?.user) {
+        customerEmail = authData.user.email || null;
+        const { data: caller } = await admin
+          .from('users')
+          .select('account_id, role')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+        if (caller?.role === 'owner') accountId = caller.account_id;
+      }
+    }
+  }
+
   try {
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/app?checkout=success`,
-      cancel_url: `${origin}/?checkout=cancelled`,
-      metadata: { tier, billing_cycle: billingCycle },
+      success_url: `${origin}/app?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: accountId ? `${origin}/app?checkout=cancelled` : `${origin}/?checkout=cancelled`,
+      customer_email: customerEmail || undefined,
+      client_reference_id: accountId || undefined,
+      metadata: {
+        tier,
+        billing_cycle: billingCycle,
+        ...(accountId ? { account_id: accountId } : {}),
+      },
     });
 
     return res.status(200).json({ url: session.url });

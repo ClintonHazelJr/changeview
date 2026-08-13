@@ -16,19 +16,9 @@ function formatUsd(n) {
   return `$${n.toLocaleString('en-US')}`;
 }
 
-async function startCheckout(tier, billingCycle = 'monthly') {
-  try {
-    const res = await fetch('/api/create-checkout-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tier, billingCycle }),
-    });
-    const data = await res.json();
-    if (data.url) window.location.href = data.url;
-    else alert(data.error || 'Could not start checkout');
-  } catch {
-    alert('Could not connect to checkout. Try again.');
-  }
+function trialSignupPath(tier, billingCycle = 'monthly') {
+  const billing = tier === 'solo' ? 'monthly' : billingCycle;
+  return `/signup?plan=${tier}&billing=${billing}`;
 }
 
 function HeroMockup() {
@@ -105,11 +95,11 @@ export default function LandingPage() {
         <div className="flex items-center gap-3">
           <Link to="/login" className="text-sm font-semibold no-underline px-3 py-2" style={{ color: C.sub }}>Log in</Link>
           <Link
-            to="/signup"
+            to="/signup?plan=solo"
             className="text-sm font-bold text-white px-5 py-2.5 rounded-full no-underline shadow-sm"
             style={{ background: C.purple }}
           >
-            Start free
+            Start free trial
           </Link>
         </div>
       </nav>
@@ -141,11 +131,11 @@ export default function LandingPage() {
               Built for independent change consultants and internal change managers who need one place for impacts, training, and communications.
             </p>
             <Link
-              to="/signup"
+              to="/signup?plan=solo"
               className="inline-flex items-center gap-2 text-sm font-bold text-white px-8 py-3.5 rounded-full no-underline shadow-lg"
               style={{ background: C.purple }}
             >
-              Start free <ArrowRight size={16} />
+              Start free trial <ArrowRight size={16} />
             </Link>
           </div>
           <HeroMockup />
@@ -239,7 +229,10 @@ export default function LandingPage() {
       <section id="pricing" className="px-6 md:px-10 py-20" style={{ background: `linear-gradient(180deg, ${C.bg}, ${tint(C.purple, '08')})` }}>
         <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-extrabold text-center mb-3" style={{ ...HEAD, color: C.ink }}>Simple pricing</h2>
-          <p className="text-sm text-center mb-10" style={{ color: C.sub }}>Start alone. Scale to your whole change practice.</p>
+          <p className="text-sm text-center mb-2" style={{ color: C.sub }}>Start alone. Scale to your whole change practice.</p>
+          <p className="text-xs text-center font-semibold mb-10" style={{ color: C.purple }}>
+            7-day free trial · No credit card required
+          </p>
 
           <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-6 items-start">
             {/* Solo — monthly only, no billing toggle */}
@@ -268,14 +261,14 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <button
-                type="button"
-                onClick={() => startCheckout('solo', 'monthly')}
-                className="w-full text-sm font-bold text-white py-3 rounded-full"
+              <Link
+                to={trialSignupPath('solo')}
+                className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                 style={{ background: C.purple }}
               >
-                Get started
-              </button>
+                Start your 7-day free trial
+              </Link>
+              <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>No credit card required</p>
             </div>
 
             {/* Small + Enterprise share a monthly/annual toggle */}
@@ -353,14 +346,14 @@ export default function LandingPage() {
                       </li>
                     ))}
                   </ul>
-                  <button
-                    type="button"
-                    onClick={() => startCheckout('small', billingCycle)}
-                    className="w-full text-sm font-bold text-white py-3 rounded-full"
+                  <Link
+                    to={trialSignupPath('small', billingCycle)}
+                    className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                     style={{ background: C.purple }}
                   >
-                    {annual ? 'Get Small annually' : 'Get Small'}
-                  </button>
+                    Start your 7-day free trial
+                  </Link>
+                  <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>No credit card required</p>
                 </div>
 
                 <div className="bg-white rounded-3xl p-8 border shadow-sm flex flex-col" style={{ borderColor: C.border }}>
@@ -396,14 +389,14 @@ export default function LandingPage() {
                       </li>
                     ))}
                   </ul>
-                  <button
-                    type="button"
-                    onClick={() => startCheckout('enterprise', billingCycle)}
-                    className="w-full text-sm font-bold text-white py-3 rounded-full"
+                  <Link
+                    to={trialSignupPath('enterprise', billingCycle)}
+                    className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                     style={{ background: C.ink }}
                   >
-                    {annual ? 'Get Enterprise annually' : 'Get Enterprise'}
-                  </button>
+                    Start your 7-day free trial
+                  </Link>
+                  <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>No credit card required</p>
                 </div>
               </div>
             </div>
@@ -419,7 +412,7 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-4 text-sm font-semibold">
             <Link to="/login" className="no-underline" style={{ color: C.sub }}>Log in</Link>
-            <Link to="/signup" className="no-underline" style={{ color: C.purple }}>Start free</Link>
+            <Link to="/signup?plan=solo" className="no-underline" style={{ color: C.purple }}>Start free trial</Link>
           </div>
         </div>
       </footer>

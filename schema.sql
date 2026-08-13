@@ -37,9 +37,11 @@ create table users (
 create table subscriptions (
   id uuid primary key default gen_random_uuid(),
   account_id uuid not null unique references accounts(id) on delete cascade,
-  plan_tier text not null check (plan_tier in ('tier_1', 'tier_2')),
+  -- Solo=tier_1, Small=small, Enterprise=tier_2
+  plan_tier text not null check (plan_tier in ('tier_1', 'small', 'tier_2')),
   billing_cycle text not null default 'monthly' check (billing_cycle in ('monthly', 'annual')),
-  status text not null default 'active' check (status in ('active', 'cancelled', 'past_due')),
+  status text not null default 'trialing' check (status in ('trialing', 'active', 'cancelled', 'past_due')),
+  trial_ends_at timestamptz,
   current_period_end date,
   stripe_subscription_id text,
   created_at timestamptz not null default now(),

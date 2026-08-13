@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { C } from '../../lib/constants';
+import ViewToggle from './ViewToggle';
 
 export function Field({ label, children }) {
   return (
@@ -83,17 +84,23 @@ export function ListCard({ icon: Icon, color, title, subtitle, tag }) {
 }
 
 export function TabSection({
-  title, subtitle, onAdd, addLabel, color, disabled, disabledText, empty, emptyText, emptyIcon: EmptyIcon, children,
+  title, subtitle, onAdd, addLabel, color, disabled, disabledText, empty, emptyText, emptyIcon: EmptyIcon,
+  viewMode, onViewChange, viewModes = ['tiles', 'list'], children,
 }) {
   return (
     <div>
-      <div className="flex items-start justify-between mb-1">
-        <h2 className="text-xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", color: C.ink }}>{title}</h2>
+      <div className="flex items-start justify-between mb-1 gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <h2 className="text-xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", color: C.ink }}>{title}</h2>
+          {typeof onViewChange === 'function' && !empty && (
+            <ViewToggle value={viewMode || 'tiles'} onChange={onViewChange} modes={viewModes} />
+          )}
+        </div>
         <button
           type="button"
           onClick={onAdd}
           disabled={disabled}
-          className="flex items-center gap-1.5 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-40 shadow-sm"
+          className="flex items-center gap-1.5 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-40 shadow-sm shrink-0"
           style={{ background: color }}
         >
           <Plus size={15} /> {addLabel}

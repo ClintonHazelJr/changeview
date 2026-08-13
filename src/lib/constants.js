@@ -46,15 +46,43 @@ export const STATUS_COLOR = {
 };
 export const TAG_OPTIONS = ['Training', 'Huddle', 'Email', 'Documentation'];
 
-/** DB keys stay tier_1 / tier_2; product names: Solo / Enterprise (Small shares paid access). */
+/** DB: tier_1 / small / tier_2. Marketing: Solo / Small / Enterprise. */
 export const PLAN_LABELS = {
   tier_1: 'Solo',
+  small: 'Small',
   tier_2: 'Enterprise',
+  solo: 'Solo',
+  enterprise: 'Enterprise',
 };
-export const isSoloPlan = (tier) => tier === 'tier_1';
-export const isEnterprisePlan = (tier) => tier === 'tier_2';
-/** Tasks, Schedule, multi-user — not available on Solo. Reports is on all tiers. */
-export const hasPaidPlanFeatures = (tier) => !isSoloPlan(tier);
+export const isSoloPlan = (tier) => tier === 'tier_1' || tier === 'solo';
+export const isEnterprisePlan = (tier) => tier === 'tier_2' || tier === 'enterprise';
+export const isSmallPlan = (tier) => tier === 'small';
+
+export function isTrialExpired(subscription) {
+  if (!subscription || subscription.status !== 'trialing') return false;
+  if (!subscription.trial_ends_at) return false;
+  return new Date(subscription.trial_ends_at).getTime() <= Date.now();
+}
+
+export function isTrialingActive(subscription) {
+  return subscription?.status === 'trialing' && !isTrialExpired(subscription);
+}
+
+export function trialDaysLeft(subscription) {
+  if (!subscription?.trial_ends_at) return 0;
+  const ms = new Date(subscription.trial_ends_at).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+}
+
+/**
+ * Tasks, Schedule, multi-user — not on Solo when paid.
+ * Active trials get full Enterprise-level access regardless of picked tier.
+ */
+export const hasPaidPlanFeatures = (tier, subscription = null) => {
+  if (isTrialingActive(subscription)) return true;
+  if (subscription && isTrialExpired(subscription)) return false;
+  return !isSoloPlan(tier);
+};
 
 export const TASK_STATUSES = [
   { key: 'backlog', label: 'Backlog' },

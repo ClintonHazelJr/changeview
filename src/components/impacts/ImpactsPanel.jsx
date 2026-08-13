@@ -3,6 +3,8 @@ import { Circle, CircleDot, AlertTriangle } from 'lucide-react';
 import { SEVERITY_COLOR, isRatedSeverity } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import ListTable from '../ui/ListTable';
+import StatusPill from '../ui/StatusPill';
 import {
   ListPageShell, ListTopBar, StatusFilterRow, GroupSection, CompactListCard,
   ListBody, countByStatus, statusColor,
@@ -33,6 +35,7 @@ export default function ImpactsPanel({ onOpenInitiative }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState(null);
+  const [viewMode, setViewMode] = useState('tiles');
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +87,41 @@ export default function ImpactsPanel({ onOpenInitiative }) {
     }));
   }, [filtered]);
 
+  const columns = [
+    {
+      key: 'departmentName',
+      label: 'Department',
+      sortable: true,
+      render: (imp) => <span className="font-semibold">{imp.departmentName}</span>,
+    },
+    {
+      key: 'initiativeName',
+      label: 'Initiative',
+      sortable: true,
+    },
+    {
+      key: 'peak',
+      label: 'Severity',
+      sortable: true,
+      sortValue: (imp) => RANK[getStatus(imp)] || 0,
+      render: (imp) => <StatusPill label={getStatus(imp)} color={statusColor(getStatus(imp))} />,
+    },
+    {
+      key: 'headcount_impacted',
+      label: 'Headcount',
+      sortable: true,
+      sortValue: (imp) => Number(imp.headcount_impacted) || 0,
+      render: (imp) => imp.headcount_impacted || 0,
+    },
+    {
+      key: 'impact_description',
+      label: 'Description',
+      sortable: true,
+      className: 'max-w-sm',
+      render: (imp) => <span className="line-clamp-2">{imp.impact_description || '—'}</span>,
+    },
+  ];
+
   return (
     <ListPageShell>
       <ListTopBar
@@ -91,6 +129,8 @@ export default function ImpactsPanel({ onOpenInitiative }) {
         addLabel="Add Impact"
         onAdd={() => {}}
         addDisabled
+        viewMode={viewMode}
+        onViewChange={setViewMode}
       />
       <StatusFilterRow
         statuses={SEVERITIES}
@@ -102,40 +142,49 @@ export default function ImpactsPanel({ onOpenInitiative }) {
         empty={!loading && filtered.length === 0}
         emptyText={loading ? 'Loading…' : 'No impacts yet. Add them inside an Initiative.'}
       >
-        {groups.map((g) => (
-          <GroupSection
-            key={g.key}
-            title={g.label}
-            items={g.items}
-            getStatus={getStatus}
-          >
-            {g.items.map((imp) => {
-              const severityTags = Object.entries({
-                org: imp.severity_org,
-                people: imp.severity_people,
-                process: imp.severity_process,
-                system: imp.severity_system,
-                env: imp.severity_environment,
-              })
-                .filter(([, v]) => isRatedSeverity(v))
-                .slice(0, 3)
-                .map(([k, v]) => ({ label: `${k}:${v}`, color: SEVERITY_COLOR[v] || statusColor(v) }));
+        {viewMode === 'list' ? (
+          <ListTable
+            columns={columns}
+            rows={filtered}
+            onRowClick={(imp) => onOpenInitiative?.(imp.initiative_id)}
+            initialSortKey="departmentName"
+          />
+        ) : (
+          groups.map((g) => (
+            <GroupSection
+              key={g.key}
+              title={g.label}
+              items={g.items}
+              getStatus={getStatus}
+            >
+              {g.items.map((imp) => {
+                const severityTags = Object.entries({
+                  org: imp.severity_org,
+                  people: imp.severity_people,
+                  process: imp.severity_process,
+                  system: imp.severity_system,
+                  env: imp.severity_environment,
+                })
+                  .filter(([, v]) => isRatedSeverity(v))
+                  .slice(0, 3)
+                  .map(([k, v]) => ({ label: `${k}:${v}`, color: SEVERITY_COLOR[v] || statusColor(v) }));
 
-              return (
-                <CompactListCard
-                  key={imp.id}
-                  title={`${imp.departmentName} · ${imp.headcount_impacted || 0} impacted`}
-                  subtitle={imp.impact_description || 'No description'}
-                  tags={[
-                    { label: getStatus(imp), color: statusColor(getStatus(imp)) },
-                    ...severityTags,
-                  ]}
-                  onClick={() => onOpenInitiative?.(imp.initiative_id)}
-                />
-              );
-            })}
-          </GroupSection>
-        ))}
+                return (
+                  <CompactListCard
+                    key={imp.id}
+                    title={`${imp.departmentName} · ${imp.headcount_impacted || 0} impacted`}
+                    subtitle={imp.impact_description || 'No description'}
+                    tags={[
+                      { label: getStatus(imp), color: statusColor(getStatus(imp)) },
+                      ...severityTags,
+                    ]}
+                    onClick={() => onOpenInitiative?.(imp.initiative_id)}
+                  />
+                );
+              })}
+            </GroupSection>
+          ))
+        )}
       </ListBody>
     </ListPageShell>
   );
