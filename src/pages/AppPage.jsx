@@ -180,8 +180,10 @@ function AppShell() {
     );
   }
 
-  const showIncompleteGate = isOwner && checkoutNeeded && !pastDue;
-  const showPastDueGate = isOwner && pastDue;
+  // Wait until subscription fetch finishes — needsCheckout(null) is true both while
+  // loading and when checkout is genuinely required; only trust it after load.
+  const showIncompleteGate = !workspaceLoading && isOwner && checkoutNeeded && !pastDue;
+  const showPastDueGate = !workspaceLoading && isOwner && pastDue;
 
   return (
     <div className="min-h-screen w-full flex flex-col" style={{ ...BODY, background: C.bg }}>
