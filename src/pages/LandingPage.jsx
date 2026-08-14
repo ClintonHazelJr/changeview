@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { C, HEAD, BODY, tint } from '../lib/constants';
 import { hasAuthRedirectParams } from '../lib/authUrls';
+import { rememberCheckoutIntent } from '../lib/checkout';
 
 const PRICING = {
   solo: { monthly: 59 },
@@ -141,8 +142,8 @@ export default function LandingPage() {
               ChangeView
             </div>
             <h1 className="text-3xl md:text-4xl font-extrabold leading-tight mb-4" style={{ ...HEAD, color: C.ink }}>
-              Scope the impact.<br />
-              Plan the comms.<br />
+              Change, without the chaos.<br />
+              Scope the impact. Plan the comms.<br />
               <span style={{ color: C.purple }}>Track the adoption.</span>
             </h1>
             <p className="text-base md:text-lg mb-8 max-w-md" style={{ color: C.sub }}>
@@ -283,8 +284,8 @@ export default function LandingPage() {
                 to="/signup?plan=solo&billing=monthly"
                 data-plan="solo"
                 onClick={() => {
-                  // TEMP DIAGNOSTIC — log literal tier at click, before anything else.
                   console.log('[pricing-click] tier=', 'solo');
+                  rememberCheckoutIntent('solo', 'monthly');
                 }}
                 className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                 style={{ background: C.purple }}
@@ -373,8 +374,8 @@ export default function LandingPage() {
                     to={trialSignupPath('small', billingCycle)}
                     data-plan="small"
                     onClick={() => {
-                      // TEMP DIAGNOSTIC — log literal tier at click, before anything else.
                       console.log('[pricing-click] tier=', 'small');
+                      rememberCheckoutIntent('small', billingCycle);
                     }}
                     className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                     style={{ background: C.purple }}
@@ -421,8 +422,8 @@ export default function LandingPage() {
                     to={trialSignupPath('enterprise', billingCycle)}
                     data-plan="enterprise"
                     onClick={() => {
-                      // TEMP DIAGNOSTIC — log literal tier at click, before anything else.
                       console.log('[pricing-click] tier=', 'enterprise');
+                      rememberCheckoutIntent('enterprise', billingCycle);
                     }}
                     className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                     style={{ background: C.ink }}

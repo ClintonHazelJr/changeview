@@ -1,7 +1,7 @@
 import { adminClient } from './_adminAuth.js';
 import { createStripeClient } from './_stripeClient.js';
 import {
-  resolvePriceId, priceEnvHint, MARKETING_TO_DB, DB_TO_MARKETING,
+  resolvePriceBinding, priceEnvHint, MARKETING_TO_DB, DB_TO_MARKETING,
 } from './_stripePlans.js';
 
 const TIER_ALIASES = {
@@ -20,7 +20,6 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // TEMP DEBUG: distinguish missing secret vs missing Price IDs (mask secret).
   const secretKey = process.env.STRIPE_SECRET_KEY;
   console.log('[checkout-debug] STRIPE_SECRET_KEY present:', Boolean(secretKey));
   console.log(
@@ -34,28 +33,45 @@ export default async function handler(req, res) {
 
   const stripe = createStripeClient(secretKey);
 
-  const { tier: rawTier, billingCycle = 'monthly' } = req.body || {};
-  const tier = TIER_ALIASES[rawTier];
+  const { tier: rawTier, billingCycle: rawCycle = 'monthly' } = req.body || {};
+  const tier = TIER_ALIASES[String(rawTier || '').toLowerCase()];
+  const billingCycle = rawCycle === 'annual' ? 'annual' : 'monthly';
   console.log('[checkout-debug] request body tier/cycle:', { rawTier, billingCycle, resolvedTier: tier || null });
 
   if (!tier) return res.status(400).json({ error: 'Unknown plan tier' });
-  if (billingCycle !== 'monthly' && billingCycle !== 'annual') {
-    return res.status(400).json({ error: 'Billing cycle must be monthly or annual' });
-  }
   if (tier === 'solo' && billingCycle !== 'monthly') {
     return res.status(400).json({ error: 'Sole Proprietor is billed monthly only' });
   }
 
-  const priceId = resolvePriceId(tier, billingCycle);
+  const binding = resolvePriceBinding(tier, billingCycle);
+  const priceId = binding.priceId;
   console.log('[checkout-debug] resolved price for', `${tier}_${billingCycle}`, {
     hasPriceId: Boolean(priceId),
     pricePrefix: priceId ? String(priceId).slice(0, 12) : null,
+    envName: binding.envName,
     hint: priceEnvHint(tier, billingCycle),
   });
   if (!priceId) {
     return res.status(500).json({
       error: `Stripe Price not configured for ${tier} (${billingCycle}). Set ${priceEnvHint(tier, billingCycle)}.`,
     });
+  }
+
+  // Hard stop: non-Solo tiers must not silently reuse the Solo Price ID (undercharge).
+  if (tier !== 'solo') {
+    const soloBinding = resolvePriceBinding('solo', 'monthly');
+    if (soloBinding.priceId && soloBinding.priceId === priceId) {
+      console.error('[checkout-debug] PRICE COLLISION', {
+        tier,
+        billingCycle,
+        envName: binding.envName,
+        soloEnv: soloBinding.envName,
+        pricePrefix: String(priceId).slice(0, 12),
+      });
+      return res.status(500).json({
+        error: `Billing misconfiguration: ${binding.envName || priceEnvHint(tier, billingCycle)} points at the same Stripe Price as Solo (${soloBinding.envName}). Fix the Enterprise/Business Price IDs in Vercel env.`,
+      });
+    }
   }
 
   try {
@@ -115,11 +131,8 @@ export default async function handler(req, res) {
               error: subErr?.message || null,
             });
             stripeCustomerId = sub?.stripe_customer_id || null;
-            // Only first Checkout gets a trial; existing Stripe subs are plan changes.
             if (sub?.stripe_subscription_id) addTrial = false;
 
-            // Persist the pricing-card tier onto the subscription before Checkout,
-            // so we never fall back to a default Solo/tier_1 row.
             const dbPlanTier = MARKETING_TO_DB[tier];
             if (dbPlanTier && !sub?.stripe_subscription_id) {
               const nextBilling = tier === 'solo' ? 'monthly' : billingCycle;
@@ -148,6 +161,8 @@ export default async function handler(req, res) {
       hasCustomerEmail: Boolean(customerEmail),
       hasStripeCustomerId: Boolean(stripeCustomerId),
       addTrial,
+      tier,
+      priceEnv: binding.envName,
     });
 
     const planTier = MARKETING_TO_DB[tier];
@@ -156,6 +171,7 @@ export default async function handler(req, res) {
       tier,
       plan_tier: planTier || '',
       billing_cycle: billingCycle,
+      price_env: binding.envName || '',
     };
 
     const sessionParams = {
@@ -165,7 +181,6 @@ export default async function handler(req, res) {
       cancel_url: accountId ? `${origin}/app?checkout=cancelled` : `${origin}/?checkout=cancelled`,
       client_reference_id: accountId || undefined,
       metadata: meta,
-      // Always collect a card, even when the subscription starts with a $0 trial.
       payment_method_collection: 'always',
       subscription_data: {
         metadata: meta,
@@ -180,18 +195,27 @@ export default async function handler(req, res) {
     }
 
     console.log('[checkout-debug] calling stripe.checkout.sessions.create…', {
-      priceIdPrefix: String(priceId).slice(0, 8),
+      tier,
+      priceEnv: binding.envName,
+      priceIdPrefix: String(priceId).slice(0, 12),
       addTrial,
       hasCustomer: Boolean(sessionParams.customer),
       hasCustomerEmail: Boolean(sessionParams.customer_email),
     });
     const session = await stripe.checkout.sessions.create(sessionParams);
-    console.log('[checkout-debug] Stripe session created', { id: session?.id || null });
+    console.log('[checkout-debug] Stripe session created', {
+      id: session?.id || null,
+      tier,
+      priceEnv: binding.envName,
+    });
     return res.status(200).json({
       url: session.url,
+      tier,
       plan: DB_TO_MARKETING[planTier] || tier,
       billingCycle,
       trial: addTrial,
+      priceEnv: binding.envName,
+      pricePrefix: String(priceId).slice(0, 12),
     });
   } catch (err) {
     console.error('[checkout-debug] FAILED after resolvePriceId');

@@ -9,9 +9,13 @@ export const PRICE_ENV = {
 };
 
 export function resolvePriceId(tier, billingCycle) {
+  return resolvePriceBinding(tier, billingCycle).priceId;
+}
+
+/** Resolve Price ID + which env var supplied it (for misconfig detection). */
+export function resolvePriceBinding(tier, billingCycle) {
   const key = `${tier}_${billingCycle}`;
   const names = PRICE_ENV[key] || [];
-  // TEMP DEBUG: which Price env vars are tried for this tier/cycle.
   console.log('[checkout-debug] resolvePriceId key:', key, 'env names:', names);
   for (const name of names) {
     const value = process.env[name];
@@ -19,14 +23,16 @@ export function resolvePriceId(tier, billingCycle) {
     console.log(
       '[checkout-debug] env',
       name,
-      hasValue ? `set (prefix=${String(value).slice(0, 8)}…)` : 'EMPTY',
+      hasValue ? `set (prefix=${String(value).slice(0, 12)}…)` : 'EMPTY',
     );
-    if (hasValue) return value;
+    if (hasValue) {
+      return { priceId: String(value).trim(), envName: name, key };
+    }
   }
   if (!names.length) {
     console.log('[checkout-debug] no PRICE_ENV mapping for key:', key);
   }
-  return '';
+  return { priceId: '', envName: null, key };
 }
 
 export function priceEnvHint(tier, billingCycle) {

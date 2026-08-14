@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { C, HEAD, BODY, tint, PLAN_LABELS } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { DB_TO_MARKETING_TIER, readCheckoutIntent, startCheckout, startBillingPortal } from '../../lib/checkout';
+import {
+  DB_TO_MARKETING_TIER,
+  normalizeMarketingTier,
+  readCheckoutIntent,
+  startCheckout,
+  startBillingPortal,
+} from '../../lib/checkout';
 
 /**
  * Billing gates:
@@ -11,24 +17,37 @@ import { DB_TO_MARKETING_TIER, readCheckoutIntent, startCheckout, startBillingPo
  */
 export default function BillingGate({ mode = 'past_due' }) {
   const { session } = useAuth();
-  const { planTier, subscription, reload } = useWorkspace();
+  const { planTier, subscription, reload, loading } = useWorkspace();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
   const intent = readCheckoutIntent();
-  const intentTier = intent?.tier && ['solo', 'small', 'enterprise', 'tier_1', 'tier_2'].includes(intent.tier)
-    ? (intent.tier === 'tier_1' ? 'solo' : intent.tier === 'tier_2' ? 'enterprise' : intent.tier)
-    : null;
-  // Prefer the pricing-card intent over a default/stale Solo subscription row.
-  const marketingTier = intentTier || DB_TO_MARKETING_TIER[planTier] || 'solo';
-  const billingCycle = (intent?.billingCycle === 'annual' || subscription?.billing_cycle === 'annual')
-    && marketingTier !== 'solo'
+  const intentTier = normalizeMarketingTier(intent?.tier);
+  // Prefer: remembered pricing-card intent → loaded subscription.plan_tier → context planTier.
+  // Never use the WorkspaceContext default (tier_1) while subscription is still loading.
+  const fromDb = normalizeMarketingTier(
+    DB_TO_MARKETING_TIER[subscription?.plan_tier]
+    || DB_TO_MARKETING_TIER[planTier]
+    || subscription?.plan_tier
+    || planTier,
+  );
+  const marketingTier = intentTier || (!loading ? fromDb : null);
+  const billingCycle = (
+    intent?.billingCycle === 'annual'
+    || subscription?.billing_cycle === 'annual'
+  ) && marketingTier && marketingTier !== 'solo'
     ? 'annual'
     : 'monthly';
 
   const openCheckout = async () => {
     setError('');
+    if (loading || !marketingTier) {
+      setError('Loading your selected plan… try again in a moment.');
+      return;
+    }
     setBusy(true);
     try {
+      console.log('[billing-gate] starting checkout', { marketingTier, billingCycle, intentTier, fromDb });
       await startCheckout(marketingTier, billingCycle, {
         accessToken: session?.access_token,
       });
@@ -51,6 +70,7 @@ export default function BillingGate({ mode = 'past_due' }) {
   };
 
   const isIncomplete = mode === 'incomplete';
+  const planLabel = PLAN_LABELS[marketingTier] || PLAN_LABELS[planTier] || 'your plan';
 
   return (
     <div className="fixed inset-0 z-[100] overflow-y-auto" style={{ ...BODY, background: `linear-gradient(180deg, ${C.bg}, ${tint(C.purple, '12')})` }}>
@@ -65,13 +85,13 @@ export default function BillingGate({ mode = 'past_due' }) {
               : 'Your trial converted but the charge on file failed. Update your card to restore access — your data is safe.'}
           </p>
           <p className="text-xs font-semibold mb-6" style={{ color: C.purple }}>
-            Plan: {PLAN_LABELS[marketingTier] || PLAN_LABELS[planTier] || planTier}
-            {billingCycle === 'annual' ? ' · annual' : ' · monthly'}
+            Plan: {loading && !marketingTier ? 'Loading…' : planLabel}
+            {marketingTier ? (billingCycle === 'annual' ? ' · annual' : ' · monthly') : ''}
           </p>
           {error && <p className="text-sm mb-4" style={{ color: C.coral }}>{error}</p>}
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || (isIncomplete && (loading || !marketingTier))}
             onClick={isIncomplete ? openCheckout : openPortal}
             className="w-full text-sm font-bold text-white py-3 rounded-full disabled:opacity-50"
             style={{ background: C.purple }}
