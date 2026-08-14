@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     .maybeSingle();
 
   if (!sub?.stripe_customer_id) {
-    return res.status(400).json({ error: 'No Stripe customer on this account yet' });
+    return res.status(400).json({ error: 'No billing information on file yet.' });
   }
 
   const origin = req.headers.origin

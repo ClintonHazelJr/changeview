@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { LogOut, Trash2, AlertTriangle } from 'lucide-react';
-import { C, HEAD, BODY, inputClass, inputStyle, initials, tint } from '../../lib/constants';
+import { CreditCard, LogOut, Trash2, AlertTriangle } from 'lucide-react';
+import { C, HEAD, BODY, inputClass, inputStyle, initials, tint, PLAN_LABELS } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { startBillingPortal } from '../../lib/checkout';
 import { Field, SaveRow } from '../ui/shared';
 import Modal from '../ui/Modal';
 import { FormWorkspace } from '../forms/AdminForms';
@@ -60,7 +61,7 @@ function ConfirmDeleteModal({
 
 export default function ProfilePanel() {
   const { profile, session, refreshProfile, signOut } = useAuth();
-  const { workspaces, reload, createWorkspace } = useWorkspace();
+  const { workspaces, reload, createWorkspace, subscription, planTier } = useWorkspace();
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [memberWorkspaces, setMemberWorkspaces] = useState([]);
   const [error, setError] = useState('');
@@ -76,8 +77,11 @@ export default function ProfilePanel() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [passwordBusy, setPasswordBusy] = useState(false);
+  const [billingBusy, setBillingBusy] = useState(false);
+  const [billingError, setBillingError] = useState('');
   const isOwner = profile?.role === 'owner';
   const accountName = profile?.accounts?.name || '';
+  const hasStripeCustomer = Boolean(subscription?.stripe_customer_id);
 
   useEffect(() => {
     setFullName(profile?.full_name || '');
@@ -112,6 +116,26 @@ export default function ProfilePanel() {
   const handleSignOut = async () => {
     await signOut();
     window.location.href = '/';
+  };
+
+  const handleManageBilling = async () => {
+    setBillingError('');
+    if (!hasStripeCustomer) {
+      setBillingError('No billing information on file yet.');
+      return;
+    }
+    setBillingBusy(true);
+    try {
+      await startBillingPortal({ accessToken: session?.access_token });
+    } catch (err) {
+      const msg = err.message || 'Could not open billing portal';
+      setBillingError(
+        msg.includes('No Stripe customer') || msg.includes('No billing')
+          ? 'No billing information on file yet.'
+          : msg,
+      );
+      setBillingBusy(false);
+    }
   };
 
   const handleChangePassword = async (e) => {
@@ -333,6 +357,37 @@ export default function ProfilePanel() {
           <SaveRow label="Save name" />
         </form>
       </div>
+
+      {isOwner && (
+        <div className="bg-white rounded-3xl border shadow-sm p-5 mb-4" style={{ borderColor: C.border }}>
+          <h3 className="text-sm font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Billing</h3>
+          <p className="text-xs mb-3" style={{ color: C.sub }}>
+            Update your payment method, view invoices, or manage your plan in Stripe's Customer Portal.
+          </p>
+          {(planTier || subscription?.status) && (
+            <p className="text-xs font-semibold mb-4" style={{ color: C.purple }}>
+              {PLAN_LABELS[planTier] || planTier || 'Plan'}
+              {subscription?.billing_cycle === 'annual' ? ' · annual' : subscription?.billing_cycle ? ' · monthly' : ''}
+              {subscription?.status ? ` · ${subscription.status}` : ''}
+            </p>
+          )}
+          {!hasStripeCustomer ? (
+            <p className="text-sm" style={{ color: C.sub }}>No billing information on file yet.</p>
+          ) : (
+            <button
+              type="button"
+              disabled={billingBusy}
+              onClick={handleManageBilling}
+              className="inline-flex items-center gap-2 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-50"
+              style={{ background: C.purple }}
+            >
+              <CreditCard size={15} />
+              {billingBusy ? 'Opening…' : 'Manage Billing'}
+            </button>
+          )}
+          {billingError && <p className="text-xs mt-3" style={{ color: C.coral }}>{billingError}</p>}
+        </div>
+      )}
 
       <div className="bg-white rounded-3xl border shadow-sm p-5 mb-4" style={{ borderColor: C.border }}>
         <h3 className="text-sm font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Change password</h3>
