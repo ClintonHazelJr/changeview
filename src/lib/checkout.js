@@ -59,7 +59,11 @@ export function clearCheckoutIntent() {
 }
 
 /** Start Stripe Checkout for a plan tier (solo | small | enterprise). */
-export async function startCheckout(tier, billingCycle = 'monthly', { accessToken } = {}) {
+export async function startCheckout(
+  tier,
+  billingCycle = 'monthly',
+  { accessToken, email, afterSignup = false } = {},
+) {
   const normalizedTier = normalizePlanTier(tier);
   const normalizedCycle = billingCycle === 'annual' && normalizedTier !== 'solo' ? 'annual' : 'monthly';
   if (!normalizedTier) {
@@ -67,7 +71,13 @@ export async function startCheckout(tier, billingCycle = 'monthly', { accessToke
   }
 
   rememberCheckoutIntent(normalizedTier, normalizedCycle);
-  console.log('[checkout] startCheckout', { tier: normalizedTier, billingCycle: normalizedCycle });
+  console.log('[checkout] startCheckout', {
+    tier: normalizedTier,
+    billingCycle: normalizedCycle,
+    afterSignup: Boolean(afterSignup),
+    hasEmail: Boolean(email),
+    hasToken: Boolean(accessToken),
+  });
 
   const headers = { 'Content-Type': 'application/json' };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
@@ -75,7 +85,12 @@ export async function startCheckout(tier, billingCycle = 'monthly', { accessToke
   const res = await fetch('/api/create-checkout-session', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ tier: normalizedTier, billingCycle: normalizedCycle }),
+    body: JSON.stringify({
+      tier: normalizedTier,
+      billingCycle: normalizedCycle,
+      email: email || undefined,
+      afterSignup: Boolean(afterSignup),
+    }),
   });
   const data = await res.json();
   if (!res.ok || !data.url) {

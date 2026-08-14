@@ -4,6 +4,39 @@ import {
   resolvePriceBinding, priceEnvHint, normalizePlanTier,
 } from './_stripePlans.js';
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Wait briefly for signup trigger to create public.users. */
+async function findOwnerByEmail(admin, email) {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (!normalized) return null;
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const { data, error } = await admin
+      .from('users')
+      .select('id, account_id, role, email')
+      .ilike('email', normalized)
+      .eq('role', 'owner')
+      .maybeSingle();
+    if (error) {
+      console.log('[checkout-debug] email owner lookup error', error.message);
+    }
+    if (data?.account_id) return data;
+    await sleep(300);
+  }
+  return null;
+}
+
+async function loadSubscription(admin, accountId) {
+  const { data, error } = await admin
+    .from('subscriptions')
+    .select('stripe_customer_id, stripe_subscription_id, status, plan_tier')
+    .eq('account_id', accountId)
+    .maybeSingle();
+  return { sub: data, error };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -25,10 +58,22 @@ export default async function handler(req, res) {
 
   const stripe = createStripeClient(secretKey);
 
-  const { tier: rawTier, billingCycle: rawCycle = 'monthly' } = req.body || {};
+  const {
+    tier: rawTier,
+    billingCycle: rawCycle = 'monthly',
+    email: rawEmail,
+    afterSignup = false,
+  } = req.body || {};
   const tier = normalizePlanTier(rawTier);
   const billingCycle = rawCycle === 'annual' ? 'annual' : 'monthly';
-  console.log('[checkout-debug] request body tier/cycle:', { rawTier, billingCycle, resolvedTier: tier || null });
+  const emailHint = String(rawEmail || '').trim().toLowerCase();
+  console.log('[checkout-debug] request body tier/cycle:', {
+    rawTier,
+    billingCycle,
+    resolvedTier: tier || null,
+    afterSignup: Boolean(afterSignup),
+    hasEmailHint: Boolean(emailHint),
+  });
 
   if (!tier) return res.status(400).json({ error: 'Unknown plan tier' });
   if (tier === 'solo' && billingCycle !== 'monthly') {
@@ -78,75 +123,93 @@ export default async function handler(req, res) {
 
     const authHeader = req.headers.authorization || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    const admin = adminClient();
     console.log('[checkout-debug] before Supabase auth', {
       hasToken: Boolean(token),
       tokenLen: token ? token.length : 0,
+      adminReady: Boolean(admin),
     });
-    if (token) {
-      const admin = adminClient();
-      console.log('[checkout-debug] adminClient ready:', Boolean(admin));
-      if (admin) {
-        console.log('[checkout-debug] calling admin.auth.getUser…');
-        const { data: authData, error: authErr } = await admin.auth.getUser(token);
-        console.log('[checkout-debug] after admin.auth.getUser', {
-          hasUser: Boolean(authData?.user),
-          userId: authData?.user?.id || null,
-          authError: authErr?.message || null,
-        });
-        if (authData?.user) {
-          customerEmail = authData.user.email || null;
-          console.log('[checkout-debug] looking up users row…');
-          const { data: caller, error: callerErr } = await admin
-            .from('users')
-            .select('account_id, role')
-            .eq('id', authData.user.id)
-            .maybeSingle();
-          console.log('[checkout-debug] users lookup', {
-            role: caller?.role || null,
-            hasAccountId: Boolean(caller?.account_id),
-            error: callerErr?.message || null,
-          });
-          if (caller?.role === 'owner' && caller.account_id) {
-            accountId = caller.account_id;
-            console.log('[checkout-debug] looking up subscriptions row…');
-            const { data: sub, error: subErr } = await admin
-              .from('subscriptions')
-              .select('stripe_customer_id, stripe_subscription_id, status, plan_tier')
-              .eq('account_id', accountId)
-              .maybeSingle();
-            console.log('[checkout-debug] subscriptions lookup', {
-              hasCustomer: Boolean(sub?.stripe_customer_id),
-              hasSubscription: Boolean(sub?.stripe_subscription_id),
-              status: sub?.status || null,
-              dbPlanTier: sub?.plan_tier || null,
-              requestedTier: tier,
-              error: subErr?.message || null,
-            });
-            stripeCustomerId = sub?.stripe_customer_id || null;
-            if (sub?.stripe_subscription_id) addTrial = false;
 
-            if (!sub?.stripe_subscription_id) {
-              const nextBilling = tier === 'solo' ? 'monthly' : billingCycle;
-              const { error: syncErr } = await admin
-                .from('subscriptions')
-                .update({
-                  plan_tier: tier,
-                  billing_cycle: nextBilling,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('account_id', accountId);
-              console.log('[checkout-debug] synced plan_tier from request', {
-                planTier: tier,
-                nextBilling,
-                syncError: syncErr?.message || null,
-              });
-            }
-          }
+    if (token && admin) {
+      console.log('[checkout-debug] calling admin.auth.getUser…');
+      const { data: authData, error: authErr } = await admin.auth.getUser(token);
+      console.log('[checkout-debug] after admin.auth.getUser', {
+        hasUser: Boolean(authData?.user),
+        userId: authData?.user?.id || null,
+        authError: authErr?.message || null,
+      });
+      if (authData?.user) {
+        customerEmail = authData.user.email || null;
+        const { data: caller, error: callerErr } = await admin
+          .from('users')
+          .select('account_id, role')
+          .eq('id', authData.user.id)
+          .maybeSingle();
+        console.log('[checkout-debug] users lookup', {
+          role: caller?.role || null,
+          hasAccountId: Boolean(caller?.account_id),
+          error: callerErr?.message || null,
+        });
+        if (caller?.role === 'owner' && caller.account_id) {
+          accountId = caller.account_id;
         }
       }
+    } else if (emailHint && admin) {
+      // Signup before email confirmation: no session — resolve account by email.
+      console.log('[checkout-debug] resolving account by email (unconfirmed signup path)…');
+      const owner = await findOwnerByEmail(admin, emailHint);
+      if (!owner?.account_id) {
+        return res.status(409).json({
+          error: 'Account is still provisioning. Wait a moment and try Continue to checkout again.',
+        });
+      }
+      accountId = owner.account_id;
+      customerEmail = emailHint;
+      console.log('[checkout-debug] email owner resolved', {
+        userId: owner.id,
+        hasAccountId: true,
+      });
     } else {
-      console.log('[checkout-debug] after Supabase auth: skipped (no Bearer token)');
+      console.log('[checkout-debug] after Supabase auth: skipped (no Bearer token or email)');
     }
+
+    if (accountId && admin) {
+      const { sub, error: subErr } = await loadSubscription(admin, accountId);
+      console.log('[checkout-debug] subscriptions lookup', {
+        hasCustomer: Boolean(sub?.stripe_customer_id),
+        hasSubscription: Boolean(sub?.stripe_subscription_id),
+        status: sub?.status || null,
+        dbPlanTier: sub?.plan_tier || null,
+        requestedTier: tier,
+        error: subErr?.message || null,
+      });
+      stripeCustomerId = sub?.stripe_customer_id || null;
+      if (sub?.stripe_subscription_id) addTrial = false;
+
+      if (!sub?.stripe_subscription_id) {
+        const nextBilling = tier === 'solo' ? 'monthly' : billingCycle;
+        const { error: syncErr } = await admin
+          .from('subscriptions')
+          .update({
+            plan_tier: tier,
+            billing_cycle: nextBilling,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('account_id', accountId);
+        console.log('[checkout-debug] synced plan_tier from request', {
+          planTier: tier,
+          nextBilling,
+          syncError: syncErr?.message || null,
+        });
+      }
+    }
+
+    if (afterSignup && !accountId) {
+      return res.status(400).json({
+        error: 'Could not attach checkout to your new account. Try again in a moment.',
+      });
+    }
+
     console.log('[checkout-debug] auth/lookup phase done', {
       accountId: accountId || null,
       hasCustomerEmail: Boolean(customerEmail),
@@ -154,6 +217,7 @@ export default async function handler(req, res) {
       addTrial,
       tier,
       priceEnv: binding.envName,
+      afterSignup: Boolean(afterSignup),
     });
 
     const meta = {
@@ -164,11 +228,19 @@ export default async function handler(req, res) {
       price_env: binding.envName || '',
     };
 
+    const emailParam = customerEmail ? `&email=${encodeURIComponent(customerEmail)}` : '';
+    const successUrl = afterSignup
+      ? `${origin}/check-email?checkout=success${emailParam}`
+      : `${origin}/app?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = afterSignup
+      ? `${origin}/signup?checkout=cancelled&plan=${tier}&billing=${billingCycle}`
+      : (accountId ? `${origin}/app?checkout=cancelled` : `${origin}/?checkout=cancelled`);
+
     const sessionParams = {
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${origin}/app?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: accountId ? `${origin}/app?checkout=cancelled` : `${origin}/?checkout=cancelled`,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       client_reference_id: accountId || undefined,
       metadata: meta,
       payment_method_collection: 'always',
@@ -191,6 +263,7 @@ export default async function handler(req, res) {
       addTrial,
       hasCustomer: Boolean(sessionParams.customer),
       hasCustomerEmail: Boolean(sessionParams.customer_email),
+      successUrlKind: afterSignup ? 'check-email' : 'app',
     });
     const session = await stripe.checkout.sessions.create(sessionParams);
     console.log('[checkout-debug] Stripe session created', {

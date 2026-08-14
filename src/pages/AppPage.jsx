@@ -195,6 +195,12 @@ export default function AppPage() {
 
   if (!session) return <Navigate to="/login" replace />;
 
+  // App access requires a confirmed email (checkout/signup may precede confirmation).
+  if (!session.user?.email_confirmed_at) {
+    const email = session.user?.email ? encodeURIComponent(session.user.email) : '';
+    return <Navigate to={`/check-email${email ? `?email=${email}` : ''}`} replace />;
+  }
+
   return (
     <WorkspaceProvider>
       <AppShell />
