@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarRange } from 'lucide-react';
+import { CalendarRange, ChevronDown, ChevronRight } from 'lucide-react';
 import { C, HEAD, BODY, tint } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -27,71 +27,163 @@ function formatShort(d) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function formatGoLive(value) {
+  const d = parseDate(value);
+  if (!d) return value;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 const DAY_MS = 86400000;
 const ROW_H = 40;
-const LABEL_W = 240;
+const LABEL_W = 280;
 const PX_PER_DAY = 14;
+
+/** Distinct from Program (teal/blue3) and Initiative (coral/red). */
+const COLOR_PROGRAM = C.teal;
+const COLOR_INITIATIVE = C.coral;
+const COLOR_TASK = C.royal;
+const COLOR_MILESTONE = C.navy;
 
 export default function SchedulePanel() {
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
-  const [rows, setRows] = useState([]);
+  const [programs, setPrograms] = useState([]);
+  const [initiatives, setInitiatives] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  /** Collapsed Program / Initiative ids. Empty = all expanded. */
+  const [collapsed, setCollapsed] = useState(() => new Set());
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       if (!activeWorkspaceId) {
-        setRows([]);
+        setPrograms([]);
+        setInitiatives([]);
+        setTasks([]);
         setLoading(false);
         return;
       }
       setLoading(true);
-      const [{ data: programs }, { data: initiatives }] = await Promise.all([
-        supabase.from('programs').select('id, name, start_date, proposed_go_live_date').eq('workspace_id', activeWorkspaceId).order('name'),
-        supabase.from('initiatives').select('id, name, start_date, proposed_go_live_date, program_id').eq('workspace_id', activeWorkspaceId).order('name'),
+      const [{ data: prog }, { data: inits }, { data: taskRows }] = await Promise.all([
+        supabase
+          .from('programs')
+          .select('id, name, start_date, proposed_go_live_date')
+          .eq('workspace_id', activeWorkspaceId)
+          .order('name'),
+        supabase
+          .from('initiatives')
+          .select('id, name, start_date, proposed_go_live_date, program_id')
+          .eq('workspace_id', activeWorkspaceId)
+          .order('name'),
+        supabase
+          .from('tasks')
+          .select('id, name, start_date, finish_date, initiative_id')
+          .eq('workspace_id', activeWorkspaceId)
+          .order('name'),
       ]);
       if (cancelled) return;
-
-      const list = [];
-      (programs || []).forEach((p) => {
-        list.push({
-          id: `program-${p.id}`,
-          name: p.name,
-          kind: 'Program',
-          start: p.start_date,
-          end: p.proposed_go_live_date || p.start_date,
-          color: C.teal,
-        });
-      });
-      (initiatives || []).forEach((i) => {
-        list.push({
-          id: `initiative-${i.id}`,
-          name: i.name,
-          kind: 'Initiative',
-          start: i.start_date,
-          end: i.proposed_go_live_date || i.start_date,
-          color: C.coral,
-        });
-      });
-      setRows(list);
+      setPrograms(prog || []);
+      setInitiatives(inits || []);
+      setTasks(taskRows || []);
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [activeWorkspaceId]);
 
-  const datedRows = useMemo(
-    () => rows.filter((r) => parseDate(r.start) || parseDate(r.end)),
-    [rows],
-  );
+  const treeRows = useMemo(() => {
+    const initsByProgram = new Map();
+    const orphans = [];
+    initiatives.forEach((i) => {
+      if (!i.program_id) {
+        orphans.push(i);
+        return;
+      }
+      if (!initsByProgram.has(i.program_id)) initsByProgram.set(i.program_id, []);
+      initsByProgram.get(i.program_id).push(i);
+    });
+
+    const tasksByInit = new Map();
+    tasks.forEach((t) => {
+      if (!t.initiative_id) return;
+      if (!tasksByInit.has(t.initiative_id)) tasksByInit.set(t.initiative_id, []);
+      tasksByInit.get(t.initiative_id).push(t);
+    });
+
+    const out = [];
+
+    const pushInitiative = (init, depth) => {
+      const childTasks = tasksByInit.get(init.id) || [];
+      out.push({
+        id: `initiative-${init.id}`,
+        entityId: init.id,
+        name: init.name,
+        kind: 'Initiative',
+        depth,
+        collapsible: childTasks.length > 0,
+        color: COLOR_INITIATIVE,
+        start: init.start_date,
+        end: init.proposed_go_live_date,
+        goLive: init.proposed_go_live_date || null,
+      });
+      if (collapsed.has(init.id)) return;
+      childTasks.forEach((t) => {
+        out.push({
+          id: `task-${t.id}`,
+          entityId: t.id,
+          name: t.name,
+          kind: 'Task',
+          depth: depth + 1,
+          collapsible: false,
+          color: COLOR_TASK,
+          start: t.start_date,
+          end: t.finish_date,
+          goLive: null,
+        });
+      });
+    };
+
+    programs.forEach((p) => {
+      const childInits = initsByProgram.get(p.id) || [];
+      out.push({
+        id: `program-${p.id}`,
+        entityId: p.id,
+        name: p.name,
+        kind: 'Program',
+        depth: 0,
+        collapsible: childInits.length > 0,
+        color: COLOR_PROGRAM,
+        start: p.start_date,
+        end: p.proposed_go_live_date,
+        goLive: null,
+      });
+      if (collapsed.has(p.id)) return;
+      childInits.forEach((init) => pushInitiative(init, 1));
+    });
+
+    orphans.forEach((init) => pushInitiative(init, 0));
+
+    return out;
+  }, [programs, initiatives, tasks, collapsed]);
 
   const range = useMemo(() => {
     const dates = [];
-    datedRows.forEach((r) => {
-      const s = parseDate(r.start);
-      const e = parseDate(r.end);
-      if (s) dates.push(s);
-      if (e) dates.push(e);
+    const consider = (value) => {
+      const d = parseDate(value);
+      if (d) dates.push(d);
+    };
+    programs.forEach((p) => {
+      consider(p.start_date);
+      consider(p.proposed_go_live_date);
     });
+    initiatives.forEach((i) => {
+      consider(i.start_date);
+      consider(i.proposed_go_live_date);
+    });
+    tasks.forEach((t) => {
+      consider(t.start_date);
+      consider(t.finish_date);
+    });
+
     if (!dates.length) {
       const today = new Date();
       return { min: startOfWeek(today), max: addDays(startOfWeek(today), 84) };
@@ -102,7 +194,7 @@ export default function SchedulePanel() {
     max = addDays(startOfWeek(max), 28);
     if (max <= min) max = addDays(min, 56);
     return { min, max };
-  }, [datedRows]);
+  }, [programs, initiatives, tasks]);
 
   const totalDays = Math.max(1, Math.round((range.max - range.min) / DAY_MS));
   const timelineWidth = totalDays * PX_PER_DAY;
@@ -115,9 +207,10 @@ export default function SchedulePanel() {
     return ticks;
   }, [range]);
 
+  /** Both ends required — no zero-width / single-date fallback bars. */
   const barStyle = (row) => {
-    const s = parseDate(row.start) || parseDate(row.end);
-    const e = parseDate(row.end) || parseDate(row.start);
+    const s = parseDate(row.start);
+    const e = parseDate(row.end);
     if (!s || !e) return null;
     const left = ((s - range.min) / DAY_MS) * PX_PER_DAY;
     const spanDays = Math.max(1, Math.round((e - s) / DAY_MS) + 1);
@@ -125,43 +218,70 @@ export default function SchedulePanel() {
     return { left, width };
   };
 
+  const milestoneLeft = (isoDate) => {
+    const d = parseDate(isoDate);
+    if (!d) return null;
+    return ((d - range.min) / DAY_MS) * PX_PER_DAY;
+  };
+
+  const toggleCollapsed = (entityId) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(entityId)) next.delete(entityId);
+      else next.add(entityId);
+      return next;
+    });
+  };
+
+  const hasAnyItems = programs.length > 0 || initiatives.length > 0 || tasks.length > 0;
+
   return (
     <div className="flex-1 p-6 max-w-[1400px] w-full mx-auto overflow-hidden flex flex-col" style={BODY}>
       <div className="mb-4 shrink-0">
         <div
           className="rounded-3xl p-5 mb-3"
-          style={{ background: `linear-gradient(120deg, ${tint(C.teal, '16')}, ${tint(C.coral, '12')})` }}
+          style={{ background: `linear-gradient(120deg, ${tint(COLOR_PROGRAM, '16')}, ${tint(COLOR_TASK, '12')})` }}
         >
           <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
             Schedule — {activeWorkspace?.name}
           </h2>
           <p className="text-sm" style={{ color: C.sub }}>
-            Gantt view of Program and Initiative timelines (start → go-live). Display only.
+            Gantt view of Program, Initiative, and Task timelines. Display only.
           </p>
         </div>
-        <div className="flex gap-3 text-xs font-semibold">
-          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: tint(C.teal, '18'), color: C.teal }}>
-            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: C.teal }} /> Programs
+        <div className="flex flex-wrap gap-3 text-xs font-semibold">
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: tint(COLOR_PROGRAM, '18'), color: COLOR_PROGRAM }}>
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: COLOR_PROGRAM }} /> Programs
           </span>
-          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: tint(C.coral, '18'), color: C.coral }}>
-            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: C.coral }} /> Initiatives
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: tint(COLOR_INITIATIVE, '18'), color: COLOR_INITIATIVE }}>
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: COLOR_INITIATIVE }} /> Initiatives
+          </span>
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: tint(COLOR_TASK, '18'), color: COLOR_TASK }}>
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: COLOR_TASK }} /> Tasks
+          </span>
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: tint(COLOR_MILESTONE, '18'), color: COLOR_MILESTONE }}>
+            <span
+              className="inline-block w-2 h-2"
+              style={{ background: COLOR_MILESTONE, transform: 'rotate(45deg)' }}
+            /> Go Live
           </span>
         </div>
       </div>
 
       {loading ? (
         <p className="text-sm" style={{ color: C.sub }}>Loading…</p>
-      ) : datedRows.length === 0 ? (
+      ) : !hasAnyItems ? (
         <div className="text-center py-14 bg-white rounded-3xl border border-dashed" style={{ borderColor: C.border }}>
-          <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: tint(C.teal, '16') }}>
-            <CalendarRange size={20} style={{ color: C.teal }} />
+          <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: tint(COLOR_PROGRAM, '16') }}>
+            <CalendarRange size={20} style={{ color: COLOR_PROGRAM }} />
           </div>
-          <div className="text-sm" style={{ color: C.sub }}>Add start and go-live dates on Programs and Initiatives to populate the Gantt.</div>
+          <div className="text-sm" style={{ color: C.sub }}>
+            Add Programs, Initiatives, and Tasks with dates to populate the Gantt.
+          </div>
         </div>
       ) : (
         <div className="flex-1 min-h-0 bg-white rounded-2xl border shadow-sm overflow-auto" style={{ borderColor: C.border }}>
           <div style={{ minWidth: LABEL_W + timelineWidth }}>
-            {/* Header */}
             <div className="flex sticky top-0 z-20 border-b" style={{ borderColor: C.border, background: C.bg, height: 44 }}>
               <div
                 className="shrink-0 px-3 flex items-center text-[11px] font-bold uppercase sticky left-0 z-30 border-r"
@@ -185,9 +305,12 @@ export default function SchedulePanel() {
               </div>
             </div>
 
-            {/* Rows */}
-            {datedRows.map((row, idx) => {
+            {treeRows.map((row, idx) => {
               const bar = barStyle(row);
+              const isCollapsed = collapsed.has(row.entityId);
+              const padLeft = 8 + row.depth * 16;
+              const goLiveX = row.goLive ? milestoneLeft(row.goLive) : null;
+
               return (
                 <div
                   key={row.id}
@@ -195,11 +318,33 @@ export default function SchedulePanel() {
                   style={{ borderColor: C.border, height: ROW_H, background: idx % 2 ? tint(C.purple, '04') : '#fff' }}
                 >
                   <div
-                    className="shrink-0 px-3 flex flex-col justify-center sticky left-0 z-10 border-r min-w-0"
-                    style={{ width: LABEL_W, borderColor: C.border, background: idx % 2 ? '#fafafa' : '#fff' }}
+                    className="shrink-0 flex items-center sticky left-0 z-10 border-r min-w-0"
+                    style={{
+                      width: LABEL_W,
+                      borderColor: C.border,
+                      background: idx % 2 ? '#fafafa' : '#fff',
+                      paddingLeft: padLeft,
+                      paddingRight: 8,
+                    }}
                   >
-                    <div className="text-xs font-bold truncate" style={{ color: C.ink }}>{row.name}</div>
-                    <div className="text-[10px]" style={{ color: C.sub }}>{row.kind}</div>
+                    {row.collapsible ? (
+                      <button
+                        type="button"
+                        aria-label={isCollapsed ? `Expand ${row.name}` : `Collapse ${row.name}`}
+                        aria-expanded={!isCollapsed}
+                        onClick={() => toggleCollapsed(row.entityId)}
+                        className="shrink-0 mr-1 p-0.5 rounded hover:bg-black/5"
+                        style={{ color: C.sub }}
+                      >
+                        {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                      </button>
+                    ) : (
+                      <span className="shrink-0 mr-1 w-[18px]" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold truncate" style={{ color: C.ink }}>{row.name}</div>
+                      <div className="text-[10px]" style={{ color: C.sub }}>{row.kind}</div>
+                    </div>
                   </div>
                   <div className="relative" style={{ width: timelineWidth }}>
                     {weekTicks.map((t) => {
@@ -208,7 +353,7 @@ export default function SchedulePanel() {
                         <div
                           key={`${row.id}-${t.toISOString()}`}
                           className="absolute top-0 bottom-0 border-l"
-                          style={{ left, borderColor: tint(C.border, 'ff') === C.border ? C.border : C.border, opacity: 0.7 }}
+                          style={{ left, borderColor: C.border, opacity: 0.7 }}
                         />
                       );
                     })}
@@ -220,8 +365,28 @@ export default function SchedulePanel() {
                           width: Math.max(bar.width, 8),
                           background: row.color,
                         }}
-                        title={`${row.name}: ${row.start || '—'} → ${row.end || '—'}`}
+                        title={`${row.name}: ${row.start} → ${row.end}`}
                       />
+                    )}
+                    {goLiveX != null && (
+                      <div
+                        className="absolute top-1/2 z-[5] pointer-events-auto"
+                        style={{ left: goLiveX, transform: 'translate(-50%, -50%)' }}
+                        title={`Go Live: ${formatGoLive(row.goLive)}`}
+                      >
+                        <span
+                          className="block"
+                          style={{
+                            width: 11,
+                            height: 11,
+                            background: COLOR_MILESTONE,
+                            transform: 'rotate(45deg)',
+                            border: '2px solid #fff',
+                            boxShadow: '0 0 0 1px rgba(15, 22, 51, 0.25)',
+                          }}
+                          aria-label={`Go Live: ${formatGoLive(row.goLive)}`}
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
