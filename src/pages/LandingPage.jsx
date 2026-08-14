@@ -144,7 +144,7 @@ export default function LandingPage() {
           </div>
           <div className="shot">
             <img
-              src="/assets/changeview_dashboard_screenshot.svg"
+              src="/assets/changeview_dashboard_hero.png"
               alt="ChangeView dashboard showing initiatives and workspace stats"
               width="1160"
               height="620"
