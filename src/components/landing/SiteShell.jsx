@@ -77,7 +77,6 @@ export default function SiteShell({ title, children, notice }) {
             </div>
             <div className="col">
               <span className="h">Resources</span>
-              <a href={section('#features')}>Playbooks</a>
               <Link to="/blog">Blog</Link>
             </div>
           </div>

@@ -110,11 +110,6 @@ export default function LandingPage() {
               <h3>Readiness surveys</h3>
               <p>Pulse-check confidence before and after each phase, and act on it instantly.</p>
             </div>
-            <div className="feature">
-              <Mark className="ic" variant="mono" color="#ff1717" />
-              <h3>Playbooks</h3>
-              <p>Reusable templates from proven frameworks — ADKAR, Kotter, and your own.</p>
-            </div>
           </div>
         </div>
       </section>
