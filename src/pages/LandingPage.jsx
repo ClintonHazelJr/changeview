@@ -139,7 +139,6 @@ export default function LandingPage() {
             </p>
             <div className="cta-row">
               <Link className="btn btn-red" to="/signup?plan=solo&billing=monthly">Start free</Link>
-              <a className="btn btn-outline" href="#pricing">Book a demo</a>
             </div>
             <span className="micro">No credit card · 14-day trial · Rolls out in a week</span>
           </div>
