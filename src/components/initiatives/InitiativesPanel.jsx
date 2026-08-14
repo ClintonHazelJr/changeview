@@ -427,7 +427,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-bold" style={{ color: C.ink }}>{c.key_message || 'Untitled'}</span>
-                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full capitalize" style={{ background: tint(C.green, '18'), color: '#1a8a5f' }}>{c.tone}</span>
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full capitalize" style={{ background: tint(C.navy, '18'), color: C.navy }}>{c.tone}</span>
                   </div>
                   <p className="text-xs mb-2" style={{ color: C.sub }}>
                     {c.impact_id ? impactLabel(c.impact_id) : 'Initiative-wide'} · {(c.channel || []).join(', ') || '—'}

@@ -41,11 +41,12 @@ const REPORTS = [
   },
 ];
 
+/** Single-hue blue ramp: light trust tint → navy (darker = higher score). */
 function cellColor(score, max) {
-  if (!score || !max) return C.bg;
+  if (!score || !max) return C.trust;
   const t = Math.min(1, score / max);
-  const a = Math.round(18 + t * 70).toString(16).padStart(2, '0');
-  return `${C.coral}${a}`;
+  const a = Math.round(28 + t * 200).toString(16).padStart(2, '0');
+  return `${C.navy}${a}`;
 }
 
 function ExportBar({ exportRef, filename, disabled }) {
@@ -430,7 +431,7 @@ function HeatMapReport({ workspaceId, exportRef }) {
                     className="mx-auto rounded-lg py-2 font-bold text-xs"
                     style={{
                       background: cellColor(row[key], max),
-                      color: row[key] > max * 0.55 ? C.ink : C.sub,
+                      color: row[key] > max * 0.45 ? '#fff' : C.ink,
                       minWidth: 48,
                     }}
                     title={`Sum severity score: ${row[key]}`}

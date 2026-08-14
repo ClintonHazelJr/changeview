@@ -1,48 +1,69 @@
+/** Brand tokens (landing + app). Legacy keys (purple/teal/…) alias into this system. */
 export const C = {
-  purple: '#7C6FF0',
-  teal: '#2DD4BF',
-  coral: '#FF8C82',
-  green: '#34D399',
-  amber: '#FBBF24',
-  ink: '#1E2140',
-  sub: '#8A8CA5',
-  bg: '#F8F8FC',
-  border: '#EFEFF6',
+  ink: '#17181c',
+  paper: '#f7f7f6',
+  navy: '#1c2f8f',
+  royal: '#3a54c4',
+  blue3: '#5f79df',
+  blue4: '#93a6ee',
+  red: '#ff1717',
+  darknavy: '#0f1633',
+  trust: '#eef0f7',
+  sub: '#575653',
+  bg: '#f7f7f6',
+  border: '#e6e5e2',
+
+  // Legacy aliases — keep existing C.purple / C.coral call sites on the new palette
+  purple: '#1c2f8f', // navy (primary)
+  teal: '#5f79df', // blue3
+  coral: '#ff1717', // red (urgent / error only)
+  green: '#1c2f8f', // navy (approved / done)
+  amber: '#3a54c4', // royal (medium)
 };
 
-export const HEAD = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
-export const BODY = { fontFamily: "'Inter', sans-serif" };
+export const HEAD = {
+  fontFamily: "'Sora', sans-serif",
+  letterSpacing: '-0.03em',
+  fontWeight: 800,
+};
+export const BODY = { fontFamily: "'Sora', sans-serif" };
 
 export const tint = (hex, a = '16') => hex + a;
 
 export const initials = (name = '') =>
   name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
 
+const GRAY = '#8a8986';
+
 export const SEVERITY_COLOR = {
-  none: '#2A2D3A',
-  low: C.green,
-  medium: C.amber,
-  high: C.coral,
+  none: GRAY,
+  low: C.blue4,
+  medium: C.royal,
+  high: C.red,
 };
 export const SEVERITY_LEVELS = ['none', 'low', 'medium', 'high'];
 export const isRatedSeverity = (value) => Boolean(value) && value !== 'none';
 export const STATUS_COLOR = {
-  planning: C.purple,
-  delivery: C.teal,
-  hypercare: C.amber,
-  closed: C.sub,
-  draft: C.amber,
-  approved: C.green,
-  rejected: C.coral,
-  none: '#2A2D3A',
-  low: C.green,
-  medium: C.amber,
-  high: C.coral,
-  backlog: C.sub,
-  ready: C.purple,
-  in_progress: C.teal,
-  blocked: C.coral,
-  done: C.green,
+  // Initiative
+  planning: C.blue4,
+  delivery: C.blue3,
+  hypercare: C.royal,
+  closed: GRAY,
+  // Requirement / impact
+  draft: GRAY,
+  approved: C.navy,
+  rejected: C.red,
+  // Severity (shared keys)
+  none: GRAY,
+  low: C.blue4,
+  medium: C.royal,
+  high: C.red,
+  // Task Kanban
+  backlog: GRAY,
+  ready: C.blue4,
+  in_progress: C.blue3,
+  blocked: C.red,
+  done: C.navy,
 };
 export const TAG_OPTIONS = ['Training', 'Huddle', 'Email', 'Documentation'];
 

@@ -242,7 +242,7 @@ export default function SystemAdmin({ initialTab = null, onInitialTabConsumed })
                       {t.members.map((m) => (
                         <div key={m.id} className="flex items-center justify-between text-sm py-2">
                           <span style={{ color: C.ink }}>{personName(m.person_id)}</span>
-                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: tint(C.green, '18'), color: '#1a8a5f' }}><Tag size={10} className="inline mr-1" />{m.role}</span>
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: tint(C.navy, '18'), color: C.navy }}><Tag size={10} className="inline mr-1" />{m.role}</span>
                         </div>
                       ))}
                       <button type="button" onClick={() => setModal({ type: 'teamMember', teamId: t.id })} className="flex items-center gap-1.5 text-xs font-bold mt-2" style={{ color: C.purple }}><Plus size={13} /> Add team member</button>
@@ -269,7 +269,7 @@ export default function SystemAdmin({ initialTab = null, onInitialTabConsumed })
                         {t.members.map((m) => (
                           <div key={m.id} className="flex items-center justify-between text-sm py-2">
                             <span style={{ color: C.ink }}>{personName(m.person_id)}</span>
-                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: tint(C.green, '18'), color: '#1a8a5f' }}><Tag size={10} className="inline mr-1" />{m.role}</span>
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: tint(C.navy, '18'), color: C.navy }}><Tag size={10} className="inline mr-1" />{m.role}</span>
                           </div>
                         ))}
                         <button type="button" onClick={() => setModal({ type: 'teamMember', teamId: t.id })} className="flex items-center gap-1.5 text-xs font-bold mt-2" style={{ color: C.purple }}><Plus size={13} /> Add team member</button>
