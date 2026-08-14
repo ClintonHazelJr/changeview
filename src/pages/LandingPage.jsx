@@ -282,6 +282,10 @@ export default function LandingPage() {
               <Link
                 to="/signup?plan=solo&billing=monthly"
                 data-plan="solo"
+                onClick={() => {
+                  // TEMP DIAGNOSTIC — log literal tier at click, before anything else.
+                  console.log('[pricing-click] tier=', 'solo');
+                }}
                 className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                 style={{ background: C.purple }}
               >
@@ -368,6 +372,10 @@ export default function LandingPage() {
                   <Link
                     to={trialSignupPath('small', billingCycle)}
                     data-plan="small"
+                    onClick={() => {
+                      // TEMP DIAGNOSTIC — log literal tier at click, before anything else.
+                      console.log('[pricing-click] tier=', 'small');
+                    }}
                     className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                     style={{ background: C.purple }}
                   >
@@ -412,6 +420,10 @@ export default function LandingPage() {
                   <Link
                     to={trialSignupPath('enterprise', billingCycle)}
                     data-plan="enterprise"
+                    onClick={() => {
+                      // TEMP DIAGNOSTIC — log literal tier at click, before anything else.
+                      console.log('[pricing-click] tier=', 'enterprise');
+                    }}
                     className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                     style={{ background: C.ink }}
                   >
