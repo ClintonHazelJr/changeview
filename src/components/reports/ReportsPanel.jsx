@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ClipboardList, FileText, Grid3X3, CalendarRange, Download, Loader2 } from 'lucide-react';
-import { C, HEAD, BODY, SEVERITY_COLOR, STATUS_COLOR, tint, isRatedSeverity } from '../../lib/constants';
+import { C, HEAD, BODY, SEVERITY_COLOR, STATUS_COLOR, tint, isRatedSeverity, stripInitiativeMeta } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { exportElementToPdf } from '../../lib/exportReportPdf';
@@ -26,7 +26,7 @@ const REPORTS = [
   {
     key: 'cia',
     title: 'Change Impact Assessment',
-    desc: 'Document-style assessment of impacts and learning needs for one initiative.',
+    desc: 'Impacts and learning needs for one initiative, or every initiative under a program.',
     icon: FileText,
     color: C.coral,
     file: 'change-impact-assessment.pdf',
@@ -193,36 +193,198 @@ function RequirementsReport({ workspaceId, exportRef }) {
   );
 }
 
+function CiaInitiativeBody({ initiative, impacts, learning, departments, people, headingLevel = 'h3' }) {
+  const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
+  const personName = (id) => (id && people.find((p) => p.id === id)?.name) || '';
+  const description = stripInitiativeMeta(initiative.description);
+  const owners = [
+    ['Change Owner', personName(initiative.change_owner_id)],
+    ['Product Owner', personName(initiative.product_owner_id)],
+    ['Business Owner', personName(initiative.business_owner_id)],
+    ['Project Manager', personName(initiative.project_manager_id)],
+  ].filter(([, name]) => name);
+  const TitleTag = headingLevel;
+
+  return (
+    <>
+      <header className="border-b pb-5 mb-8" style={{ borderColor: C.border }}>
+        <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: C.sub }}>
+          ChangeView · Change Impact Assessment
+        </div>
+        <TitleTag className="text-2xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>{initiative.name}</TitleTag>
+        <div className="flex flex-wrap gap-3 text-xs mb-3" style={{ color: C.sub }}>
+          {initiative.status && <span className="capitalize">Status: {initiative.status}</span>}
+          {initiative.proposed_go_live_date && (
+            <span>Proposed go-live: {initiative.proposed_go_live_date}</span>
+          )}
+          <span>Prepared {new Date().toLocaleDateString()}</span>
+        </div>
+        {owners.length > 0 && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-3" style={{ color: C.ink }}>
+            {owners.map(([label, name]) => (
+              <span key={label}><span style={{ color: C.sub }}>{label}:</span> {name}</span>
+            ))}
+          </div>
+        )}
+        {description && (
+          <p className="text-sm leading-relaxed" style={{ color: C.ink }}>{description}</p>
+        )}
+      </header>
+
+      <section className="mb-8">
+        <h4 className="text-sm font-extrabold uppercase tracking-wide mb-2" style={{ ...HEAD, color: C.ink }}>
+          Executive summary
+        </h4>
+        <p className="text-sm leading-relaxed" style={{ color: C.sub }}>
+          This assessment covers {impacts.length} impact area{impacts.length === 1 ? '' : 's'} and {learning.length} learning need{learning.length === 1 ? '' : 's'}
+          {' '}for {initiative.name}. Use it to brief stakeholders on who is affected, how severely, and what training is planned.
+        </p>
+      </section>
+
+      {impacts.length === 0 ? (
+        <p className="text-sm" style={{ color: C.sub }}>No impacts recorded for this initiative.</p>
+      ) : impacts.map((imp, idx) => {
+        const linked = learning.filter((l) => l.impact_id === imp.id);
+        return (
+          <section key={imp.id} className={`${idx > 0 ? 'border-t pt-7 mt-7' : ''}`} style={{ borderColor: C.border }}>
+            <h4 className="text-base font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
+              {idx + 1}. {deptName(imp.department_id)}
+              {imp.headcount_impacted != null && (
+                <span className="text-sm font-semibold ml-2" style={{ color: C.sub }}>· {imp.headcount_impacted} impacted</span>
+              )}
+            </h4>
+            {imp.status && (
+              <div className="mb-2">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize" style={{ background: tint(STATUS_COLOR[imp.status] || C.sub, '22'), color: STATUS_COLOR[imp.status] || C.sub }}>
+                  {imp.status}
+                </span>
+              </div>
+            )}
+            {imp.impact_description && (
+              <p className="text-sm mb-4 leading-relaxed" style={{ color: C.ink }}>{imp.impact_description}</p>
+            )}
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <div className="rounded-2xl p-3" style={{ background: C.bg }}>
+                <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Current state</div>
+                <p className="text-sm mb-1" style={{ color: C.ink }}><span style={{ color: C.sub }}>System:</span> {imp.current_state_system || '—'}</p>
+                <p className="text-sm" style={{ color: C.ink }}><span style={{ color: C.sub }}>Process:</span> {imp.current_state_process || '—'}</p>
+              </div>
+              <div className="rounded-2xl p-3" style={{ background: C.bg }}>
+                <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Future state</div>
+                <p className="text-sm mb-1" style={{ color: C.ink }}><span style={{ color: C.sub }}>System:</span> {imp.future_state_system || '—'}</p>
+                <p className="text-sm" style={{ color: C.ink }}><span style={{ color: C.sub }}>Process:</span> {imp.future_state_process || '—'}</p>
+              </div>
+            </div>
+            <div className="mb-3">
+              <div className="text-[11px] font-bold uppercase mb-2" style={{ color: C.sub }}>Severity</div>
+              <div className="flex flex-wrap gap-2">
+                {SEV_COLS.map(({ key, label }) => {
+                  const v = imp[key] || 'none';
+                  const show = isRatedSeverity(v);
+                  return (
+                    <span
+                      key={key}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
+                      style={{
+                        background: show ? tint(SEVERITY_COLOR[v], '22') : C.bg,
+                        color: show ? SEVERITY_COLOR[v] : C.sub,
+                      }}
+                    >
+                      {label}: {v === 'none' ? 'No Impact' : v}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+            {(imp.intervention_tags || []).length > 0 && (
+              <div className="mb-3">
+                <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Interventions</div>
+                <p className="text-sm capitalize" style={{ color: C.ink }}>{(imp.intervention_tags || []).join(', ')}</p>
+              </div>
+            )}
+            {linked.length > 0 && (
+              <div>
+                <div className="text-[11px] font-bold uppercase mb-2" style={{ color: C.sub }}>Learning needs</div>
+                <ul className="space-y-1.5">
+                  {linked.map((l) => (
+                    <li key={l.id} className="text-sm" style={{ color: C.ink }}>
+                      <strong>{l.team || 'Team'}</strong>
+                      {l.goal ? ` — ${l.goal}` : ''}
+                      <span style={{ color: C.sub }}>
+                        {' '}· {l.type || 'Training'} · {l.headcount || 0} people · {l.session_count || 0} sessions · {l.time_hours || 0}h
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
 function CiaReport({ workspaceId, exportRef }) {
+  const [scope, setScope] = useState('initiative');
+  const [programs, setPrograms] = useState([]);
+  const [programId, setProgramId] = useState('');
   const [initiatives, setInitiatives] = useState([]);
   const [initiativeId, setInitiativeId] = useState('');
   const [impacts, setImpacts] = useState([]);
   const [learning, setLearning] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [people, setPeople] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => new Set());
+
+  const INIT_SELECT = 'id, name, description, status, proposed_go_live_date, program_id, change_owner_id, product_owner_id, business_owner_id, project_manager_id';
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data } = await supabase.from('initiatives').select('id, name, description, status, proposed_go_live_date').eq('workspace_id', workspaceId).order('name');
+      const [initRes, progRes, peopleRes] = await Promise.all([
+        supabase.from('initiatives').select(INIT_SELECT).eq('workspace_id', workspaceId).order('name'),
+        supabase.from('programs').select('id, name').eq('workspace_id', workspaceId).order('name'),
+        supabase.from('people').select('id, name').eq('workspace_id', workspaceId),
+      ]);
       if (cancelled) return;
-      setInitiatives(data || []);
-      if (data?.[0] && !initiativeId) setInitiativeId(data[0].id);
+      const initRows = initRes.data || [];
+      const progRows = progRes.data || [];
+      setInitiatives(initRows);
+      setPrograms(progRows);
+      setPeople(peopleRes.data || []);
+      if (initRows[0] && !initiativeId) setInitiativeId(initRows[0].id);
+      if (progRows[0] && !programId) setProgramId(progRows[0].id);
     })();
     return () => { cancelled = true; };
   }, [workspaceId]);
 
+  const programInitiatives = useMemo(
+    () => (programId ? initiatives.filter((i) => i.program_id === programId) : []),
+    [initiatives, programId],
+  );
+
+  const activeInitiativeIds = useMemo(() => {
+    if (scope === 'program') return programInitiatives.map((i) => i.id);
+    return initiativeId ? [initiativeId] : [];
+  }, [scope, programInitiatives, initiativeId]);
+
+  const activeInitiativeKey = activeInitiativeIds.join(',');
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!initiativeId) {
+      if (!activeInitiativeKey) {
         setImpacts([]);
         setLearning([]);
+        setDepartments([]);
         return;
       }
       setLoading(true);
+      const ids = activeInitiativeKey.split(',');
       const [imp, ln, dept] = await Promise.all([
-        supabase.from('impacts').select('*').eq('initiative_id', initiativeId).order('created_at'),
+        supabase.from('impacts').select('*').in('initiative_id', ids).order('created_at'),
         supabase.from('learning_needs').select('*').eq('workspace_id', workspaceId).order('created_at'),
         supabase.from('departments').select('id, name').eq('workspace_id', workspaceId),
       ]);
@@ -235,143 +397,151 @@ function CiaReport({ workspaceId, exportRef }) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [initiativeId, workspaceId]);
+  }, [activeInitiativeKey, workspaceId]);
+
+  useEffect(() => {
+    setCollapsed(new Set());
+  }, [programId, scope]);
 
   const initiative = initiatives.find((i) => i.id === initiativeId);
-  const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
+  const program = programs.find((p) => p.id === programId);
+
+  const toggleCollapsed = (id) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   return (
     <div>
-      <div className="mb-4">
-        <label className="text-xs font-semibold block mb-1.5" style={{ color: C.sub }}>Initiative</label>
-        <select
-          className="text-sm rounded-xl border px-3 py-2 min-w-[260px]"
-          style={{ borderColor: C.border, color: C.ink }}
-          value={initiativeId}
-          onChange={(e) => setInitiativeId(e.target.value)}
-        >
-          {initiatives.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-        </select>
+      <div className="flex flex-wrap gap-3 mb-4 items-end">
+        <div>
+          <label className="text-xs font-semibold block mb-1.5" style={{ color: C.sub }}>Scope</label>
+          <div className="flex rounded-xl border overflow-hidden" style={{ borderColor: C.border }}>
+            {[
+              { key: 'initiative', label: 'Initiative' },
+              { key: 'program', label: 'Program' },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setScope(opt.key)}
+                className="text-sm font-semibold px-3 py-2"
+                style={{
+                  background: scope === opt.key ? C.coral : '#fff',
+                  color: scope === opt.key ? '#fff' : C.ink,
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {scope === 'initiative' ? (
+          <div>
+            <label className="text-xs font-semibold block mb-1.5" style={{ color: C.sub }}>Initiative</label>
+            <select
+              className="text-sm rounded-xl border px-3 py-2 min-w-[260px]"
+              style={{ borderColor: C.border, color: C.ink }}
+              value={initiativeId}
+              onChange={(e) => setInitiativeId(e.target.value)}
+            >
+              {initiatives.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+            </select>
+          </div>
+        ) : (
+          <div>
+            <label className="text-xs font-semibold block mb-1.5" style={{ color: C.sub }}>Program</label>
+            <select
+              className="text-sm rounded-xl border px-3 py-2 min-w-[260px]"
+              style={{ borderColor: C.border, color: C.ink }}
+              value={programId}
+              onChange={(e) => setProgramId(e.target.value)}
+            >
+              {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
       {loading ? (
         <p className="text-sm" style={{ color: C.sub }}>Loading…</p>
-      ) : !initiative ? (
-        <p className="text-sm" style={{ color: C.sub }}>No initiatives in this workspace.</p>
+      ) : scope === 'initiative' ? (
+        !initiative ? (
+          <p className="text-sm" style={{ color: C.sub }}>No initiatives in this workspace.</p>
+        ) : (
+          <article
+            ref={exportRef}
+            className="bg-white rounded-3xl border shadow-sm p-10 max-w-3xl"
+            style={{ borderColor: C.border }}
+          >
+            <CiaInitiativeBody
+              initiative={initiative}
+              impacts={impacts.filter((imp) => imp.initiative_id === initiative.id)}
+              learning={learning}
+              departments={departments}
+              people={people}
+            />
+          </article>
+        )
+      ) : !program ? (
+        <p className="text-sm" style={{ color: C.sub }}>No programs in this workspace.</p>
+      ) : programInitiatives.length === 0 ? (
+        <p className="text-sm" style={{ color: C.sub }}>No initiatives under this program.</p>
       ) : (
-        <article
-          ref={exportRef}
-          className="bg-white rounded-3xl border shadow-sm p-10 max-w-3xl"
-          style={{ borderColor: C.border }}
-        >
-          <header className="border-b pb-5 mb-8" style={{ borderColor: C.border }}>
+        <div ref={exportRef} className="max-w-3xl space-y-4">
+          <div className="bg-white rounded-3xl border shadow-sm p-6" style={{ borderColor: C.border }}>
             <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: C.sub }}>
               ChangeView · Change Impact Assessment
             </div>
-            <h3 className="text-2xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>{initiative.name}</h3>
-            <div className="flex flex-wrap gap-3 text-xs mb-3" style={{ color: C.sub }}>
-              {initiative.status && <span className="capitalize">Status: {initiative.status}</span>}
-              {initiative.proposed_go_live_date && (
-                <span>Proposed go-live: {initiative.proposed_go_live_date}</span>
-              )}
-              <span>Prepared {new Date().toLocaleDateString()}</span>
-            </div>
-            {initiative.description && (
-              <p className="text-sm leading-relaxed" style={{ color: C.ink }}>{initiative.description}</p>
-            )}
-          </header>
-
-          <section className="mb-8">
-            <h4 className="text-sm font-extrabold uppercase tracking-wide mb-2" style={{ ...HEAD, color: C.ink }}>
-              Executive summary
-            </h4>
-            <p className="text-sm leading-relaxed" style={{ color: C.sub }}>
-              This assessment covers {impacts.length} impact area{impacts.length === 1 ? '' : 's'} and {learning.length} learning need{learning.length === 1 ? '' : 's'}
-              {' '}for {initiative.name}. Use it to brief stakeholders on who is affected, how severely, and what training is planned.
+            <h3 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>{program.name}</h3>
+            <p className="text-sm" style={{ color: C.sub }}>
+              Program-level assessment covering {programInitiatives.length} initiative{programInitiatives.length === 1 ? '' : 's'}.
+              {' '}Prepared {new Date().toLocaleDateString()}.
             </p>
-          </section>
-
-          {impacts.length === 0 ? (
-            <p className="text-sm" style={{ color: C.sub }}>No impacts recorded for this initiative.</p>
-          ) : impacts.map((imp, idx) => {
-            const linked = learning.filter((l) => l.impact_id === imp.id);
+          </div>
+          {programInitiatives.map((init) => {
+            const initImpacts = impacts.filter((imp) => imp.initiative_id === init.id);
+            const impactIds = new Set(initImpacts.map((i) => i.id));
+            const initLearning = learning.filter((l) => impactIds.has(l.impact_id));
+            const isCollapsed = collapsed.has(init.id);
             return (
-              <section key={imp.id} className={`${idx > 0 ? 'border-t pt-7 mt-7' : ''}`} style={{ borderColor: C.border }}>
-                <h4 className="text-base font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
-                  {idx + 1}. {deptName(imp.department_id)}
-                  {imp.headcount_impacted != null && (
-                    <span className="text-sm font-semibold ml-2" style={{ color: C.sub }}>· {imp.headcount_impacted} impacted</span>
-                  )}
-                </h4>
-                {imp.status && (
-                  <div className="mb-2">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize" style={{ background: tint(STATUS_COLOR[imp.status] || C.sub, '22'), color: STATUS_COLOR[imp.status] || C.sub }}>
-                      {imp.status}
-                    </span>
+              <article
+                key={init.id}
+                className="bg-white rounded-3xl border shadow-sm overflow-hidden"
+                style={{ borderColor: C.border }}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleCollapsed(init.id)}
+                  className="w-full flex items-center gap-2 px-6 py-4 text-left border-b"
+                  style={{ borderColor: C.border, background: C.bg }}
+                >
+                  <span className="text-sm font-bold" style={{ color: C.sub }}>{isCollapsed ? '▸' : '▾'}</span>
+                  <span className="text-base font-extrabold flex-1" style={{ ...HEAD, color: C.ink }}>{init.name}</span>
+                  <span className="text-xs" style={{ color: C.sub }}>
+                    {initImpacts.length} impact{initImpacts.length === 1 ? '' : 's'}
+                  </span>
+                </button>
+                {!isCollapsed && (
+                  <div className="p-8">
+                    <CiaInitiativeBody
+                      initiative={init}
+                      impacts={initImpacts}
+                      learning={initLearning}
+                      departments={departments}
+                      people={people}
+                      headingLevel="h4"
+                    />
                   </div>
                 )}
-                {imp.impact_description && (
-                  <p className="text-sm mb-4 leading-relaxed" style={{ color: C.ink }}>{imp.impact_description}</p>
-                )}
-                <div className="grid md:grid-cols-2 gap-4 mb-4">
-                  <div className="rounded-2xl p-3" style={{ background: C.bg }}>
-                    <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Current state</div>
-                    <p className="text-sm mb-1" style={{ color: C.ink }}><span style={{ color: C.sub }}>System:</span> {imp.current_state_system || '—'}</p>
-                    <p className="text-sm" style={{ color: C.ink }}><span style={{ color: C.sub }}>Process:</span> {imp.current_state_process || '—'}</p>
-                  </div>
-                  <div className="rounded-2xl p-3" style={{ background: C.bg }}>
-                    <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Future state</div>
-                    <p className="text-sm mb-1" style={{ color: C.ink }}><span style={{ color: C.sub }}>System:</span> {imp.future_state_system || '—'}</p>
-                    <p className="text-sm" style={{ color: C.ink }}><span style={{ color: C.sub }}>Process:</span> {imp.future_state_process || '—'}</p>
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <div className="text-[11px] font-bold uppercase mb-2" style={{ color: C.sub }}>Severity</div>
-                  <div className="flex flex-wrap gap-2">
-                    {SEV_COLS.map(({ key, label }) => {
-                      const v = imp[key] || 'none';
-                      const show = isRatedSeverity(v);
-                      return (
-                        <span
-                          key={key}
-                          className="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
-                          style={{
-                            background: show ? tint(SEVERITY_COLOR[v], '22') : C.bg,
-                            color: show ? SEVERITY_COLOR[v] : C.sub,
-                          }}
-                        >
-                          {label}: {v === 'none' ? 'No Impact' : v}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-                {(imp.intervention_tags || []).length > 0 && (
-                  <div className="mb-3">
-                    <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Interventions</div>
-                    <p className="text-sm capitalize" style={{ color: C.ink }}>{(imp.intervention_tags || []).join(', ')}</p>
-                  </div>
-                )}
-                {linked.length > 0 && (
-                  <div>
-                    <div className="text-[11px] font-bold uppercase mb-2" style={{ color: C.sub }}>Learning needs</div>
-                    <ul className="space-y-1.5">
-                      {linked.map((l) => (
-                        <li key={l.id} className="text-sm" style={{ color: C.ink }}>
-                          <strong>{l.team || 'Team'}</strong>
-                          {l.goal ? ` — ${l.goal}` : ''}
-                          <span style={{ color: C.sub }}>
-                            {' '}· {l.type || 'Training'} · {l.headcount || 0} people · {l.session_count || 0} sessions · {l.time_hours || 0}h
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </section>
+              </article>
             );
           })}
-        </article>
+        </div>
       )}
     </div>
   );

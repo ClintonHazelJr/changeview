@@ -52,7 +52,7 @@ const COLOR_HYPERCARE = C.darknavy;
 const COLOR_GO_LIVE = C.navy;
 const COLOR_COMMS = C.blue4;
 
-export default function SchedulePanel() {
+export default function SchedulePanel({ onOpenRecord }) {
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const [programs, setPrograms] = useState([]);
   const [initiatives, setInitiatives] = useState([]);
@@ -189,6 +189,7 @@ export default function SchedulePanel() {
         out.push({
           id: `hypercare-${hc.id}`,
           entityId: hc.id,
+          initiativeId: init.id,
           name: 'Hypercare',
           kind: 'Hypercare',
           depth: depth + 1,
@@ -299,6 +300,16 @@ export default function SchedulePanel() {
     });
   };
 
+  const openRow = (row) => {
+    if (!onOpenRecord) return;
+    if (row.kind === 'Program') onOpenRecord({ type: 'program', id: row.entityId });
+    else if (row.kind === 'Initiative') onOpenRecord({ type: 'initiative', id: row.entityId });
+    else if (row.kind === 'Task') onOpenRecord({ type: 'task', id: row.entityId });
+    else if (row.kind === 'Hypercare') {
+      onOpenRecord({ type: 'hypercare', id: row.entityId, initiativeId: row.initiativeId });
+    }
+  };
+
   const hasAnyItems = programs.length > 0 || initiatives.length > 0 || tasks.length > 0
     || hypercareRows.length > 0 || comms.length > 0;
 
@@ -380,6 +391,8 @@ export default function SchedulePanel() {
               const isCollapsed = collapsed.has(row.entityId);
               const padLeft = 8 + row.depth * 16;
               const goLiveX = row.goLive ? milestoneLeft(row.goLive) : null;
+              const canOpen = Boolean(onOpenRecord)
+                && ['Program', 'Initiative', 'Task', 'Hypercare'].includes(row.kind);
 
               return (
                 <div
@@ -412,8 +425,27 @@ export default function SchedulePanel() {
                       <span className="shrink-0 mr-1 w-[18px]" />
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs font-bold truncate" style={{ color: C.ink }}>{row.name}</div>
-                      <div className="text-[10px]" style={{ color: C.sub }}>{row.kind}</div>
+                      {canOpen ? (
+                        <button
+                          type="button"
+                          onClick={() => openRow(row)}
+                          className="text-left w-full min-w-0 group"
+                          title={`Open ${row.kind}`}
+                        >
+                          <div
+                            className="text-xs font-bold truncate group-hover:underline"
+                            style={{ color: C.ink }}
+                          >
+                            {row.name}
+                          </div>
+                          <div className="text-[10px]" style={{ color: C.sub }}>{row.kind}</div>
+                        </button>
+                      ) : (
+                        <>
+                          <div className="text-xs font-bold truncate" style={{ color: C.ink }}>{row.name}</div>
+                          <div className="text-[10px]" style={{ color: C.sub }}>{row.kind}</div>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="relative" style={{ width: timelineWidth }}>
@@ -428,15 +460,30 @@ export default function SchedulePanel() {
                       );
                     })}
                     {bar && (
-                      <div
-                        className="absolute top-1/2 -translate-y-1/2 h-5 rounded-md shadow-sm"
-                        style={{
-                          left: bar.left,
-                          width: Math.max(bar.width, 8),
-                          background: row.color,
-                        }}
-                        title={`${row.name}: ${row.start} → ${row.end}`}
-                      />
+                      canOpen ? (
+                        <button
+                          type="button"
+                          onClick={() => openRow(row)}
+                          className="absolute top-1/2 -translate-y-1/2 h-5 rounded-md shadow-sm hover:brightness-110 cursor-pointer"
+                          style={{
+                            left: bar.left,
+                            width: Math.max(bar.width, 8),
+                            background: row.color,
+                          }}
+                          title={`Open ${row.name}`}
+                          aria-label={`Open ${row.kind}: ${row.name}`}
+                        />
+                      ) : (
+                        <div
+                          className="absolute top-1/2 -translate-y-1/2 h-5 rounded-md shadow-sm"
+                          style={{
+                            left: bar.left,
+                            width: Math.max(bar.width, 8),
+                            background: row.color,
+                          }}
+                          title={`${row.name}: ${row.start} → ${row.end}`}
+                        />
+                      )
                     )}
                     {goLiveX != null && (
                       <div

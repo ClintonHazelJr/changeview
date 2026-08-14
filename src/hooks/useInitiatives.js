@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { packInitiativeMeta, parseDbError } from '../lib/constants';
+import { parseDbError, stripInitiativeMeta } from '../lib/constants';
 import { useWorkspace } from '../contexts/WorkspaceContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -44,13 +44,6 @@ export function useInitiatives() {
       throw new Error('Select a Program, or create one under Program first.');
     }
 
-    const description = packInitiativeMeta(vals.description, {
-      changeOwner: vals.changeOwner || '',
-      productOwner: vals.productOwner || '',
-      businessOwner: vals.businessOwner || '',
-      projectManager: vals.projectManager || '',
-    });
-
     const { data, error } = await supabase
       .from('initiatives')
       .insert({
@@ -58,13 +51,17 @@ export function useInitiatives() {
         workspace_id: activeWorkspaceId,
         program_id: vals.programId,
         name: vals.name,
-        description,
+        description: stripInitiativeMeta(vals.description),
         status: 'planning',
         start_date: vals.startDate || null,
         proposed_go_live_date: vals.goLiveDate || null,
         budget: vals.budget ? Number(vals.budget) : null,
         use_case: vals.useCase,
         expected_benefits: vals.expectedBenefits,
+        change_owner_id: vals.changeOwnerId || null,
+        product_owner_id: vals.productOwnerId || null,
+        business_owner_id: vals.businessOwnerId || null,
+        project_manager_id: vals.projectManagerId || null,
       })
       .select()
       .single();
@@ -73,7 +70,35 @@ export function useInitiatives() {
     return data;
   };
 
-  return { initiatives, programs, loading, reload: load, addInitiative };
+  const updateInitiative = async (id, vals) => {
+    if (!vals.programId) {
+      throw new Error('Select a Program, or create one under Program first.');
+    }
+    const { data, error } = await supabase
+      .from('initiatives')
+      .update({
+        program_id: vals.programId,
+        name: vals.name,
+        description: stripInitiativeMeta(vals.description),
+        start_date: vals.startDate || null,
+        proposed_go_live_date: vals.goLiveDate || null,
+        budget: vals.budget !== '' && vals.budget != null ? Number(vals.budget) : null,
+        use_case: vals.useCase,
+        expected_benefits: vals.expectedBenefits,
+        change_owner_id: vals.changeOwnerId || null,
+        product_owner_id: vals.productOwnerId || null,
+        business_owner_id: vals.businessOwnerId || null,
+        project_manager_id: vals.projectManagerId || null,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error(parseDbError(error));
+    await load();
+    return data;
+  };
+
+  return { initiatives, programs, loading, reload: load, addInitiative, updateInitiative };
 }
 
 export function useInitiativeDetail(initiativeId) {

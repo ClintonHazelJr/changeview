@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CircleDot, Play, Loader, Ban, CheckCircle2 } from 'lucide-react';
 import { C, HEAD, BODY, SEVERITY_COLOR, TASK_STATUSES, tint, parseDbError, inputClass, inputStyle } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
@@ -30,7 +30,7 @@ const TASK_HEADERS = [
   'Effort Estimate', 'Start Date', 'Finish Date', 'Sprint', 'PI',
 ];
 
-export default function TasksPanel() {
+export default function TasksPanel({ initialTaskId = null, onTaskFocusConsumed }) {
   const {
     tasks, initiatives, people, teams, requirements,
     saveTask, updateTaskStatus, deleteTask, reload,
@@ -72,6 +72,13 @@ export default function TasksPanel() {
 
   const openAdd = () => { setEditing(null); setModal('task'); };
   const openEdit = (task) => { setEditing(task); setModal('task'); };
+
+  useEffect(() => {
+    if (!initialTaskId || !tasks.length) return;
+    const match = tasks.find((t) => t.id === initialTaskId);
+    if (match) openEdit(match);
+    onTaskFocusConsumed?.();
+  }, [initialTaskId, tasks]);
 
   const onDropColumn = async (status) => {
     const taskId = window.__cvDragTaskId;

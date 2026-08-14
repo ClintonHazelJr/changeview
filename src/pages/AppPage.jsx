@@ -38,6 +38,9 @@ function AppShell() {
 
   const [section, setSection] = useState('dashboard');
   const [initiativeFocusId, setInitiativeFocusId] = useState(null);
+  const [initiativeFocusTab, setInitiativeFocusTab] = useState(null);
+  const [programFocusId, setProgramFocusId] = useState(null);
+  const [taskFocusId, setTaskFocusId] = useState(null);
   const [adminTabFocus, setAdminTabFocus] = useState(null);
   const [openAddOrg, setOpenAddOrg] = useState(false);
   const orgSetupCheckedForWs = useRef(null);
@@ -110,37 +113,81 @@ function AppShell() {
     return () => { cancelled = true; };
   }, [params, setParams, session?.access_token, reload]);
 
-  const openInitiative = (id) => {
+  const openInitiative = (id, tab = 'details') => {
     setInitiativeFocusId(id);
+    setInitiativeFocusTab(tab);
     setSection('initiatives');
   };
+
+  const openFromSchedule = useCallback((target) => {
+    if (!target?.type) return;
+    if (target.type === 'program') {
+      setProgramFocusId(target.id);
+      setSection('program');
+      return;
+    }
+    if (target.type === 'initiative') {
+      setInitiativeFocusId(target.id);
+      setInitiativeFocusTab('details');
+      setSection('initiatives');
+      return;
+    }
+    if (target.type === 'task') {
+      setTaskFocusId(target.id);
+      setSection('tasks');
+      return;
+    }
+    if (target.type === 'hypercare' && target.initiativeId) {
+      setInitiativeFocusId(target.initiativeId);
+      setInitiativeFocusTab('hypercare');
+      setSection('initiatives');
+    }
+  }, []);
 
   const handleNavigate = useCallback((target) => {
     if (!target?.section) return;
     setSection(target.section);
-    if (target.initiativeId) setInitiativeFocusId(target.initiativeId);
+    if (target.initiativeId) {
+      setInitiativeFocusId(target.initiativeId);
+      setInitiativeFocusTab(target.initTab || 'details');
+    }
     if (target.adminTab) setAdminTabFocus(target.adminTab);
     else if (target.section !== 'settings') setAdminTabFocus(null);
   }, []);
 
   let body = null;
   if (section === 'dashboard') body = <Dashboard onOpenInitiative={openInitiative} />;
-  else if (section === 'program') body = <ProgramsPanel />;
-  else if (section === 'initiatives') {
+  else if (section === 'program') {
+    body = (
+      <ProgramsPanel
+        initialProgramId={programFocusId}
+        onProgramFocusConsumed={() => setProgramFocusId(null)}
+      />
+    );
+  } else if (section === 'initiatives') {
     body = (
       <InitiativesPanel
         initialSelectedId={initiativeFocusId}
-        onSelectedConsumed={() => setInitiativeFocusId(null)}
+        initialTab={initiativeFocusTab}
+        onSelectedConsumed={() => {
+          setInitiativeFocusId(null);
+          setInitiativeFocusTab(null);
+        }}
       />
     );
   } else if (section === 'requirements') body = <RequirementsPanel />;
   else if (section === 'tasks') {
     body = featuresUnlocked
-      ? <TasksPanel />
+      ? (
+        <TasksPanel
+          initialTaskId={taskFocusId}
+          onTaskFocusConsumed={() => setTaskFocusId(null)}
+        />
+      )
       : <UpgradePrompt feature="Tasks" />;
   } else if (section === 'schedule') {
     body = featuresUnlocked
-      ? <SchedulePanel />
+      ? <SchedulePanel onOpenRecord={openFromSchedule} />
       : <UpgradePrompt feature="Schedule" />;
   } else if (section === 'reports') {
     body = <ReportsPanel />;

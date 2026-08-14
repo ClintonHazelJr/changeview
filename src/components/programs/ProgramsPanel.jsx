@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CircleDot, Rocket, CheckCircle2 } from 'lucide-react';
 import { usePrograms } from '../../hooks/usePrograms';
 import Modal from '../ui/Modal';
@@ -21,7 +21,7 @@ function formatDate(value) {
   return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function ProgramsPanel() {
+export default function ProgramsPanel({ initialProgramId = null, onProgramFocusConsumed }) {
   const { programs, orgs, addProgram, updateProgram } = usePrograms();
   const [modal, setModal] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -53,6 +53,13 @@ export default function ProgramsPanel() {
 
   const openAdd = () => { setEditing(null); setModal('program'); };
   const openEdit = (p) => { setEditing(p); setModal('program'); };
+
+  useEffect(() => {
+    if (!initialProgramId || !programs.length) return;
+    const match = programs.find((p) => p.id === initialProgramId);
+    if (match) openEdit(match);
+    onProgramFocusConsumed?.();
+  }, [initialProgramId, programs]);
 
   const columns = [
     {

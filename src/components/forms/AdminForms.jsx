@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Sparkles, Copy } from 'lucide-react';
 import {
-  C, inputClass, inputStyle, TAG_OPTIONS, SEVERITY_COLOR, SEVERITY_LEVELS,
+  C, inputClass, inputStyle, TAG_OPTIONS, SEVERITY_COLOR, SEVERITY_LEVELS, stripInitiativeMeta,
 } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -143,7 +143,7 @@ export function FormWorkspace({ onSave }) {
   );
 }
 
-export function FormInitiative({ onSave }) {
+export function FormInitiative({ initial, onSave }) {
   const { activeWorkspaceId } = useWorkspace();
   const [people, setPeople] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -151,12 +151,21 @@ export function FormInitiative({ onSave }) {
   const [loadingPeople, setLoadingPeople] = useState(true);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
   const [vals, setVals] = useState({
-    name: '', description: '', programId: '', startDate: '', goLiveDate: '', budget: '', useCase: '', expectedBenefits: '',
-    changeOwnerId: '', productOwnerId: '', businessOwnerId: '', projectManagerId: '',
+    name: initial?.name || '',
+    description: stripInitiativeMeta(initial?.description),
+    programId: initial?.program_id || '',
+    startDate: initial?.start_date || '',
+    goLiveDate: initial?.proposed_go_live_date || '',
+    budget: initial?.budget ?? '',
+    useCase: initial?.use_case || '',
+    expectedBenefits: initial?.expected_benefits || '',
+    changeOwnerId: initial?.change_owner_id || '',
+    productOwnerId: initial?.product_owner_id || '',
+    businessOwnerId: initial?.business_owner_id || '',
+    projectManagerId: initial?.project_manager_id || '',
   });
   const [error, setError] = useState('');
   const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
-  const personName = (id) => people.find((p) => p.id === id)?.name || '';
 
   useEffect(() => {
     let cancelled = false;
@@ -197,15 +206,7 @@ export function FormInitiative({ onSave }) {
       e.preventDefault();
       try {
         if (!vals.programId) throw new Error('Select a Program, or create one under Program first.');
-        if (vals.name) {
-          await onSave({
-            ...vals,
-            changeOwner: personName(vals.changeOwnerId),
-            productOwner: personName(vals.productOwnerId),
-            businessOwner: personName(vals.businessOwnerId),
-            projectManager: personName(vals.projectManagerId),
-          });
-        }
+        if (vals.name) await onSave(vals);
       } catch (err) { setError(err.message); }
     }}>
       <Field label="Program">

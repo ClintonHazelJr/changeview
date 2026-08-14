@@ -3,7 +3,7 @@ import {
   ChevronLeft, FileText, AlertTriangle, Users, GraduationCap, MessageSquare,
   CircleDot, Rocket, HeartPulse, CheckCircle2,
 } from 'lucide-react';
-import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, STATUS_COLOR, isRatedSeverity, parseInitiativeMeta, parseDbError } from '../../lib/constants';
+import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, STATUS_COLOR, isRatedSeverity, stripInitiativeMeta, parseDbError } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useInitiatives, useInitiativeDetail } from '../../hooks/useInitiatives';
 import { useAdminData } from '../../hooks/useAdminData';
@@ -35,13 +35,17 @@ function formatDate(value) {
   return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function InitiativesPanel({ initialSelectedId = null, onSelectedConsumed }) {
-  const { initiatives, programs, addInitiative, reload: reloadInitiatives } = useInitiatives();
+export default function InitiativesPanel({
+  initialSelectedId = null,
+  initialTab = null,
+  onSelectedConsumed,
+}) {
+  const { initiatives, programs, addInitiative, updateInitiative, reload: reloadInitiatives } = useInitiatives();
   const { departments, people } = useAdminData();
   const { profile } = useAuth();
   const { activeWorkspaceId } = useWorkspace();
   const [selectedInitId, setSelectedInitId] = useState(initialSelectedId);
-  const [initTab, setInitTab] = useState('details');
+  const [initTab, setInitTab] = useState(initialTab || 'details');
   const [modal, setModal] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
@@ -64,10 +68,10 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
   useEffect(() => {
     if (initialSelectedId) {
       setSelectedInitId(initialSelectedId);
-      setInitTab('details');
+      setInitTab(initialTab || 'details');
       onSelectedConsumed?.();
     }
-  }, [initialSelectedId, onSelectedConsumed]);
+  }, [initialSelectedId, initialTab, onSelectedConsumed]);
 
   const detail = useInitiativeDetail(selectedInitId);
   const selectedInit = detail.initiative;
@@ -75,6 +79,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
 
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '—';
+  const personLabel = (id) => people.find((p) => p.id === id)?.name || '';
   const impactLabel = (id) => {
     const i = detail.impacts.find((x) => x.id === id);
     return i ? `${deptName(i.department_id)} impact` : '—';
@@ -191,19 +196,21 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                 addLabel="Add Initiative"
                 onAdd={programs.length ? () => setModal('initiative') : undefined}
               >
-                {g.items.map((i) => {
-                  const meta = parseInitiativeMeta(i.description);
-                  return (
+                {g.items.map((i) => (
                     <CompactListCard
                       key={i.id}
                       title={i.name}
                       subtitle={formatDate(i.proposed_go_live_date) ? `Go live ${formatDate(i.proposed_go_live_date)}` : 'No go-live date'}
                       tags={[{ label: getStatus(i), color: statusColor(getStatus(i)) }]}
-                      avatars={[meta.changeOwner, meta.productOwner, meta.businessOwner, meta.projectManager].filter(Boolean)}
+                      avatars={[
+                        personLabel(i.change_owner_id),
+                        personLabel(i.product_owner_id),
+                        personLabel(i.business_owner_id),
+                        personLabel(i.project_manager_id),
+                      ].filter(Boolean)}
                       onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
                     />
-                  );
-                })}
+                  ))}
               </GroupSection>
             ))
           )}
@@ -263,22 +270,32 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
       </div>
 
       <div className="flex-1 p-8 max-w-4xl overflow-y-auto">
-        {initTab === 'details' && selectedInit && (() => {
-          const meta = parseInitiativeMeta(selectedInit.description);
-          return (
+        {initTab === 'details' && selectedInit && (
           <div>
-            <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>{selectedInit.name}</h2>
-            <p className="text-sm mb-6" style={{ color: C.sub }}>{meta.description || '—'}</p>
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <h2 className="text-xl font-extrabold" style={{ ...HEAD, color: C.ink }}>{selectedInit.name}</h2>
+              <button
+                type="button"
+                onClick={() => openEdit('initiative', selectedInit)}
+                className="text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
+                style={{ background: tint(C.coral, '18'), color: C.coral }}
+              >
+                Edit
+              </button>
+            </div>
+            <p className="text-sm mb-6" style={{ color: C.sub }}>
+              {stripInitiativeMeta(selectedInit.description) || '—'}
+            </p>
             <div className="grid grid-cols-2 gap-3 mb-6">
               {[
                 ['Status', selectedInit.status],
                 ['Program', programName(selectedInit.program_id)],
                 ['Go Live Date', selectedInit.proposed_go_live_date || '—'],
                 ['Budget', selectedInit.budget ? `$${Number(selectedInit.budget).toLocaleString()}` : '—'],
-                ['Change Owner', meta.changeOwner || '—'],
-                ['Product Owner', meta.productOwner || '—'],
-                ['Business Owner', meta.businessOwner || '—'],
-                ['Project Manager', meta.projectManager || '—'],
+                ['Change Owner', personName(selectedInit.change_owner_id)],
+                ['Product Owner', personName(selectedInit.product_owner_id)],
+                ['Business Owner', personName(selectedInit.business_owner_id)],
+                ['Project Manager', personName(selectedInit.project_manager_id)],
               ].map(([label, val]) => (
                 <div key={label} className="bg-white rounded-2xl p-4 shadow-sm border" style={{ borderColor: C.border }}>
                   <div className="text-[11px] font-semibold uppercase mb-1" style={{ color: C.sub }}>{label}</div>
@@ -295,8 +312,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
               <div className="text-sm" style={{ color: C.ink }}>{selectedInit.expected_benefits || '—'}</div>
             </div>
           </div>
-          );
-        })()}
+        )}
 
         {initTab === 'impacts' && (
           <TabSection title="Impacts" subtitle="Scope who and what is affected by this change." onAdd={() => openCreate('impact')} addLabel="Add Impact" color={C.coral} empty={initData.impacts.length === 0} emptyText="No impacts recorded yet." emptyIcon={AlertTriangle}>
@@ -551,6 +567,23 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
             )}
             onComplete={closeModal}
             onDelete={editingRecord ? async () => { await detail.deleteLearningNeed(editingRecord.id); closeModal(); } : undefined}
+          />
+        </Modal>
+      )}
+      {modal === 'initiative' && (
+        <Modal title={editingRecord ? 'Edit Initiative' : 'Add Initiative'} onClose={closeModal} wide>
+          <FormInitiative
+            initial={editingRecord}
+            onSave={async (vals) => {
+              if (editingRecord) {
+                await updateInitiative(editingRecord.id, vals);
+                await detail.reload();
+                await reloadInitiatives();
+              } else {
+                await addInitiative(vals);
+              }
+              closeModal();
+            }}
           />
         </Modal>
       )}

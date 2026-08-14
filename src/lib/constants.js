@@ -141,40 +141,7 @@ export function parseDbError(err) {
   return msg;
 }
 
-/** Store owner/PM names in description until schema has text fields (FK is users, not people). */
-export function packInitiativeMeta(description, {
-  changeOwner, productOwner, businessOwner, projectManager,
-}) {
-  const cleaned = (description || '').replace(/\n?\[cv-meta:[^\]]+\]\s*$/, '').trim();
-  if (!changeOwner && !productOwner && !businessOwner && !projectManager) return cleaned;
-  return `${cleaned}\n[cv-meta:${JSON.stringify({
-    changeOwner: changeOwner || '',
-    productOwner: productOwner || '',
-    businessOwner: businessOwner || '',
-    projectManager: projectManager || '',
-  })}]`;
-}
-
-export function parseInitiativeMeta(description) {
-  const raw = description || '';
-  const match = raw.match(/\[cv-meta:({.*?})\]\s*$/);
-  if (!match) {
-    return {
-      description: raw, changeOwner: '', productOwner: '', businessOwner: '', projectManager: '',
-    };
-  }
-  try {
-    const meta = JSON.parse(match[1]);
-    return {
-      description: raw.replace(/\n?\[cv-meta:[^\]]+\]\s*$/, '').trim(),
-      changeOwner: meta.changeOwner || '',
-      productOwner: meta.productOwner || '',
-      businessOwner: meta.businessOwner || '',
-      projectManager: meta.projectManager || '',
-    };
-  } catch {
-    return {
-      description: raw, changeOwner: '', productOwner: '', businessOwner: '', projectManager: '',
-    };
-  }
+/** Strip legacy [cv-meta:{...}] tags once stuffed into initiative descriptions. */
+export function stripInitiativeMeta(description) {
+  return (description || '').replace(/\n?\[cv-meta:[^\]]+\]\s*$/, '').trim();
 }
