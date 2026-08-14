@@ -11,9 +11,20 @@ export const PRICE_ENV = {
 export function resolvePriceId(tier, billingCycle) {
   const key = `${tier}_${billingCycle}`;
   const names = PRICE_ENV[key] || [];
+  // TEMP DEBUG: which Price env vars are tried for this tier/cycle.
+  console.log('[checkout-debug] resolvePriceId key:', key, 'env names:', names);
   for (const name of names) {
     const value = process.env[name];
-    if (value) return value;
+    const hasValue = Boolean(value && String(value).trim());
+    console.log(
+      '[checkout-debug] env',
+      name,
+      hasValue ? `set (prefix=${String(value).slice(0, 8)}…)` : 'EMPTY',
+    );
+    if (hasValue) return value;
+  }
+  if (!names.length) {
+    console.log('[checkout-debug] no PRICE_ENV mapping for key:', key);
   }
   return '';
 }

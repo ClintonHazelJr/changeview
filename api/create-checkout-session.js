@@ -4,8 +4,6 @@ import {
   resolvePriceId, priceEnvHint, MARKETING_TO_DB, DB_TO_MARKETING,
 } from './_stripePlans.js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
-
 const TIER_ALIASES = {
   solo: 'solo',
   small: 'small',
@@ -22,9 +20,19 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (!process.env.STRIPE_SECRET_KEY) {
+  // TEMP DEBUG: distinguish missing secret vs missing Price IDs (mask secret).
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  console.log('[checkout-debug] STRIPE_SECRET_KEY present:', Boolean(secretKey));
+  console.log(
+    '[checkout-debug] STRIPE_SECRET_KEY prefix:',
+    secretKey ? String(secretKey).slice(0, 7) : '(empty)',
+  );
+
+  if (!secretKey) {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
+
+  const stripe = new Stripe(secretKey);
 
   const { tier: rawTier, billingCycle = 'monthly' } = req.body || {};
   const tier = TIER_ALIASES[rawTier];
