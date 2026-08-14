@@ -16,13 +16,13 @@ export default function UpgradePrompt({
           <Sparkles size={22} style={{ color: C.purple }} />
         </div>
         <h2 className="text-xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>
-          {title || `${feature} is on ${PLAN_LABELS.small} and ${PLAN_LABELS.tier_2}`}
+          {title || `${feature} is on ${PLAN_LABELS.small} and ${PLAN_LABELS.enterprise}`}
         </h2>
         <p className="text-sm mb-6" style={{ color: C.sub }}>
           {body || (
             <>
-              Your plan is <strong style={{ color: C.ink }}>{PLAN_LABELS.tier_1}</strong>.
-              Upgrade to {PLAN_LABELS.small} or <strong style={{ color: C.ink }}>{PLAN_LABELS.tier_2}</strong> for
+              Your plan is <strong style={{ color: C.ink }}>{PLAN_LABELS.solo}</strong>.
+              Upgrade to {PLAN_LABELS.small} or <strong style={{ color: C.ink }}>{PLAN_LABELS.enterprise}</strong> for
               Tasks, Schedule, unlimited workspaces, and multi-user access.
             </>
           )}

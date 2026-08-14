@@ -1,7 +1,7 @@
 import { adminClient, setCors, requireAccountOwner } from './_adminAuth.js';
 import { createStripeClient, subscriptionPeriodEndUnix } from './_stripeClient.js';
 import {
-  planFromPriceId, MARKETING_TO_DB, unixToDateString, unixToIso, mapStripeSubscriptionStatus,
+  planFromPriceId, normalizePlanTier, unixToDateString, unixToIso, mapStripeSubscriptionStatus,
 } from './_stripePlans.js';
 
 /**
@@ -62,10 +62,12 @@ export default async function handler(req, res) {
 
   const priceId = stripeSub?.items?.data?.[0]?.price?.id || null;
   const fromPrice = planFromPriceId(priceId);
-  const marketingTier = session.metadata?.tier || fromPrice?.marketingTier || 'solo';
-  const planTier = fromPrice?.planTier || MARKETING_TO_DB[marketingTier] || 'tier_1';
+  const planTier = fromPrice?.planTier
+    || normalizePlanTier(session.metadata?.tier)
+    || normalizePlanTier(session.metadata?.plan_tier)
+    || 'solo';
   let billingCycle = fromPrice?.billingCycle || session.metadata?.billing_cycle || 'monthly';
-  if (planTier === 'tier_1') billingCycle = 'monthly';
+  if (planTier === 'solo') billingCycle = 'monthly';
 
   const stripeCustomerId = typeof session.customer === 'string'
     ? session.customer

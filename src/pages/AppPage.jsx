@@ -125,7 +125,7 @@ function AppShell() {
           title="Multi-user access requires a paid plan"
           body={(
             <>
-              {PLAN_LABELS.tier_1} is single-user. Upgrade to {PLAN_LABELS.small} or {PLAN_LABELS.tier_2} to invite
+              {PLAN_LABELS.solo} is single-user. Upgrade to {PLAN_LABELS.small} or {PLAN_LABELS.enterprise} to invite
               colleagues and assign them to workspaces.
             </>
           )}

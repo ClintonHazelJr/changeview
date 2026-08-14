@@ -33,14 +33,13 @@ create table users (
   created_at timestamptz not null default now()
 );
 
--- Billing: 2 tiers.
--- Tier 1: single org, month-to-month only.
--- Tier 2: unlimited orgs, unlocks Reports + Schedule, monthly or annual (discounted).
+-- Billing: 3 tiers (solo | small | enterprise).
+-- Solo: single workspace, month-to-month only.
+-- Small / Enterprise: unlocks Reports + Schedule + multi-user; monthly or annual.
 create table subscriptions (
   id uuid primary key default gen_random_uuid(),
   account_id uuid not null unique references accounts(id) on delete cascade,
-  -- Solo=tier_1, Small=small, Enterprise=tier_2
-  plan_tier text not null check (plan_tier in ('tier_1', 'small', 'tier_2')),
+  plan_tier text not null check (plan_tier in ('solo', 'small', 'enterprise')),
   billing_cycle text not null default 'monthly' check (billing_cycle in ('monthly', 'annual')),
   status text not null default 'incomplete' check (status in ('incomplete', 'trialing', 'active', 'cancelled', 'past_due')),
   trial_ends_at timestamptz,
@@ -49,8 +48,8 @@ create table subscriptions (
   stripe_subscription_id text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  -- Tier 1 can only ever be monthly, enforce it in the schema, not just app logic
-  constraint tier_1_must_be_monthly check (plan_tier != 'tier_1' or billing_cycle = 'monthly')
+  -- Solo can only ever be monthly
+  constraint solo_must_be_monthly check (plan_tier != 'solo' or billing_cycle = 'monthly')
 );
 
 -- ---------- Reference numbering ----------
@@ -83,11 +82,8 @@ end;
 $$ language plpgsql;
 
 -- ---------- Workspace (tier-gated container) ----------
--- Tier 1 accounts get exactly one Workspace. Tier 2 accounts can create
--- unlimited Workspaces. Enforced below via trigger, not just app logic,
--- so a bug in the UI can't silently let a Tier 1 account create a second one.
--- This sits between Account and Company/Org: a consultant on Tier 2 might
--- run one Workspace per client relationship, each holding several Companies.
+-- Solo accounts get exactly one Workspace. Small/Enterprise can create unlimited.
+-- Enforced below via trigger, not just app logic.
 
 create table workspaces (
   id uuid primary key default gen_random_uuid(),
@@ -104,10 +100,10 @@ declare
 begin
   select plan_tier into v_plan_tier from subscriptions where account_id = new.account_id;
 
-  if v_plan_tier = 'tier_1' then
+  if v_plan_tier = 'solo' then
     select count(*) into v_existing_count from workspaces where account_id = new.account_id;
     if v_existing_count >= 1 then
-      raise exception 'Tier 1 accounts are limited to a single Workspace. Upgrade to Tier 2 to add more.';
+      raise exception 'Sole Proprietor plans are limited to a single Workspace. Upgrade to Business or Enterprise to add more.';
     end if;
   end if;
 

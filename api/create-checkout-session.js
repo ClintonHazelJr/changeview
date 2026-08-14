@@ -1,16 +1,8 @@
 import { adminClient } from './_adminAuth.js';
 import { createStripeClient } from './_stripeClient.js';
 import {
-  resolvePriceBinding, priceEnvHint, MARKETING_TO_DB, DB_TO_MARKETING,
+  resolvePriceBinding, priceEnvHint, normalizePlanTier,
 } from './_stripePlans.js';
-
-const TIER_ALIASES = {
-  solo: 'solo',
-  small: 'small',
-  enterprise: 'enterprise',
-  tier_1: 'solo',
-  tier_2: 'enterprise',
-};
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -34,7 +26,7 @@ export default async function handler(req, res) {
   const stripe = createStripeClient(secretKey);
 
   const { tier: rawTier, billingCycle: rawCycle = 'monthly' } = req.body || {};
-  const tier = TIER_ALIASES[String(rawTier || '').toLowerCase()];
+  const tier = normalizePlanTier(rawTier);
   const billingCycle = rawCycle === 'annual' ? 'annual' : 'monthly';
   console.log('[checkout-debug] request body tier/cycle:', { rawTier, billingCycle, resolvedTier: tier || null });
 
@@ -133,19 +125,18 @@ export default async function handler(req, res) {
             stripeCustomerId = sub?.stripe_customer_id || null;
             if (sub?.stripe_subscription_id) addTrial = false;
 
-            const dbPlanTier = MARKETING_TO_DB[tier];
-            if (dbPlanTier && !sub?.stripe_subscription_id) {
+            if (!sub?.stripe_subscription_id) {
               const nextBilling = tier === 'solo' ? 'monthly' : billingCycle;
               const { error: syncErr } = await admin
                 .from('subscriptions')
                 .update({
-                  plan_tier: dbPlanTier,
+                  plan_tier: tier,
                   billing_cycle: nextBilling,
                   updated_at: new Date().toISOString(),
                 })
                 .eq('account_id', accountId);
               console.log('[checkout-debug] synced plan_tier from request', {
-                dbPlanTier,
+                planTier: tier,
                 nextBilling,
                 syncError: syncErr?.message || null,
               });
@@ -165,11 +156,10 @@ export default async function handler(req, res) {
       priceEnv: binding.envName,
     });
 
-    const planTier = MARKETING_TO_DB[tier];
     const meta = {
       account_id: accountId || '',
       tier,
-      plan_tier: planTier || '',
+      plan_tier: tier,
       billing_cycle: billingCycle,
       price_env: binding.envName || '',
     };
@@ -211,7 +201,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       url: session.url,
       tier,
-      plan: DB_TO_MARKETING[planTier] || tier,
+      plan: tier,
       billingCycle,
       trial: addTrial,
       priceEnv: binding.envName,

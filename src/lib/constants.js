@@ -67,16 +67,14 @@ export const STATUS_COLOR = {
 };
 export const TAG_OPTIONS = ['Training', 'Huddle', 'Email', 'Documentation'];
 
-/** DB: tier_1 / small / tier_2. Display labels only — IDs stay solo/small/enterprise. */
+/** Plan tier IDs match DB plan_tier: solo | small | enterprise. */
 export const PLAN_LABELS = {
-  tier_1: 'Sole Proprietor',
-  small: 'Business',
-  tier_2: 'Enterprise',
   solo: 'Sole Proprietor',
+  small: 'Business',
   enterprise: 'Enterprise',
 };
-export const isSoloPlan = (tier) => tier === 'tier_1' || tier === 'solo';
-export const isEnterprisePlan = (tier) => tier === 'tier_2' || tier === 'enterprise';
+export const isSoloPlan = (tier) => tier === 'solo';
+export const isEnterprisePlan = (tier) => tier === 'enterprise';
 export const isSmallPlan = (tier) => tier === 'small';
 
 export function isTrialExpired(subscription) {
@@ -137,8 +135,8 @@ export function formatReference(num) {
 
 export function parseDbError(err) {
   const msg = err?.message || err?.error_description || 'Something went wrong';
-  if (msg.includes('Tier 1 accounts are limited')) {
-    return 'Sole Proprietor plans are limited to a single Workspace. Upgrade to Enterprise to add more.';
+  if (msg.includes('Tier 1 accounts are limited') || msg.includes('Sole Proprietor plans are limited') || msg.includes('solo accounts are limited')) {
+    return 'Sole Proprietor plans are limited to a single Workspace. Upgrade to Business or Enterprise to add more.';
   }
   return msg;
 }

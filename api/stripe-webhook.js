@@ -5,7 +5,7 @@ import {
   mapStripeSubscriptionStatus,
   unixToDateString,
   unixToIso,
-  MARKETING_TO_DB,
+  normalizePlanTier,
 } from './_stripePlans.js';
 
 /** Required so Stripe signature verification sees the exact raw body. */
@@ -97,10 +97,10 @@ function patchFromStripeSubscription(subscription, extras = {}) {
   }
   if (fromPrice) {
     patch.plan_tier = fromPrice.planTier;
-    patch.billing_cycle = fromPrice.planTier === 'tier_1' ? 'monthly' : fromPrice.billingCycle;
+    patch.billing_cycle = fromPrice.planTier === 'solo' ? 'monthly' : fromPrice.billingCycle;
   } else if (extras.planTier) {
     patch.plan_tier = extras.planTier;
-    patch.billing_cycle = extras.billingCycle || 'monthly';
+    patch.billing_cycle = extras.planTier === 'solo' ? 'monthly' : (extras.billingCycle || 'monthly');
   }
   return patch;
 }
@@ -123,10 +123,10 @@ async function handleCheckoutCompleted(stripe, admin, session) {
     return;
   }
 
-  const marketingTier = session.metadata?.tier;
-  const planTier = MARKETING_TO_DB[marketingTier] || MARKETING_TO_DB[session.metadata?.plan_tier];
+  const planTier = normalizePlanTier(session.metadata?.tier)
+    || normalizePlanTier(session.metadata?.plan_tier);
   let billingCycle = session.metadata?.billing_cycle || 'monthly';
-  if (planTier === 'tier_1') billingCycle = 'monthly';
+  if (planTier === 'solo') billingCycle = 'monthly';
 
   const patch = patchFromStripeSubscription(stripeSub, {
     stripeCustomerId: customerIdFrom(session),

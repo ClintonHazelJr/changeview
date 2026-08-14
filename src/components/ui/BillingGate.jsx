@@ -3,8 +3,7 @@ import { C, HEAD, BODY, tint, PLAN_LABELS } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import {
-  DB_TO_MARKETING_TIER,
-  normalizeMarketingTier,
+  normalizePlanTier,
   readCheckoutIntent,
   startCheckout,
   startBillingPortal,
@@ -22,15 +21,10 @@ export default function BillingGate({ mode = 'past_due' }) {
   const [busy, setBusy] = useState(false);
 
   const intent = readCheckoutIntent();
-  const intentTier = normalizeMarketingTier(intent?.tier);
+  const intentTier = normalizePlanTier(intent?.tier);
   // Prefer: remembered pricing-card intent → loaded subscription.plan_tier → context planTier.
-  // Never use the WorkspaceContext default (tier_1) while subscription is still loading.
-  const fromDb = normalizeMarketingTier(
-    DB_TO_MARKETING_TIER[subscription?.plan_tier]
-    || DB_TO_MARKETING_TIER[planTier]
-    || subscription?.plan_tier
-    || planTier,
-  );
+  // Never use the WorkspaceContext default (solo) while subscription is still loading.
+  const fromDb = normalizePlanTier(subscription?.plan_tier || planTier);
   const marketingTier = intentTier || (!loading ? fromDb : null);
   const billingCycle = (
     intent?.billingCycle === 'annual'
