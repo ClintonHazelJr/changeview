@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { hasAuthRedirectParams } from '../lib/authUrls';
 import { rememberCheckoutIntent } from '../lib/checkout';
@@ -7,21 +7,31 @@ import SiteShell from '../components/landing/SiteShell';
 
 const PAGE_TITLE = 'ChangeView — Change that people actually adopt';
 
-function trialSignupPath(tier) {
-  if (tier === 'enterprise') return '/signup?plan=enterprise&billing=monthly';
-  if (tier === 'small') return '/signup?plan=small&billing=monthly';
+/** Display prices; Stripe Price IDs come from env via checkout. Annual = 2 months free. */
+const PLAN_PRICES = {
+  solo: { monthly: 59 },
+  small: { monthly: 149, annual: 1490 },
+  enterprise: { monthly: 299, annual: 2990 },
+};
+
+function trialSignupPath(tier, billingCycle = 'monthly') {
+  const cycle = tier === 'solo' ? 'monthly' : (billingCycle === 'annual' ? 'annual' : 'monthly');
+  if (tier === 'enterprise') return `/signup?plan=enterprise&billing=${cycle}`;
+  if (tier === 'small') return `/signup?plan=small&billing=${cycle}`;
   return '/signup?plan=solo&billing=monthly';
 }
 
-function PlanCta({ tier, className, children }) {
+function PlanCta({ tier, billingCycle = 'monthly', className, children }) {
+  const cycle = tier === 'solo' ? 'monthly' : billingCycle;
   return (
     <Link
-      to={trialSignupPath(tier)}
+      to={trialSignupPath(tier, cycle)}
       data-plan={tier}
+      data-billing={cycle}
       className={className}
       onClick={() => {
-        console.log('[pricing-click] tier=', tier);
-        rememberCheckoutIntent(tier, 'monthly');
+        console.log('[pricing-click] tier=', tier, 'billing=', cycle);
+        rememberCheckoutIntent(tier, cycle);
       }}
     >
       {children}
@@ -31,6 +41,7 @@ function PlanCta({ tier, className, children }) {
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const [billingCycle, setBillingCycle] = useState('monthly');
   const accountDeleted = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('account') === 'deleted';
 
@@ -38,6 +49,12 @@ export default function LandingPage() {
     if (!hasAuthRedirectParams()) return;
     navigate(`/auth/callback${window.location.search}${window.location.hash}`, { replace: true });
   }, [navigate]);
+
+  const smallPrice = billingCycle === 'annual' ? PLAN_PRICES.small.annual : PLAN_PRICES.small.monthly;
+  const enterprisePrice = billingCycle === 'annual'
+    ? PLAN_PRICES.enterprise.annual
+    : PLAN_PRICES.enterprise.monthly;
+  const pricePer = billingCycle === 'annual' ? '/ yr' : '/ mo';
 
   return (
     <SiteShell
@@ -150,26 +167,60 @@ export default function LandingPage() {
           <div className="head">
             <span className="kicker">Pricing</span>
             <h2>Simple plans, real access.</h2>
+            <div className="billing-toggle" role="group" aria-label="Billing cycle">
+              <button
+                type="button"
+                className={billingCycle === 'monthly' ? 'active' : ''}
+                aria-pressed={billingCycle === 'monthly'}
+                onClick={() => setBillingCycle('monthly')}
+              >
+                Monthly
+              </button>
+              <button
+                type="button"
+                className={billingCycle === 'annual' ? 'active' : ''}
+                aria-pressed={billingCycle === 'annual'}
+                onClick={() => setBillingCycle('annual')}
+              >
+                Annual
+              </button>
+              {billingCycle === 'annual' ? (
+                <span className="billing-save">2 months free on Business &amp; Enterprise</span>
+              ) : null}
+            </div>
           </div>
           <div className="tiers">
             <div className="tier">
               <h3>Sole Proprietor</h3>
-              <div className="price"><span className="amt">$59</span><span className="per">/ mo</span></div>
+              <div className="price">
+                <span className="amt">${PLAN_PRICES.solo.monthly}</span>
+                <span className="per">/ mo</span>
+              </div>
               <p>1 user, 1 workspace. For a solo consultant running a single client rollout.</p>
               <PlanCta tier="solo" className="btn btn-ghost-navy">Start free trial</PlanCta>
             </div>
             <div className="tier pop">
               <span className="badge">MOST POPULAR</span>
               <h3>Business</h3>
-              <div className="price"><span className="amt">$149</span><span className="per">/ mo</span></div>
+              <div className="price">
+                <span className="amt">${smallPrice.toLocaleString('en-US')}</span>
+                <span className="per">{pricePer}</span>
+              </div>
               <p>5 users, unlimited workspaces. For teams running change across multiple clients or departments.</p>
-              <PlanCta tier="small" className="btn btn-red pay">Start free trial</PlanCta>
+              <PlanCta tier="small" billingCycle={billingCycle} className="btn btn-red pay">
+                Start free trial
+              </PlanCta>
             </div>
             <div className="tier">
               <h3>Enterprise</h3>
-              <div className="price"><span className="amt">$299</span><span className="per">/ mo</span></div>
-              <p>Unlimited users, unlimited workspaces. Annual billing available.</p>
-              <PlanCta tier="enterprise" className="btn btn-ghost-navy">Start free trial</PlanCta>
+              <div className="price">
+                <span className="amt">${enterprisePrice.toLocaleString('en-US')}</span>
+                <span className="per">{pricePer}</span>
+              </div>
+              <p>Unlimited users, unlimited workspaces. Same monthly or annual billing as Business.</p>
+              <PlanCta tier="enterprise" billingCycle={billingCycle} className="btn btn-ghost-navy">
+                Start free trial
+              </PlanCta>
             </div>
           </div>
         </div>

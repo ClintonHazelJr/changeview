@@ -344,6 +344,41 @@
 }
 
 /* pricing */
+.cv-landing .billing-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.cv-landing .billing-toggle button {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 8px 16px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.cv-landing .billing-toggle button.active {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: #fff;
+}
+
+.cv-landing .billing-save {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red);
+  margin-left: 4px;
+}
+
 .cv-landing .tiers {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
