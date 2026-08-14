@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Sparkles, Copy } from 'lucide-react';
 import {
-  C, inputClass, inputStyle, TAG_OPTIONS, SEVERITY_COLOR, SEVERITY_LEVELS, stripInitiativeMeta,
+  C, inputClass, inputStyle, TAG_OPTIONS, SEVERITY_COLOR, SEVERITY_LEVELS, stripInitiativeMeta, assignableOptions,
 } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -76,7 +76,7 @@ export function FormPerson({ departments, initial, onSave }) {
       <Field label="Name"><input className={inputClass} style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Micheal Blackman" autoFocus /></Field>
       <Field label="Department">
         <select className={inputClass} style={inputStyle} value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-          {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          {assignableOptions(departments, departmentId).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
       </Field>
       <Field label="Title"><input className={inputClass} style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Change Manager" /></Field>
@@ -186,7 +186,7 @@ export function FormInitiative({ initial, onSave }) {
       setLoadingPrograms(true);
       const [peopleRes, deptRes, programsRes] = await Promise.all([
         supabase.from('people').select('id, name, title, email, department_id, is_active').eq('workspace_id', activeWorkspaceId).order('name'),
-        supabase.from('departments').select('id, name').eq('workspace_id', activeWorkspaceId),
+        supabase.from('departments').select('id, name, is_active').eq('workspace_id', activeWorkspaceId),
         supabase.from('programs').select('id, name').eq('workspace_id', activeWorkspaceId).order('name'),
       ]);
       if (cancelled) return;
@@ -682,11 +682,11 @@ export function FormImpact({ departments, initial, onSave, onDelete, onComplete 
     }}>
       <div className="grid grid-cols-2 gap-4">
         <Field label="Department">
-          {departments.length === 0 ? (
+          {assignableOptions(departments, departmentId).length === 0 ? (
             <p className="text-xs" style={{ color: C.sub }}>Add a Department in Settings first.</p>
           ) : (
             <select className={inputClass} style={inputStyle} value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              {assignableOptions(departments, departmentId).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           )}
         </Field>

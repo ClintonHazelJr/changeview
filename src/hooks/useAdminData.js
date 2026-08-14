@@ -54,7 +54,12 @@ export function useAdminData() {
 
   const addDepartment = async ({ orgId, name, location }) => {
     const { error } = await supabase.from('departments').insert({
-      account_id: accountId, workspace_id: workspaceId, org_id: orgId, name, location,
+      account_id: accountId,
+      workspace_id: workspaceId,
+      org_id: orgId,
+      name,
+      location,
+      is_active: true,
     });
     if (error) throw error;
     await load();
@@ -68,6 +73,15 @@ export function useAdminData() {
         name,
         location: location || null,
       })
+      .eq('id', id);
+    if (error) throw error;
+    await load();
+  };
+
+  const setDepartmentActive = async (id, isActive) => {
+    const { error } = await supabase
+      .from('departments')
+      .update({ is_active: isActive })
       .eq('id', id);
     if (error) throw error;
     await load();
@@ -128,6 +142,7 @@ export function useAdminData() {
 
   return {
     orgs, departments, people, teams, loading, reload: load,
-    addOrg, addDepartment, updateDepartment, addPerson, updatePerson, setPersonActive, addTeam, addTeamMember,
+    addOrg, addDepartment, updateDepartment, setDepartmentActive,
+    addPerson, updatePerson, setPersonActive, addTeam, addTeamMember,
   };
 }

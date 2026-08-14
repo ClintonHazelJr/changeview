@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import {
   Building2, MapPin, Users, UserCircle2, Plus, ChevronRight, Mail, Tag, UserCheck, UserX,
 } from 'lucide-react';
-import { C, HEAD, BODY, tint, initials, parseDbError } from '../../lib/constants';
+import {
+  C, HEAD, BODY, tint, initials, parseDbError, isActiveRecord,
+} from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useAdminData } from '../../hooks/useAdminData';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -10,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ListCard, TabSection } from '../ui/shared';
 import ListTable from '../ui/ListTable';
 import StatusPill from '../ui/StatusPill';
+import ShowInactiveToggle from '../ui/ShowInactiveToggle';
 import Modal from '../ui/Modal';
 import CsvImportModal from '../ui/CsvImportModal';
 import { findByName } from '../../lib/csvImport';
@@ -27,13 +30,17 @@ export default function SystemAdmin({
   const { profile } = useAuth();
   const {
     orgs, departments, people, teams,
-    addOrg, addDepartment, updateDepartment, addPerson, updatePerson, setPersonActive, addTeam, addTeamMember, reload,
+    addOrg, addDepartment, updateDepartment, setDepartmentActive,
+    addPerson, updatePerson, setPersonActive, addTeam, addTeamMember, reload,
   } = useAdminData();
   const [adminTab, setAdminTab] = useState(initialTab || 'org');
   const [modal, setModal] = useState(null);
   const [editingPerson, setEditingPerson] = useState(null);
   const [editingDepartment, setEditingDepartment] = useState(null);
   const [busyPersonId, setBusyPersonId] = useState(null);
+  const [busyDepartmentId, setBusyDepartmentId] = useState(null);
+  const [showInactivePeople, setShowInactivePeople] = useState(false);
+  const [showInactiveDepartments, setShowInactiveDepartments] = useState(false);
   const [bulk, setBulk] = useState(null);
   const [expandedTeam, setExpandedTeam] = useState(null);
   const [viewMode, setViewMode] = useState('tiles');
@@ -54,8 +61,14 @@ export default function SystemAdmin({
 
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '—';
-  const personIsActive = (p) => p.is_active !== false;
+  const personIsActive = (p) => isActiveRecord(p);
+  const departmentIsActive = (d) => isActiveRecord(d);
   const activePeople = people.filter(personIsActive);
+  const inactivePeopleCount = people.filter((p) => !personIsActive(p)).length;
+  const visiblePeople = showInactivePeople ? people : activePeople;
+  const activeDepartments = departments.filter(departmentIsActive);
+  const inactiveDepartmentsCount = departments.filter((d) => !departmentIsActive(d)).length;
+  const visibleDepartments = showInactiveDepartments ? departments : activeDepartments;
 
   const openAddPerson = () => {
     setEditingPerson(null);
@@ -93,6 +106,19 @@ export default function SystemAdmin({
       alert(err.message || 'Could not update person');
     } finally {
       setBusyPersonId(null);
+    }
+  };
+
+  const toggleDepartmentActive = async (d) => {
+    const next = !departmentIsActive(d);
+    if (!next && !window.confirm(`Deactivate ${d.name}? It will no longer appear in assign-to pickers.`)) return;
+    setBusyDepartmentId(d.id);
+    try {
+      await setDepartmentActive(d.id, next);
+    } catch (err) {
+      alert(err.message || 'Could not update department');
+    } finally {
+      setBusyDepartmentId(null);
     }
   };
 
@@ -197,7 +223,20 @@ export default function SystemAdmin({
             viewMode={viewMode}
             onViewChange={setViewMode}
           >
-            {viewMode === 'list' ? (
+            <div className="flex justify-end mb-3">
+              <ShowInactiveToggle
+                show={showInactiveDepartments}
+                onChange={setShowInactiveDepartments}
+                inactiveCount={inactiveDepartmentsCount}
+              />
+            </div>
+            {visibleDepartments.length === 0 ? (
+              <p className="text-sm py-6 text-center" style={{ color: C.sub }}>
+                {inactiveDepartmentsCount > 0
+                  ? 'No active departments. Turn on Show inactive to find and reactivate one.'
+                  : 'No departments yet.'}
+              </p>
+            ) : viewMode === 'list' ? (
               <ListTable
                 columns={[
                   { key: 'name', label: 'Name', sortable: true, render: (d) => <span className="font-semibold">{d.name}</span> },
@@ -209,24 +248,101 @@ export default function SystemAdmin({
                     render: (d) => orgs.find((c) => c.id === d.org_id)?.name || '—',
                   },
                   { key: 'location', label: 'Location', sortable: true, render: (d) => d.location || '—' },
+                  {
+                    key: 'is_active',
+                    label: 'Status',
+                    sortable: true,
+                    sortValue: (d) => (departmentIsActive(d) ? 1 : 0),
+                    render: (d) => (
+                      <StatusPill
+                        label={departmentIsActive(d) ? 'Active' : 'Inactive'}
+                        color={departmentIsActive(d) ? C.green : C.sub}
+                      />
+                    ),
+                  },
+                  {
+                    key: 'actions',
+                    label: '',
+                    render: (d) => (
+                      <button
+                        type="button"
+                        disabled={busyDepartmentId === d.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleDepartmentActive(d);
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full disabled:opacity-50"
+                        style={{
+                          background: departmentIsActive(d) ? tint(C.coral, '18') : tint(C.green, '18'),
+                          color: departmentIsActive(d) ? C.coral : C.green,
+                        }}
+                      >
+                        {departmentIsActive(d) ? <UserX size={12} /> : <UserCheck size={12} />}
+                        {busyDepartmentId === d.id ? '…' : departmentIsActive(d) ? 'Deactivate' : 'Reactivate'}
+                      </button>
+                    ),
+                  },
                 ]}
-                rows={departments}
+                rows={visibleDepartments}
                 onRowClick={openEditDepartment}
                 initialSortKey="name"
               />
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                {departments.map((d) => (
-                  <ListCard
-                    key={d.id}
-                    icon={MapPin}
-                    color={C.teal}
-                    title={d.name}
-                    subtitle={orgs.find((c) => c.id === d.org_id)?.name}
-                    tag={d.location}
-                    onClick={() => openEditDepartment(d)}
-                  />
-                ))}
+                {visibleDepartments.map((d) => {
+                  const inactive = !departmentIsActive(d);
+                  const busy = busyDepartmentId === d.id;
+                  return (
+                    <div
+                      key={d.id}
+                      className="bg-white rounded-2xl p-4 shadow-sm border flex items-start gap-3"
+                      style={{
+                        borderColor: C.border,
+                        opacity: inactive ? 0.72 : 1,
+                        background: inactive ? tint(C.sub, '08') : '#fff',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => openEditDepartment(d)}
+                        className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                      >
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                          style={{ background: tint(inactive ? C.sub : C.teal, '18') }}
+                        >
+                          <MapPin size={16} style={{ color: inactive ? C.sub : C.teal }} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            <div className="text-sm font-bold truncate" style={{ color: inactive ? C.sub : C.ink }}>{d.name}</div>
+                            <StatusPill
+                              label={inactive ? 'Inactive' : 'Active'}
+                              color={inactive ? C.sub : C.green}
+                            />
+                          </div>
+                          <div className="text-xs truncate" style={{ color: C.sub }}>
+                            {orgs.find((c) => c.id === d.org_id)?.name || '—'}
+                            {d.location ? ` · ${d.location}` : ''}
+                          </div>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => toggleDepartmentActive(d)}
+                        className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-full shrink-0 disabled:opacity-50"
+                        style={{
+                          background: inactive ? tint(C.green, '18') : tint(C.coral, '18'),
+                          color: inactive ? C.green : C.coral,
+                        }}
+                      >
+                        {inactive ? <UserCheck size={12} /> : <UserX size={12} />}
+                        {busy ? '…' : inactive ? 'Reactivate' : 'Deactivate'}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </TabSection>
@@ -239,7 +355,7 @@ export default function SystemAdmin({
             addLabel="Add Person"
             onBulkUpload={() => setBulk('people')}
             color={C.coral}
-            disabled={departments.length === 0}
+            disabled={activeDepartments.length === 0}
             disabledText="Add a Department first."
             empty={people.length === 0}
             emptyText="No people yet."
@@ -247,7 +363,20 @@ export default function SystemAdmin({
             viewMode={viewMode}
             onViewChange={setViewMode}
           >
-            {viewMode === 'list' ? (
+            <div className="flex justify-end mb-3">
+              <ShowInactiveToggle
+                show={showInactivePeople}
+                onChange={setShowInactivePeople}
+                inactiveCount={inactivePeopleCount}
+              />
+            </div>
+            {visiblePeople.length === 0 ? (
+              <p className="text-sm py-6 text-center" style={{ color: C.sub }}>
+                {inactivePeopleCount > 0
+                  ? 'No active people. Turn on Show inactive to find and reactivate someone.'
+                  : 'No people yet.'}
+              </p>
+            ) : viewMode === 'list' ? (
               <ListTable
                 columns={[
                   { key: 'name', label: 'Name', sortable: true, render: (p) => <span className="font-semibold">{p.name}</span> },
@@ -295,13 +424,13 @@ export default function SystemAdmin({
                     ),
                   },
                 ]}
-                rows={people}
+                rows={visiblePeople}
                 onRowClick={openEditPerson}
                 initialSortKey="name"
               />
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                {people.map((p) => {
+                {visiblePeople.map((p) => {
                   const inactive = !personIsActive(p);
                   const busy = busyPersonId === p.id;
                   return (
@@ -503,6 +632,7 @@ export default function SystemAdmin({
               org_id: vals.orgId,
               name: vals.name,
               location: vals.location,
+              is_active: true,
             });
             if (error) throw new Error(parseDbError(error));
           }}

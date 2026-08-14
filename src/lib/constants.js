@@ -141,6 +141,16 @@ export function parseDbError(err) {
   return msg;
 }
 
+/** Soft-active flag: missing column / null treated as active. */
+export function isActiveRecord(row) {
+  return row?.is_active !== false;
+}
+
+/** Active rows for new assignments; keep currentId even if deactivated. */
+export function assignableOptions(rows, currentId) {
+  return (rows || []).filter((r) => isActiveRecord(r) || (currentId && r.id === currentId));
+}
+
 /** Strip legacy [cv-meta:{...}] tags once stuffed into initiative descriptions. */
 export function stripInitiativeMeta(description) {
   return (description || '').replace(/\n?\[cv-meta:[^\]]+\]\s*$/, '').trim();

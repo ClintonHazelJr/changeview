@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Search, X } from 'lucide-react';
-import { C, inputClass, inputStyle, tint } from '../../lib/constants';
+import { C, inputClass, inputStyle, tint, assignableOptions } from '../../lib/constants';
 import { Field } from './shared';
 
 function personSubtitle(person, departments = []) {
@@ -26,12 +26,6 @@ function matchesQuery(person, query) {
     person.department_name,
   ].filter(Boolean).join(' ').toLowerCase();
   return haystack.includes(q);
-}
-
-/** Active people for new assignments; keep current value even if deactivated. */
-function isAssignablePerson(person, currentValue) {
-  if (person.is_active !== false) return true;
-  return Boolean(currentValue && person.id === currentValue);
 }
 
 function emitChange(onChange, id) {
@@ -69,7 +63,7 @@ export default function PersonSelect({
   );
 
   const assignable = useMemo(
-    () => people.filter((p) => isAssignablePerson(p, value)),
+    () => assignableOptions(people, value),
     [people, value],
   );
 
