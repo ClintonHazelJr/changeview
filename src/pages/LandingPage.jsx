@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { hasAuthRedirectParams } from '../lib/authUrls';
 import { rememberCheckoutIntent } from '../lib/checkout';
-import './landing.css';
+import Mark from '../components/landing/Mark';
+import SiteShell from '../components/landing/SiteShell';
 
 const PAGE_TITLE = 'ChangeView — Change that people actually adopt';
 
@@ -10,51 +11,6 @@ function trialSignupPath(tier) {
   if (tier === 'enterprise') return '/signup?plan=enterprise&billing=monthly';
   if (tier === 'small') return '/signup?plan=small&billing=monthly';
   return '/signup?plan=solo&billing=monthly';
-}
-
-/** Logo mark — same SVG system as the design file (full / mono / footer). */
-function Mark({ variant = 'full', color, style, className }) {
-  const mono = variant === 'mono';
-  const footer = variant === 'footer';
-  const full = variant === 'full';
-
-  let c1;
-  let c2;
-  let c3;
-  let c4;
-  if (mono) {
-    c1 = c2 = c3 = c4 = color || '#1c2f8f';
-  } else if (footer) {
-    c1 = '#93a6ee';
-    c2 = '#93a6ee';
-    c3 = '#93a6ee';
-    c4 = '#ffffff';
-  } else {
-    c1 = '#1c2f8f';
-    c2 = '#3a54c4';
-    c3 = '#5f79df';
-    c4 = '#93a6ee';
-  }
-
-  return (
-    <span className={className} style={style} aria-hidden>
-      <svg
-        viewBox="0 0 124 100"
-        width="100%"
-        height="100%"
-        style={{ display: 'block', overflow: 'visible' }}
-        aria-label="changeview"
-      >
-        {full && <circle cx="87" cy="50" r="33" fill="#ff1717" />}
-        <g fill="none" strokeLinejoin="round" strokeLinecap="butt" strokeWidth="19">
-          <polyline points="54,10 88,50 54,90" stroke={c4} />
-          <polyline points="36,10 70,50 36,90" stroke={c3} />
-          <polyline points="18,10 52,50 18,90" stroke={c2} />
-          <polyline points="0,10 34,50 0,90" stroke={c1} />
-        </g>
-      </svg>
-    </span>
-  );
 }
 
 function PlanCta({ tier, className, children }) {
@@ -79,54 +35,19 @@ export default function LandingPage() {
     && new URLSearchParams(window.location.search).get('account') === 'deleted';
 
   useEffect(() => {
-    document.title = PAGE_TITLE;
-    const id = 'cv-sora-font';
-    if (!document.getElementById(id)) {
-      const link = document.createElement('link');
-      link.id = id;
-      link.rel = 'stylesheet';
-      link.href = 'https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap';
-      document.head.appendChild(link);
-    }
-    return () => {
-      document.title = 'ChangeView';
-    };
-  }, []);
-
-  useEffect(() => {
     if (!hasAuthRedirectParams()) return;
     navigate(`/auth/callback${window.location.search}${window.location.hash}`, { replace: true });
   }, [navigate]);
 
   return (
-    <div className="cv-landing">
-      {accountDeleted && (
+    <SiteShell
+      title={PAGE_TITLE}
+      notice={accountDeleted ? (
         <div className="notice">
           Your account has been deleted. Billing is cancelled and all data was removed.
         </div>
-      )}
-
-      <nav className="site">
-        <div className="wrap row">
-          <Link className="brand" to="/">
-            <Mark variant="full" style={{ width: 38, height: 30, display: 'block' }} />
-            <span>changeview</span>
-          </Link>
-          <div className="navlinks">
-            <a href="#features">Product</a>
-            <a href="#how">How it works</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#features">Resources</a>
-          </div>
-          <div className="navright">
-            <Link className="signin" to="/login">Sign in</Link>
-            <Link className="btn btn-navy" style={{ padding: '11px 22px', fontSize: 15 }} to="/signup?plan=solo&billing=monthly">
-              Start free
-            </Link>
-          </div>
-        </div>
-      </nav>
-
+      ) : null}
+    >
       <header className="hero">
         <div className="wrap">
           <div className="stack">
@@ -292,38 +213,6 @@ export default function LandingPage() {
           <Link className="btn btn-red" to="/signup?plan=solo&billing=monthly">Start free</Link>
         </div>
       </section>
-
-      <footer>
-        <div className="wrap row">
-          <div className="about">
-            <span className="brand">
-              <Mark variant="footer" style={{ width: 32, height: 26, display: 'block' }} />
-              <span>changeview</span>
-            </span>
-            <span className="tag">Change management that people actually adopt.</span>
-          </div>
-          <div className="cols">
-            <div className="col">
-              <span className="h">Product</span>
-              <a href="#features">Features</a>
-              <a href="#pricing">Pricing</a>
-              <a href="#features">Integrations</a>
-            </div>
-            <div className="col">
-              <span className="h">Company</span>
-              <a href="#how">About</a>
-              <a href="#how">Careers</a>
-              <a href="#pricing">Contact</a>
-            </div>
-            <div className="col">
-              <span className="h">Resources</span>
-              <a href="#features">Playbooks</a>
-              <a href="#features">Blog</a>
-              <a href="#features">Help center</a>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </SiteShell>
   );
 }

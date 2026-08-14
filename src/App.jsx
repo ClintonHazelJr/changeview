@@ -1,6 +1,10 @@
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import LandingPage from './pages/LandingPage';
+import AboutPage from './pages/AboutPage';
+import ContactPage from './pages/ContactPage';
+import BlogIndexPage from './pages/BlogIndexPage';
+import BlogPostPage from './pages/BlogPostPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import AcceptInvitePage from './pages/AcceptInvitePage';
@@ -13,6 +17,10 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/blog" element={<BlogIndexPage />} />
+        <Route path="/blog/:slug" element={<BlogPostPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
