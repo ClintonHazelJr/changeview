@@ -14,6 +14,8 @@
 create table accounts (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  -- Soft-delete: blocks access; row kept for a recovery window before hard purge.
+  deleted_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -25,6 +27,9 @@ create table users (
   -- owner: the paying account holder, full access to every Workspace on the account.
   -- member: no access to anything until explicitly granted via workspace_members below.
   role text not null default 'member' check (role in ('owner', 'member')),
+  -- Soft deactivate: frees a seat; login blocked via Auth ban in /api/deactivate-user.
+  -- Do not hard-delete users — their id is referenced as owners/assignees/authors.
+  is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
 
@@ -34,10 +39,13 @@ create table users (
 create table subscriptions (
   id uuid primary key default gen_random_uuid(),
   account_id uuid not null unique references accounts(id) on delete cascade,
-  plan_tier text not null check (plan_tier in ('tier_1', 'tier_2')),
+  -- Solo=tier_1, Small=small, Enterprise=tier_2
+  plan_tier text not null check (plan_tier in ('tier_1', 'small', 'tier_2')),
   billing_cycle text not null default 'monthly' check (billing_cycle in ('monthly', 'annual')),
-  status text not null default 'active' check (status in ('active', 'cancelled', 'past_due')),
+  status text not null default 'incomplete' check (status in ('incomplete', 'trialing', 'active', 'cancelled', 'past_due')),
+  trial_ends_at timestamptz,
   current_period_end date,
+  stripe_customer_id text,
   stripe_subscription_id text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -113,7 +121,7 @@ create trigger check_workspace_tier_limit
 
 -- Now that workspaces exists, add the column on users that couldn't be
 -- declared inline back when users was first created above.
-alter table users add column default_workspace_id uuid references workspaces(id);
+alter table users add column default_workspace_id uuid references workspaces(id) on delete set null;
 -- Reopens here on next login, set whenever the user switches workspace.
 
 -- Grants a member access to one specific Workspace. Owners don't need rows
@@ -274,6 +282,34 @@ create table cost_entries (
 --                 join programs p on p.id = i.program_id
 --                 where p.organization_id = '...' and ce.billable = true;
 
+-- ---------- Requirements (belongs to Initiative) ----------
+-- Added when Requirements moved from "out of scope" to a real nav item.
+-- Deliberately does NOT link to a Tasks table, Planning/Tasks/Kanban stays
+-- out of scope. requirement_impacts is a simple many-to-many so a
+-- Requirement can reference the Impacts it relates to.
+
+create table requirements (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  initiative_id uuid not null references initiatives(id) on delete cascade,
+  reference_number text,
+  description text not null,
+  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected')),
+  priority text check (priority in ('low', 'medium', 'high')),
+  author_id uuid references people(id),
+  business_approver_id uuid references people(id),
+  created_at timestamptz not null default now()
+);
+
+create table requirement_impacts (
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  requirement_id uuid not null references requirements(id) on delete cascade,
+  impact_id uuid not null references impacts(id) on delete cascade,
+  primary key (requirement_id, impact_id)
+);
+
 -- ---------- Impact (belongs to Initiative) ----------
 
 create table impacts (
@@ -289,14 +325,29 @@ create table impacts (
   future_state_system text,
   future_state_process text,
   impact_description text,
-  severity_org text check (severity_org in ('low', 'medium', 'high')),
-  severity_people text check (severity_people in ('low', 'medium', 'high')),
-  severity_process text check (severity_process in ('low', 'medium', 'high')),
-  severity_system text check (severity_system in ('low', 'medium', 'high')),
-  severity_environment text check (severity_environment in ('low', 'medium', 'high')),
+  severity_org text check (severity_org in ('none', 'low', 'medium', 'high')),
+  severity_people text check (severity_people in ('none', 'low', 'medium', 'high')),
+  severity_process text check (severity_process in ('none', 'low', 'medium', 'high')),
+  severity_system text check (severity_system in ('none', 'low', 'medium', 'high')),
+  severity_environment text check (severity_environment in ('none', 'low', 'medium', 'high')),
   intervention_tags text[] default '{}', -- e.g. {training, huddle}
+  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+-- Files attached to Impact current/future process fields (Supabase Storage paths)
+create table impact_attachments (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  impact_id uuid not null references impacts(id) on delete cascade,
+  field text not null check (field in ('current_process', 'future_process')),
+  file_name text not null,
+  file_path text not null,
+  content_type text,
+  file_size bigint,
+  uploaded_at timestamptz not null default now()
 );
 
 -- ---------- Stakeholders (belongs to Initiative) ----------
@@ -328,7 +379,20 @@ create table learning_needs (
   type text, -- training, huddle
   session_count int default 1,
   time_hours numeric(5,2) default 0,
+  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected')),
   created_at timestamptz not null default now()
+);
+
+create table learning_need_attachments (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  learning_need_id uuid not null references learning_needs(id) on delete cascade,
+  file_name text not null,
+  file_path text not null,
+  content_type text,
+  file_size bigint,
+  uploaded_at timestamptz not null default now()
 );
 
 -- ---------- Comms (belongs to Impact, optionally rolls up to Initiative-wide) ----------
@@ -369,6 +433,37 @@ create table hypercare (
   created_at timestamptz not null default now()
 );
 
+-- ---------- Tasks (belongs to Initiative; Kanban / Planning) ----------
+
+create table tasks (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  initiative_id uuid not null references initiatives(id) on delete cascade,
+  name text not null,
+  description text,
+  assignee_id uuid references people(id),
+  project_team_id uuid references project_teams(id),
+  status text not null default 'backlog'
+    check (status in ('backlog', 'ready', 'in_progress', 'blocked', 'done')),
+  priority text check (priority in ('low', 'medium', 'high')),
+  effort_estimate text,
+  start_date date,
+  finish_date date,
+  sprint text,
+  pi text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table task_requirements (
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  task_id uuid not null references tasks(id) on delete cascade,
+  requirement_id uuid not null references requirements(id) on delete cascade,
+  primary key (task_id, requirement_id)
+);
+
 -- ============================================================
 -- Indexes (query patterns: always filtered by account_id first,
 -- then usually by initiative_id or impact_id)
@@ -376,6 +471,9 @@ create table hypercare (
 
 create index idx_initiatives_account on initiatives(account_id);
 create index idx_initiatives_program on initiatives(program_id);
+create index idx_requirements_initiative on requirements(initiative_id);
+create index idx_requirement_impacts_requirement on requirement_impacts(requirement_id);
+create index idx_requirement_impacts_impact on requirement_impacts(impact_id);
 create index idx_cost_entries_initiative on cost_entries(initiative_id);
 create index idx_cost_entries_account on cost_entries(account_id);
 create index idx_workspaces_account on workspaces(account_id);
@@ -404,6 +502,11 @@ create index idx_programs_workspace on programs(workspace_id);
 create index idx_initiatives_workspace on initiatives(workspace_id);
 create index idx_impacts_workspace on impacts(workspace_id);
 create index idx_comms_workspace on comms(workspace_id);
+create index idx_tasks_workspace on tasks(workspace_id);
+create index idx_tasks_initiative on tasks(initiative_id);
+create index idx_tasks_status on tasks(status);
+create index idx_task_requirements_task on task_requirements(task_id);
+create index idx_task_requirements_requirement on task_requirements(requirement_id);
 
 -- ============================================================
 -- Row Level Security (Supabase)
@@ -421,6 +524,10 @@ alter table stakeholders enable row level security;
 alter table learning_needs enable row level security;
 alter table comms enable row level security;
 alter table hypercare enable row level security;
+alter table requirements enable row level security;
+alter table requirement_impacts enable row level security;
+alter table tasks enable row level security;
+alter table task_requirements enable row level security;
 alter table cost_entries enable row level security;
 alter table programs enable row level security;
 alter table organizations enable row level security;

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { authCallbackUrl } from '../lib/authUrls';
 
 const AuthContext = createContext(null);
 
@@ -11,10 +12,17 @@ export function AuthProvider({ children }) {
   const loadProfile = useCallback(async (userId) => {
     const { data, error } = await supabase
       .from('users')
-      .select('*, accounts(name)')
+      .select('*, accounts(name, deleted_at)')
       .eq('id', userId)
       .maybeSingle();
     if (!error && data) {
+      // Soft-deactivated users must not keep a session even if Auth ban lags.
+      if (data.is_active === false || data.accounts?.deleted_at) {
+        await supabase.auth.signOut();
+        setProfile(null);
+        setSession(null);
+        return null;
+      }
       setProfile(data);
       return data;
     }
@@ -63,12 +71,20 @@ export function AuthProvider({ children }) {
     };
   }, [ensureProvisioned]);
 
-  const signUp = async ({ email, password, fullName, accountName }) => {
+  const signUp = async ({
+    email, password, fullName, accountName, planTier = 'solo', billingCycle = 'monthly',
+  }) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName, account_name: accountName || `${fullName}'s Account` },
+        emailRedirectTo: authCallbackUrl('/app'),
+        data: {
+          full_name: fullName,
+          account_name: accountName || `${fullName}'s Account`,
+          plan_tier: planTier,
+          billing_cycle: billingCycle,
+        },
       },
     });
     if (error) throw error;
@@ -87,6 +103,13 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  const resetPassword = async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: authCallbackUrl('/reset-password'),
+    });
+    if (error) throw error;
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
@@ -96,7 +119,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      session, profile, loading, signUp, signIn, signOut, refreshProfile,
+      session, profile, loading, signUp, signIn, signOut, resetPassword, refreshProfile,
       user: session?.user,
     }}>
       {children}

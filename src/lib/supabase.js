@@ -7,4 +7,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase env vars missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local');
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    // Do not auto-parse URL: with a leftover ?code= PKCE link, detectSessionInUrl
+    // calls exchangeCodeForSession and throws "PKCE code verifier not found".
+    // AuthCallback / AcceptInvite read hash tokens explicitly (implicit style).
+    detectSessionInUrl: false,
+    flowType: 'implicit',
+  },
+});

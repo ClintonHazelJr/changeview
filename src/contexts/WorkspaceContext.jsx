@@ -1,7 +1,14 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
-import { parseDbError } from '../lib/constants';
+import {
+  parseDbError,
+  hasPaidPlanFeatures,
+  isTrialingActive,
+  isPastDue,
+  needsCheckout,
+  trialDaysLeft,
+} from '../lib/constants';
 
 const WorkspaceContext = createContext(null);
 
@@ -10,18 +17,20 @@ export function WorkspaceProvider({ children }) {
   const [workspaces, setWorkspaces] = useState([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
   const [planTier, setPlanTier] = useState('tier_1');
+  const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const loadWorkspaces = useCallback(async () => {
     if (!profile) {
       setWorkspaces([]);
       setActiveWorkspaceId(null);
+      setSubscription(null);
+      setPlanTier('tier_1');
       setLoading(false);
       return;
     }
 
-    let query = supabase.from('workspaces').select('*').order('created_at');
-    const { data, error } = await query;
+    const { data, error } = await supabase.from('workspaces').select('*').order('created_at');
     if (error) {
       console.error(error);
       setLoading(false);
@@ -32,10 +41,17 @@ export function WorkspaceProvider({ children }) {
 
     const { data: sub } = await supabase
       .from('subscriptions')
-      .select('plan_tier')
+      .select('plan_tier, billing_cycle, status, trial_ends_at, stripe_subscription_id, stripe_customer_id, current_period_end')
       .eq('account_id', profile.account_id)
-      .single();
-    if (sub) setPlanTier(sub.plan_tier);
+      .maybeSingle();
+
+    if (sub) {
+      setSubscription(sub);
+      setPlanTier(sub.plan_tier || 'tier_1');
+    } else {
+      setSubscription(null);
+      setPlanTier('tier_1');
+    }
 
     const wsId = profile.default_workspace_id || data?.[0]?.id;
     setActiveWorkspaceId(wsId);
@@ -67,7 +83,27 @@ export function WorkspaceProvider({ children }) {
     return data;
   };
 
+  const renameWorkspace = async (id, name) => {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) throw new Error('Workspace name is required.');
+    const { data, error } = await supabase
+      .from('workspaces')
+      .update({ name: trimmed })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error(parseDbError(error));
+    setWorkspaces((prev) => prev.map((w) => (w.id === id ? data : w)));
+    return data;
+  };
+
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+
+  const trialActive = isTrialingActive(subscription);
+  const pastDue = isPastDue(subscription);
+  const checkoutNeeded = needsCheckout(subscription);
+  const daysLeft = trialDaysLeft(subscription);
+  const paidFeatures = hasPaidPlanFeatures(planTier, subscription);
 
   return (
     <WorkspaceContext.Provider value={{
@@ -75,9 +111,16 @@ export function WorkspaceProvider({ children }) {
       activeWorkspace,
       activeWorkspaceId,
       planTier,
+      subscription,
+      trialActive,
+      pastDue,
+      needsCheckout: checkoutNeeded,
+      trialDaysLeft: daysLeft,
+      hasPaidFeatures: paidFeatures,
       loading,
       switchWorkspace,
       createWorkspace,
+      renameWorkspace,
       reload: loadWorkspaces,
     }}>
       {children}

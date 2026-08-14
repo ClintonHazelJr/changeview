@@ -1,28 +1,69 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Building2, Plus, ChevronRight, ChevronLeft, LayoutGrid, FileText, AlertTriangle,
-  Users, GraduationCap, MessageSquare,
+  ChevronLeft, FileText, AlertTriangle, Users, GraduationCap, MessageSquare,
+  CircleDot, Rocket, HeartPulse, CheckCircle2,
 } from 'lucide-react';
-import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, parseInitiativeMeta } from '../../lib/constants';
+import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, STATUS_COLOR, isRatedSeverity, parseInitiativeMeta } from '../../lib/constants';
 import { useInitiatives, useInitiativeDetail } from '../../hooks/useInitiatives';
 import { useAdminData } from '../../hooks/useAdminData';
-import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { TabSection } from '../ui/shared';
 import Modal from '../ui/Modal';
 import {
-  FormInitiative, FormImpact, FormStakeholder, FormLearningNeed, FormComms,
+  FormInitiative, FormImpact, FormStakeholder, FormLearningNeed, FormComms, FormHypercare,
 } from '../forms/AdminForms';
+import ListTable from '../ui/ListTable';
+import StatusPill from '../ui/StatusPill';
+import {
+  ListPageShell, ListTopBar, StatusFilterRow, GroupSection, CompactListCard,
+  ListBody, countByStatus, statusColor,
+} from '../ui/ListChrome';
 
-export default function InitiativesPanel() {
-  const { activeWorkspace } = useWorkspace();
-  const { initiatives, addInitiative } = useInitiatives();
-  const { orgs, departments, people } = useAdminData();
-  const [selectedInitId, setSelectedInitId] = useState(null);
+const INIT_STATUSES = [
+  { key: 'planning', label: 'Planning', icon: CircleDot },
+  { key: 'delivery', label: 'Delivery', icon: Rocket },
+  { key: 'hypercare', label: 'Hypercare', icon: HeartPulse },
+  { key: 'closed', label: 'Closed', icon: CheckCircle2 },
+];
+
+function formatDate(value) {
+  if (!value) return null;
+  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+export default function InitiativesPanel({ initialSelectedId = null, onSelectedConsumed }) {
+  const { initiatives, programs, addInitiative, reload: reloadInitiatives } = useInitiatives();
+  const { departments, people } = useAdminData();
+  const [selectedInitId, setSelectedInitId] = useState(initialSelectedId);
   const [initTab, setInitTab] = useState('details');
   const [modal, setModal] = useState(null);
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [statusFilter, setStatusFilter] = useState(null);
+  const [viewMode, setViewMode] = useState('tiles');
+
+  const openCreate = (type) => {
+    setEditingRecord(null);
+    setModal(type);
+  };
+  const openEdit = (type, record) => {
+    setEditingRecord(record);
+    setModal(type);
+  };
+  const closeModal = () => {
+    setModal(null);
+    setEditingRecord(null);
+  };
+
+  useEffect(() => {
+    if (initialSelectedId) {
+      setSelectedInitId(initialSelectedId);
+      setInitTab('details');
+      onSelectedConsumed?.();
+    }
+  }, [initialSelectedId, onSelectedConsumed]);
 
   const detail = useInitiativeDetail(selectedInitId);
   const selectedInit = detail.initiative;
+  const programName = (id) => programs.find((p) => p.id === id)?.name || 'No Program';
 
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '—';
@@ -36,6 +77,7 @@ export default function InitiativesPanel() {
     stakeholders: detail.stakeholders,
     learningNeeds: detail.learningNeeds,
     comms: detail.comms,
+    hypercare: detail.hypercare,
   };
 
   const initTabs = [
@@ -44,58 +86,123 @@ export default function InitiativesPanel() {
     { key: 'stakeholders', label: 'Stakeholders', icon: Users, color: C.teal, count: initData.stakeholders.length },
     { key: 'learning', label: 'Learning Needs', icon: GraduationCap, color: C.amber, count: initData.learningNeeds.length },
     { key: 'comms', label: 'Comms', icon: MessageSquare, color: C.green, count: initData.comms.length },
+    {
+      key: 'hypercare',
+      label: 'Hypercare',
+      icon: HeartPulse,
+      color: C.amber,
+      highlight: selectedInit?.status === 'hypercare',
+    },
   ];
 
+  const getStatus = (i) => i.status || 'planning';
+  const counts = countByStatus(initiatives, getStatus, INIT_STATUSES.map((s) => s.key));
+  const filtered = useMemo(
+    () => (statusFilter ? initiatives.filter((i) => getStatus(i) === statusFilter) : initiatives),
+    [initiatives, statusFilter],
+  );
+  const groups = useMemo(() => {
+    const map = new Map();
+    filtered.forEach((i) => {
+      const key = i.program_id || 'none';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(i);
+    });
+    return [...map.entries()].map(([key, items]) => ({
+      key,
+      label: key === 'none' ? 'No Program' : programName(key),
+      items,
+    }));
+  }, [filtered, programs]);
+
   if (!selectedInitId) {
+    const columns = [
+      {
+        key: 'name',
+        label: 'Name',
+        sortable: true,
+        render: (i) => <span className="font-semibold">{i.name}</span>,
+      },
+      {
+        key: 'status',
+        label: 'Status',
+        sortable: true,
+        sortValue: (i) => getStatus(i),
+        render: (i) => <StatusPill label={getStatus(i)} color={statusColor(getStatus(i))} />,
+      },
+      {
+        key: 'program',
+        label: 'Program',
+        sortable: true,
+        sortValue: (i) => programName(i.program_id),
+        render: (i) => programName(i.program_id),
+      },
+      {
+        key: 'proposed_go_live_date',
+        label: 'Go live',
+        sortable: true,
+        render: (i) => formatDate(i.proposed_go_live_date) || '—',
+      },
+    ];
+
     return (
-      <div className="flex-1 p-8 max-w-4xl w-full mx-auto" style={BODY}>
-        <div className="flex items-start justify-between mb-1">
-          <h2 className="text-xl font-extrabold" style={{ ...HEAD, color: C.ink }}>Initiatives — {activeWorkspace?.name}</h2>
-          <button
-            type="button"
-            onClick={() => setModal('initiative')}
-            disabled={orgs.length === 0}
-            className="flex items-center gap-1.5 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-40 shadow-sm"
-            style={{ background: C.purple }}
-          >
-            <Plus size={15} /> Add Initiative
-          </button>
-        </div>
-        <p className="text-sm mb-5" style={{ color: C.sub }}>
-          {orgs.length === 0 ? 'Set up an Org in System Admin first.' : 'Pick one to open its Impacts, Stakeholders, Learning Needs, and Comms.'}
-        </p>
-        {initiatives.length === 0 ? (
-          <div className="text-center py-14 bg-white rounded-3xl border border-dashed" style={{ borderColor: C.border }}>
-            <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: tint(C.purple, '16') }}><LayoutGrid size={20} style={{ color: C.purple }} /></div>
-            <div className="text-sm" style={{ color: C.sub }}>No initiatives yet.</div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {initiatives.map((i) => (
-              <button
-                key={i.id}
-                type="button"
-                onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
-                className="bg-white rounded-2xl p-4 shadow-sm border text-left hover:shadow-md transition-shadow"
-                style={{ borderColor: C.border }}
+      <ListPageShell>
+        <ListTopBar
+          title="Initiatives"
+          addLabel="Add Initiative"
+          onAdd={() => setModal('initiative')}
+          addDisabled={programs.length === 0}
+          viewMode={viewMode}
+          onViewChange={setViewMode}
+        />
+        <StatusFilterRow
+          statuses={INIT_STATUSES}
+          counts={counts}
+          active={statusFilter}
+          onSelect={setStatusFilter}
+          onAddStatus={programs.length ? () => setModal('initiative') : undefined}
+        />
+        <ListBody
+          empty={filtered.length === 0}
+          emptyText={programs.length === 0 ? 'Create a Program first, then add Initiatives.' : 'No initiatives yet.'}
+        >
+          {viewMode === 'list' ? (
+            <ListTable
+              columns={columns}
+              rows={filtered}
+              onRowClick={(i) => { setSelectedInitId(i.id); setInitTab('details'); }}
+              initialSortKey="name"
+            />
+          ) : (
+            groups.map((g) => (
+              <GroupSection
+                key={g.key}
+                title={g.label}
+                items={g.items}
+                getStatus={getStatus}
+                addLabel="Add Initiative"
+                onAdd={programs.length ? () => setModal('initiative') : undefined}
               >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: tint(C.purple, '18') }}><Building2 size={16} style={{ color: C.purple }} /></div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-bold truncate" style={{ color: C.ink }}>{i.name}</div>
-                    <div className="text-xs" style={{ color: C.sub }}>{i.status}</div>
-                  </div>
-                  <ChevronRight size={16} style={{ color: C.sub }} />
-                </div>
-                <p className="text-xs line-clamp-2" style={{ color: C.sub }}>{i.description}</p>
-              </button>
-            ))}
-          </div>
-        )}
+                {g.items.map((i) => {
+                  const meta = parseInitiativeMeta(i.description);
+                  return (
+                    <CompactListCard
+                      key={i.id}
+                      title={i.name}
+                      subtitle={formatDate(i.proposed_go_live_date) ? `Go live ${formatDate(i.proposed_go_live_date)}` : 'No go-live date'}
+                      tags={[{ label: getStatus(i), color: statusColor(getStatus(i)) }]}
+                      avatars={[meta.changeOwner, meta.productOwner, meta.businessOwner, meta.projectManager].filter(Boolean)}
+                      onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
+                    />
+                  );
+                })}
+              </GroupSection>
+            ))
+          )}
+        </ListBody>
         {modal === 'initiative' && (
           <Modal title="Add Initiative" onClose={() => setModal(null)}>
             <FormInitiative
-              people={people}
               onSave={async (vals) => {
                 const data = await addInitiative(vals);
                 setModal(null);
@@ -105,13 +212,13 @@ export default function InitiativesPanel() {
             />
           </Modal>
         )}
-      </div>
+      </ListPageShell>
     );
   }
 
   return (
-    <div className="flex flex-1" style={BODY}>
-      <div className="w-56 bg-white border-r flex flex-col py-5 px-3" style={{ borderColor: C.border }}>
+    <div className="flex flex-1 min-h-0 overflow-hidden" style={BODY}>
+      <div className="w-56 bg-white border-r flex flex-col py-5 px-3 shrink-0 overflow-y-auto" style={{ borderColor: C.border }}>
         <button type="button" onClick={() => setSelectedInitId(null)} className="flex items-center gap-1.5 text-xs font-semibold mb-4 px-2" style={{ color: C.sub }}>
           <ChevronLeft size={14} /> All Initiatives
         </button>
@@ -136,11 +243,18 @@ export default function InitiativesPanel() {
                 {t.count}
               </span>
             )}
+            {t.highlight && !t.count && (
+              <span
+                className="ml-auto w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ background: t.color }}
+                title="Initiative is in Hypercare"
+              />
+            )}
           </button>
         ))}
       </div>
 
-      <div className="flex-1 p-8 max-w-4xl">
+      <div className="flex-1 p-8 max-w-4xl overflow-y-auto">
         {initTab === 'details' && selectedInit && (() => {
           const meta = parseInitiativeMeta(selectedInit.description);
           return (
@@ -150,9 +264,12 @@ export default function InitiativesPanel() {
             <div className="grid grid-cols-2 gap-3 mb-6">
               {[
                 ['Status', selectedInit.status],
+                ['Program', programName(selectedInit.program_id)],
                 ['Go Live Date', selectedInit.proposed_go_live_date || '—'],
                 ['Budget', selectedInit.budget ? `$${Number(selectedInit.budget).toLocaleString()}` : '—'],
                 ['Change Owner', meta.changeOwner || '—'],
+                ['Product Owner', meta.productOwner || '—'],
+                ['Business Owner', meta.businessOwner || '—'],
                 ['Project Manager', meta.projectManager || '—'],
               ].map(([label, val]) => (
                 <div key={label} className="bg-white rounded-2xl p-4 shadow-sm border" style={{ borderColor: C.border }}>
@@ -174,7 +291,7 @@ export default function InitiativesPanel() {
         })()}
 
         {initTab === 'impacts' && (
-          <TabSection title="Impacts" subtitle="Scope who and what is affected by this change." onAdd={() => setModal('impact')} addLabel="Add Impact" color={C.coral} empty={initData.impacts.length === 0} emptyText="No impacts recorded yet." emptyIcon={AlertTriangle}>
+          <TabSection title="Impacts" subtitle="Scope who and what is affected by this change." onAdd={() => openCreate('impact')} addLabel="Add Impact" color={C.coral} empty={initData.impacts.length === 0} emptyText="No impacts recorded yet." emptyIcon={AlertTriangle}>
             <div className="space-y-3">
               {initData.impacts.map((imp) => {
                 const severity = {
@@ -182,17 +299,34 @@ export default function InitiativesPanel() {
                   system: imp.severity_system, environment: imp.severity_environment,
                 };
                 return (
-                  <div key={imp.id} className="bg-white rounded-2xl p-4 shadow-sm border" style={{ borderColor: C.border }}>
-                    <div className="text-sm font-bold mb-2" style={{ color: C.ink }}>{deptName(imp.department_id)} · {imp.headcount_impacted} impacted</div>
+                  <button
+                    key={imp.id}
+                    type="button"
+                    onClick={() => openEdit('impact', imp)}
+                    className="w-full text-left bg-white rounded-2xl p-4 shadow-sm border hover:shadow-md transition-shadow"
+                    style={{ borderColor: C.border }}
+                  >
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <div className="text-sm font-bold" style={{ color: C.ink }}>{deptName(imp.department_id)} · {imp.headcount_impacted} impacted</div>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize"
+                        style={{
+                          background: tint(STATUS_COLOR[imp.status || 'draft'], '22'),
+                          color: STATUS_COLOR[imp.status || 'draft'],
+                        }}
+                      >
+                        {imp.status || 'draft'}
+                      </span>
+                    </div>
                     <div className="flex flex-wrap gap-2 mb-2">
-                      {Object.entries(severity).map(([k, v]) => v && (
+                      {Object.entries(severity).map(([k, v]) => isRatedSeverity(v) && (
                         <span key={k} className="text-[10px] font-semibold px-2 py-1 rounded-full capitalize" style={{ background: tint(SEVERITY_COLOR[v], '22'), color: SEVERITY_COLOR[v] }}>{k}: {v}</span>
                       ))}
                     </div>
                     <p className="text-xs mb-1" style={{ color: C.sub }}><b>Now:</b> {imp.current_state_process}</p>
                     <p className="text-xs" style={{ color: C.sub }}><b>Future:</b> {imp.future_state_process}</p>
                     <div className="flex gap-1.5 mt-2">{(imp.intervention_tags || []).map((t) => <span key={t} className="text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize" style={{ background: tint(C.coral, '18'), color: C.coral }}>{t}</span>)}</div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -200,19 +334,25 @@ export default function InitiativesPanel() {
         )}
 
         {initTab === 'stakeholders' && (
-          <TabSection title="Stakeholders" subtitle="Who's involved, and their RACI role on this Initiative." onAdd={() => setModal('stakeholder')} addLabel="Add Stakeholder" color={C.teal} disabled={people.length === 0} disabledText="Add People in System Admin first." empty={initData.stakeholders.length === 0} emptyText="No stakeholders added yet." emptyIcon={Users}>
+          <TabSection title="Stakeholders" subtitle="Who's involved, and their RACI role on this Initiative." onAdd={() => openCreate('stakeholder')} addLabel="Add Stakeholder" color={C.teal} disabled={people.length === 0} disabledText="Add People in Settings first." empty={initData.stakeholders.length === 0} emptyText="No stakeholders added yet." emptyIcon={Users}>
             <div className="grid grid-cols-2 gap-3">
               {initData.stakeholders.map((s) => {
                 const raci = { r: s.raci_responsible, a: s.raci_accountable, c: s.raci_consulted, i: s.raci_informed };
                 return (
-                  <div key={s.id} className="bg-white rounded-2xl p-4 shadow-sm border flex items-center gap-3" style={{ borderColor: C.border }}>
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => openEdit('stakeholder', s)}
+                    className="w-full text-left bg-white rounded-2xl p-4 shadow-sm border flex items-center gap-3 hover:shadow-md transition-shadow"
+                    style={{ borderColor: C.border }}
+                  >
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: C.teal }}>{initials(personName(s.person_id))}</div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-bold truncate" style={{ color: C.ink }}>{personName(s.person_id)}</div>
                       <div className="text-xs truncate" style={{ color: C.sub }}>{s.project_role}</div>
                       <div className="flex gap-1 mt-1">{Object.entries(raci).filter(([, v]) => v).map(([k]) => <span key={k} className="text-[9px] font-bold w-4 h-4 rounded flex items-center justify-center uppercase" style={{ background: tint(C.teal, '20'), color: C.teal }}>{k}</span>)}</div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -220,29 +360,71 @@ export default function InitiativesPanel() {
         )}
 
         {initTab === 'learning' && (
-          <TabSection title="Learning Needs" subtitle="Training required per Impact, feeds directly into the delivery plan." onAdd={() => setModal('learning')} addLabel="Add Learning Need" color={C.amber} disabled={initData.impacts.length === 0} disabledText="Add an Impact first." empty={initData.learningNeeds.length === 0} emptyText="No learning needs yet." emptyIcon={GraduationCap}>
+          <TabSection title="Learning Needs" subtitle="Training required per Impact, feeds directly into the delivery plan." onAdd={() => openCreate('learning')} addLabel="Add Learning Need" color={C.amber} disabled={initData.impacts.length === 0} disabledText="Add an Impact first." empty={initData.learningNeeds.length === 0} emptyText="No learning needs yet." emptyIcon={GraduationCap}>
             <div className="space-y-2">
               {initData.learningNeeds.map((ln) => (
-                <div key={ln.id} className="bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between" style={{ borderColor: C.border }}>
-                  <div>
-                    <div className="text-sm font-bold" style={{ color: C.ink }}>{ln.team} <span className="font-normal text-xs" style={{ color: C.sub }}>· {impactLabel(ln.impact_id)}</span></div>
+                <button
+                  key={ln.id}
+                  type="button"
+                  onClick={() => openEdit('learning', ln)}
+                  className="w-full text-left bg-white rounded-2xl p-4 shadow-sm border flex items-center justify-between hover:shadow-md transition-shadow"
+                  style={{ borderColor: C.border }}
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <div className="text-sm font-bold" style={{ color: C.ink }}>{ln.team} <span className="font-normal text-xs" style={{ color: C.sub }}>· {impactLabel(ln.impact_id)}</span></div>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize"
+                        style={{
+                          background: tint(STATUS_COLOR[ln.status || 'draft'], '22'),
+                          color: STATUS_COLOR[ln.status || 'draft'],
+                        }}
+                      >
+                        {ln.status || 'draft'}
+                      </span>
+                    </div>
                     <div className="text-xs" style={{ color: C.sub }}>{ln.goal}</div>
                   </div>
-                  <div className="text-right text-xs" style={{ color: C.sub }}>
+                  <div className="text-right text-xs shrink-0" style={{ color: C.sub }}>
                     <div className="font-semibold" style={{ color: C.amber }}>{ln.type}</div>
                     {ln.headcount} people · {ln.session_count} session · {ln.time_hours}h
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </TabSection>
         )}
 
+        {initTab === 'hypercare' && selectedInit && (
+          <div>
+            <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Hypercare</h2>
+            <p className="text-sm mb-5" style={{ color: C.sub }}>
+              One hypercare plan per Initiative — pilot criteria, assumptions, and go-live timing.
+            </p>
+            <div className="bg-white rounded-3xl border shadow-sm p-5 max-w-xl" style={{ borderColor: C.border }}>
+              <FormHypercare
+                initiative={selectedInit}
+                hypercare={initData.hypercare}
+                onSave={async (vals) => {
+                  await detail.saveHypercare(vals);
+                  await reloadInitiatives();
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         {initTab === 'comms' && (
-          <TabSection title="Comms" subtitle="Draft and save communications, generated with AI from your Impact data." onAdd={() => setModal('comms')} addLabel="Add Comms" color={C.green} empty={initData.comms.length === 0} emptyText="No comms drafted yet." emptyIcon={MessageSquare}>
+          <TabSection title="Comms" subtitle="Draft and save communications, generated with AI from your Impact data." onAdd={() => openCreate('comms')} addLabel="Add Comms" color={C.green} empty={initData.comms.length === 0} emptyText="No comms drafted yet." emptyIcon={MessageSquare}>
             <div className="space-y-3">
               {initData.comms.map((c) => (
-                <div key={c.id} className="bg-white rounded-2xl p-4 shadow-sm border" style={{ borderColor: C.border }}>
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => openEdit('comms', c)}
+                  className="w-full text-left bg-white rounded-2xl p-4 shadow-sm border hover:shadow-md transition-shadow"
+                  style={{ borderColor: C.border }}
+                >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-bold" style={{ color: C.ink }}>{c.key_message || 'Untitled'}</span>
                     <span className="text-[10px] font-semibold px-2 py-1 rounded-full capitalize" style={{ background: tint(C.green, '18'), color: '#1a8a5f' }}>{c.tone}</span>
@@ -251,19 +433,73 @@ export default function InitiativesPanel() {
                     {c.impact_id ? impactLabel(c.impact_id) : 'Initiative-wide'} · {(c.channel || []).join(', ') || '—'}
                   </p>
                   {c.final_content && <p className="text-xs whitespace-pre-wrap" style={{ color: C.ink }}>{c.final_content}</p>}
-                </div>
+                </button>
               ))}
             </div>
           </TabSection>
         )}
       </div>
 
-      {modal === 'impact' && <Modal title="Add Impact" wide onClose={() => setModal(null)}><FormImpact departments={departments} onSave={async (v) => { await detail.addImpact(v); setModal(null); }} /></Modal>}
-      {modal === 'stakeholder' && <Modal title="Add Stakeholder" onClose={() => setModal(null)}><FormStakeholder people={people} onSave={async (v) => { await detail.addStakeholder(v); setModal(null); }} /></Modal>}
-      {modal === 'learning' && <Modal title="Add Learning Need" onClose={() => setModal(null)}><FormLearningNeed impacts={initData.impacts} deptName={deptName} onSave={async (v) => { await detail.addLearningNeed(v); setModal(null); }} /></Modal>}
+      {modal === 'impact' && (
+        <Modal title={editingRecord ? 'Edit Impact' : 'Add Impact'} wide onClose={closeModal}>
+          <FormImpact
+            departments={departments}
+            initial={editingRecord}
+            onSave={async (v) => (
+              editingRecord
+                ? detail.updateImpact(editingRecord.id, v)
+                : detail.addImpact(v)
+            )}
+            onComplete={closeModal}
+            onDelete={editingRecord ? async () => { await detail.deleteImpact(editingRecord.id); closeModal(); } : undefined}
+          />
+        </Modal>
+      )}
+      {modal === 'stakeholder' && (
+        <Modal title={editingRecord ? 'Edit Stakeholder' : 'Add Stakeholder'} onClose={closeModal}>
+          <FormStakeholder
+            people={people}
+            departments={departments}
+            initial={editingRecord}
+            onSave={async (v) => {
+              if (editingRecord) await detail.updateStakeholder(editingRecord.id, v);
+              else await detail.addStakeholder(v);
+              closeModal();
+            }}
+            onDelete={editingRecord ? async () => { await detail.deleteStakeholder(editingRecord.id); closeModal(); } : undefined}
+          />
+        </Modal>
+      )}
+      {modal === 'learning' && (
+        <Modal title={editingRecord ? 'Edit Learning Need' : 'Add Learning Need'} onClose={closeModal}>
+          <FormLearningNeed
+            impacts={initData.impacts}
+            deptName={deptName}
+            initial={editingRecord}
+            onSave={async (v) => (
+              editingRecord
+                ? detail.updateLearningNeed(editingRecord.id, v)
+                : detail.addLearningNeed(v)
+            )}
+            onComplete={closeModal}
+            onDelete={editingRecord ? async () => { await detail.deleteLearningNeed(editingRecord.id); closeModal(); } : undefined}
+          />
+        </Modal>
+      )}
       {modal === 'comms' && selectedInit && (
-        <Modal title="Add Comms" wide onClose={() => setModal(null)}>
-          <FormComms initiative={selectedInit} impacts={initData.impacts} deptName={deptName} onSave={async (v) => { await detail.addComms(v); setModal(null); }} />
+        <Modal title={editingRecord ? 'Edit Comms' : 'Add Comms'} wide onClose={closeModal}>
+          <FormComms
+            initiative={selectedInit}
+            impacts={initData.impacts}
+            deptName={deptName}
+            initial={editingRecord}
+            onSave={async (v) => {
+              if (editingRecord) await detail.updateComms(editingRecord.id, v);
+              else await detail.addComms(v);
+              closeModal();
+            }}
+            onDelete={editingRecord ? async () => { await detail.deleteComms(editingRecord.id); closeModal(); } : undefined}
+          />
         </Modal>
       )}
     </div>

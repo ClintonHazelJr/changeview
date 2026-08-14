@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Building2, MapPin, Users, UserCircle2, Plus, ChevronRight, Mail, Tag,
 } from 'lucide-react';
@@ -6,20 +6,28 @@ import { C, HEAD, BODY, tint, initials } from '../../lib/constants';
 import { useAdminData } from '../../hooks/useAdminData';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { ListCard, TabSection } from '../ui/shared';
+import ListTable from '../ui/ListTable';
 import Modal from '../ui/Modal';
 import {
   FormOrg, FormDepartment, FormPerson, FormTeam, FormTeamMember,
 } from '../forms/AdminForms';
 
-export default function SystemAdmin() {
+export default function SystemAdmin({ initialTab = null, onInitialTabConsumed }) {
   const { activeWorkspace } = useWorkspace();
   const {
     orgs, departments, people, teams,
     addOrg, addDepartment, addPerson, addTeam, addTeamMember,
   } = useAdminData();
-  const [adminTab, setAdminTab] = useState('org');
+  const [adminTab, setAdminTab] = useState(initialTab || 'org');
   const [modal, setModal] = useState(null);
   const [expandedTeam, setExpandedTeam] = useState(null);
+  const [viewMode, setViewMode] = useState('tiles');
+
+  useEffect(() => {
+    if (!initialTab) return;
+    setAdminTab(initialTab);
+    onInitialTabConsumed?.();
+  }, [initialTab, onInitialTabConsumed]);
 
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '—';
@@ -69,7 +77,7 @@ export default function SystemAdmin() {
         {adminSteps.filter((s) => s.count > 0).length === 0 && (
           <div className="rounded-3xl p-7 mb-6" style={{ background: `linear-gradient(120deg, ${tint(C.purple, '12')}, ${tint(C.teal, '10')})` }}>
             <div className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Welcome to {activeWorkspace?.name}</div>
-            <p className="text-sm max-w-md" style={{ color: C.sub }}>Set up your Org, Department, People, and Project Teams, in that order, then head to Initiatives.</p>
+            <p className="text-sm max-w-md" style={{ color: C.sub }}>Set up your Org, Department, People, and Project Teams, in that order, then create a Program and Initiatives.</p>
           </div>
         )}
         <div className="grid grid-cols-4 gap-3 mb-7">
@@ -83,48 +91,154 @@ export default function SystemAdmin() {
         </div>
 
         {adminTab === 'org' && (
-          <TabSection title="Org" subtitle={`Add each client company you'll run change work for inside ${activeWorkspace?.name}.`} onAdd={() => setModal('org')} addLabel="Add Org" color={C.purple} empty={orgs.length === 0} emptyText="No orgs yet. Add your first company to get started." emptyIcon={Building2}>
-            <div className="grid grid-cols-2 gap-3">{orgs.map((c) => <ListCard key={c.id} icon={Building2} color={C.purple} title={c.name} subtitle="Company" />)}</div>
+          <TabSection
+            title="Org"
+            subtitle={`Add each client company you'll run change work for inside ${activeWorkspace?.name}.`}
+            onAdd={() => setModal('org')}
+            addLabel="Add Org"
+            color={C.purple}
+            empty={orgs.length === 0}
+            emptyText="No orgs yet. Add your first company to get started."
+            emptyIcon={Building2}
+            viewMode={viewMode}
+            onViewChange={setViewMode}
+          >
+            {viewMode === 'list' ? (
+              <ListTable
+                columns={[
+                  { key: 'name', label: 'Name', sortable: true, render: (c) => <span className="font-semibold">{c.name}</span> },
+                  { key: 'type', label: 'Type', render: () => 'Company' },
+                ]}
+                rows={orgs}
+                initialSortKey="name"
+              />
+            ) : (
+              <div className="grid grid-cols-2 gap-3">{orgs.map((c) => <ListCard key={c.id} icon={Building2} color={C.purple} title={c.name} subtitle="Company" />)}</div>
+            )}
           </TabSection>
         )}
         {adminTab === 'department' && (
-          <TabSection title="Department" subtitle="Departments sit under an Org and tag who's impacted on every Impact record." onAdd={() => setModal('department')} addLabel="Add Department" color={C.teal} disabled={orgs.length === 0} disabledText="Add an Org first." empty={departments.length === 0} emptyText="No departments yet." emptyIcon={MapPin}>
-            <div className="grid grid-cols-2 gap-3">{departments.map((d) => <ListCard key={d.id} icon={MapPin} color={C.teal} title={d.name} subtitle={orgs.find((c) => c.id === d.org_id)?.name} tag={d.location} />)}</div>
+          <TabSection
+            title="Department"
+            subtitle="Departments sit under an Org and tag who's impacted on every Impact record."
+            onAdd={() => setModal('department')}
+            addLabel="Add Department"
+            color={C.teal}
+            disabled={orgs.length === 0}
+            disabledText="Add an Org first."
+            empty={departments.length === 0}
+            emptyText="No departments yet."
+            emptyIcon={MapPin}
+            viewMode={viewMode}
+            onViewChange={setViewMode}
+          >
+            {viewMode === 'list' ? (
+              <ListTable
+                columns={[
+                  { key: 'name', label: 'Name', sortable: true, render: (d) => <span className="font-semibold">{d.name}</span> },
+                  {
+                    key: 'org',
+                    label: 'Org',
+                    sortable: true,
+                    sortValue: (d) => orgs.find((c) => c.id === d.org_id)?.name || '',
+                    render: (d) => orgs.find((c) => c.id === d.org_id)?.name || '—',
+                  },
+                  { key: 'location', label: 'Location', sortable: true, render: (d) => d.location || '—' },
+                ]}
+                rows={departments}
+                initialSortKey="name"
+              />
+            ) : (
+              <div className="grid grid-cols-2 gap-3">{departments.map((d) => <ListCard key={d.id} icon={MapPin} color={C.teal} title={d.name} subtitle={orgs.find((c) => c.id === d.org_id)?.name} tag={d.location} />)}</div>
+            )}
           </TabSection>
         )}
         {adminTab === 'people' && (
-          <TabSection title="People" subtitle="Your directory. Add someone once here, then reuse them as a Stakeholder or Team Member on any Initiative." onAdd={() => setModal('people')} addLabel="Add Person" color={C.coral} disabled={departments.length === 0} disabledText="Add a Department first." empty={people.length === 0} emptyText="No people yet." emptyIcon={UserCircle2}>
-            <div className="grid grid-cols-2 gap-3">
-              {people.map((p) => (
-                <div key={p.id} className="bg-white rounded-2xl p-4 shadow-sm border flex items-start gap-3" style={{ borderColor: C.border }}>
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: C.coral }}>{initials(p.name)}</div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-bold truncate" style={{ color: C.ink }}>{p.name}</div>
-                    <div className="text-xs truncate" style={{ color: C.sub }}>{p.title || '—'} · {deptName(p.department_id)}</div>
-                    {p.email && <div className="flex items-center gap-1 text-xs mt-1 truncate" style={{ color: C.sub }}><Mail size={11} />{p.email}</div>}
+          <TabSection
+            title="People"
+            subtitle="Your directory. Add someone once here, then reuse them as a Stakeholder or Team Member on any Initiative."
+            onAdd={() => setModal('people')}
+            addLabel="Add Person"
+            color={C.coral}
+            disabled={departments.length === 0}
+            disabledText="Add a Department first."
+            empty={people.length === 0}
+            emptyText="No people yet."
+            emptyIcon={UserCircle2}
+            viewMode={viewMode}
+            onViewChange={setViewMode}
+          >
+            {viewMode === 'list' ? (
+              <ListTable
+                columns={[
+                  { key: 'name', label: 'Name', sortable: true, render: (p) => <span className="font-semibold">{p.name}</span> },
+                  { key: 'title', label: 'Title', sortable: true, render: (p) => p.title || '—' },
+                  {
+                    key: 'department',
+                    label: 'Department',
+                    sortable: true,
+                    sortValue: (p) => deptName(p.department_id),
+                    render: (p) => deptName(p.department_id),
+                  },
+                  { key: 'email', label: 'Email', sortable: true, render: (p) => p.email || '—' },
+                ]}
+                rows={people}
+                initialSortKey="name"
+              />
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {people.map((p) => (
+                  <div key={p.id} className="bg-white rounded-2xl p-4 shadow-sm border flex items-start gap-3" style={{ borderColor: C.border }}>
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: C.coral }}>{initials(p.name)}</div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold truncate" style={{ color: C.ink }}>{p.name}</div>
+                      <div className="text-xs truncate" style={{ color: C.sub }}>{p.title || '—'} · {deptName(p.department_id)}</div>
+                      {p.email && <div className="flex items-center gap-1 text-xs mt-1 truncate" style={{ color: C.sub }}><Mail size={11} />{p.email}</div>}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </TabSection>
         )}
         {adminTab === 'teams' && (
-          <TabSection title="Project Teams" subtitle="Group People into a team, so you can assign a whole team to an Initiative in one go." onAdd={() => setModal('team')} addLabel="Add Project Team" color={C.green} disabled={people.length === 0} disabledText="Add at least one Person first." empty={teams.length === 0} emptyText="No project teams yet." emptyIcon={Users}>
-            <div className="space-y-3">
-              {teams.map((t) => (
-                <div key={t.id} className="bg-white border rounded-2xl overflow-hidden shadow-sm" style={{ borderColor: C.border }}>
-                  <button type="button" onClick={() => setExpandedTeam(expandedTeam === t.id ? null : t.id)} className="w-full flex items-center justify-between px-4 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: tint(C.green, '20') }}><Users size={14} style={{ color: C.green }} /></div>
-                      <span className="text-sm font-bold" style={{ color: C.ink }}>{t.name}</span>
-                    </div>
-                    <span className="flex items-center gap-2 text-xs" style={{ color: C.sub }}>
-                      {t.members.length} member{t.members.length !== 1 ? 's' : ''}
-                      <ChevronRight size={14} className="transition-transform" style={{ transform: expandedTeam === t.id ? 'rotate(90deg)' : 'none' }} />
-                    </span>
-                  </button>
-                  {expandedTeam === t.id && (
-                    <div className="px-4 py-3" style={{ background: C.bg }}>
+          <TabSection
+            title="Project Teams"
+            subtitle="Group People into a team, so you can assign a whole team to an Initiative in one go."
+            onAdd={() => setModal('team')}
+            addLabel="Add Project Team"
+            color={C.green}
+            disabled={people.length === 0}
+            disabledText="Add at least one Person first."
+            empty={teams.length === 0}
+            emptyText="No project teams yet."
+            emptyIcon={Users}
+            viewMode={viewMode}
+            onViewChange={setViewMode}
+          >
+            {viewMode === 'list' ? (
+              <div className="space-y-3">
+                <ListTable
+                  columns={[
+                    { key: 'name', label: 'Team', sortable: true, render: (t) => <span className="font-semibold">{t.name}</span> },
+                    {
+                      key: 'members',
+                      label: 'Members',
+                      sortable: true,
+                      sortValue: (t) => t.members.length,
+                      render: (t) => `${t.members.length} member${t.members.length !== 1 ? 's' : ''}`,
+                    },
+                  ]}
+                  rows={teams}
+                  onRowClick={(t) => setExpandedTeam(expandedTeam === t.id ? null : t.id)}
+                  initialSortKey="name"
+                />
+                {expandedTeam && (() => {
+                  const t = teams.find((x) => x.id === expandedTeam);
+                  if (!t) return null;
+                  return (
+                    <div className="bg-white rounded-2xl border p-4" style={{ borderColor: C.border }}>
+                      <div className="text-sm font-bold mb-2" style={{ color: C.ink }}>{t.name} · members</div>
                       {t.members.map((m) => (
                         <div key={m.id} className="flex items-center justify-between text-sm py-2">
                           <span style={{ color: C.ink }}>{personName(m.person_id)}</span>
@@ -133,10 +247,38 @@ export default function SystemAdmin() {
                       ))}
                       <button type="button" onClick={() => setModal({ type: 'teamMember', teamId: t.id })} className="flex items-center gap-1.5 text-xs font-bold mt-2" style={{ color: C.purple }}><Plus size={13} /> Add team member</button>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {teams.map((t) => (
+                  <div key={t.id} className="bg-white border rounded-2xl overflow-hidden shadow-sm" style={{ borderColor: C.border }}>
+                    <button type="button" onClick={() => setExpandedTeam(expandedTeam === t.id ? null : t.id)} className="w-full flex items-center justify-between px-4 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: tint(C.green, '20') }}><Users size={14} style={{ color: C.green }} /></div>
+                        <span className="text-sm font-bold" style={{ color: C.ink }}>{t.name}</span>
+                      </div>
+                      <span className="flex items-center gap-2 text-xs" style={{ color: C.sub }}>
+                        {t.members.length} member{t.members.length !== 1 ? 's' : ''}
+                        <ChevronRight size={14} className="transition-transform" style={{ transform: expandedTeam === t.id ? 'rotate(90deg)' : 'none' }} />
+                      </span>
+                    </button>
+                    {expandedTeam === t.id && (
+                      <div className="px-4 py-3" style={{ background: C.bg }}>
+                        {t.members.map((m) => (
+                          <div key={m.id} className="flex items-center justify-between text-sm py-2">
+                            <span style={{ color: C.ink }}>{personName(m.person_id)}</span>
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: tint(C.green, '18'), color: '#1a8a5f' }}><Tag size={10} className="inline mr-1" />{m.role}</span>
+                          </div>
+                        ))}
+                        <button type="button" onClick={() => setModal({ type: 'teamMember', teamId: t.id })} className="flex items-center gap-1.5 text-xs font-bold mt-2" style={{ color: C.purple }}><Plus size={13} /> Add team member</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </TabSection>
         )}
       </div>
@@ -147,7 +289,11 @@ export default function SystemAdmin() {
       {modal === 'team' && <Modal title="Add Project Team" onClose={() => setModal(null)}><FormTeam onSave={async (n) => { await addTeam(n); setModal(null); }} /></Modal>}
       {modal?.type === 'teamMember' && (
         <Modal title="Add Team Member" onClose={() => setModal(null)}>
-          <FormTeamMember people={people} onSave={async (personId, role) => { await addTeamMember(modal.teamId, personId, role); setModal(null); }} />
+          <FormTeamMember
+            people={people}
+            departments={departments}
+            onSave={async (personId, role) => { await addTeamMember(modal.teamId, personId, role); setModal(null); }}
+          />
         </Modal>
       )}
     </div>
