@@ -115,7 +115,7 @@ export default function SignupPage() {
       <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md border" style={{ borderColor: C.border }}>
         <h1 className="text-2xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Start your 7-day free trial</h1>
         <p className="text-sm mb-2" style={{ color: C.sub }}>
-          Card required — you will not be charged until the trial ends. Full Enterprise access during the trial.
+          Card required — you will not be charged until the trial ends. Full {PLAN_LABELS[planTier] || 'plan'} access during the trial.
         </p>
         <p className="text-xs font-semibold mb-6" style={{ color: C.purple }}>
           Plan: {PLAN_LABELS[planTier] || planTier}

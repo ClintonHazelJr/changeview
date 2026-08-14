@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { C, BODY, PLAN_LABELS } from '../lib/constants';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { WorkspaceProvider, useWorkspace } from '../contexts/WorkspaceContext';
 import TopNav from '../components/layout/TopNav';
@@ -25,6 +26,8 @@ function AppShell() {
     trialActive,
     pastDue,
     needsCheckout: checkoutNeeded,
+    activeWorkspaceId,
+    loading: workspaceLoading,
     reload,
   } = useWorkspace();
   const isOwner = profile?.role === 'owner';
@@ -36,6 +39,30 @@ function AppShell() {
   const [section, setSection] = useState('dashboard');
   const [initiativeFocusId, setInitiativeFocusId] = useState(null);
   const [adminTabFocus, setAdminTabFocus] = useState(null);
+  const [openAddOrg, setOpenAddOrg] = useState(false);
+  const orgSetupCheckedForWs = useRef(null);
+
+  // Empty workspace → System Admin Org tab with Add Org ready (login + workspace switch).
+  useEffect(() => {
+    if (workspaceLoading || !activeWorkspaceId) return undefined;
+    if (orgSetupCheckedForWs.current === activeWorkspaceId) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      const { count, error } = await supabase
+        .from('organizations')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', activeWorkspaceId);
+      if (cancelled) return;
+      orgSetupCheckedForWs.current = activeWorkspaceId;
+      if (error || (count ?? 0) > 0) return;
+      setSection('settings');
+      setAdminTabFocus('org');
+      setOpenAddOrg(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId, workspaceLoading]);
 
   useEffect(() => {
     const checkout = params.get('checkout');
@@ -147,6 +174,8 @@ function AppShell() {
       <SystemAdmin
         initialTab={adminTabFocus}
         onInitialTabConsumed={() => setAdminTabFocus(null)}
+        initialOpenAddOrg={openAddOrg}
+        onInitialOpenAddOrgConsumed={() => setOpenAddOrg(false)}
       />
     );
   }

@@ -12,7 +12,12 @@ import {
   FormOrg, FormDepartment, FormPerson, FormTeam, FormTeamMember,
 } from '../forms/AdminForms';
 
-export default function SystemAdmin({ initialTab = null, onInitialTabConsumed }) {
+export default function SystemAdmin({
+  initialTab = null,
+  onInitialTabConsumed,
+  initialOpenAddOrg = false,
+  onInitialOpenAddOrgConsumed,
+}) {
   const { activeWorkspace } = useWorkspace();
   const {
     orgs, departments, people, teams,
@@ -28,6 +33,13 @@ export default function SystemAdmin({ initialTab = null, onInitialTabConsumed })
     setAdminTab(initialTab);
     onInitialTabConsumed?.();
   }, [initialTab, onInitialTabConsumed]);
+
+  useEffect(() => {
+    if (!initialOpenAddOrg) return;
+    setAdminTab('org');
+    setModal('org');
+    onInitialOpenAddOrgConsumed?.();
+  }, [initialOpenAddOrg, onInitialOpenAddOrgConsumed]);
 
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '—';

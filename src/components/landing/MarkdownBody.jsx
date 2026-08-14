@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 
-/** Minimal markdown → React for marketing posts (h1/h2/p + *em* / **strong**). */
+/** Minimal markdown → React for marketing posts (h1/h2/p/ul + *em* / **strong**). */
 export default function MarkdownBody({ source }) {
   const blocks = String(source || '')
     .replace(/\r\n/g, '\n')
@@ -18,6 +18,28 @@ export default function MarkdownBody({ source }) {
         if (block.startsWith('## ')) {
           return <h2 key={i}>{inline(block.slice(3))}</h2>;
         }
+
+        const lines = block.split('\n');
+        const listStart = lines.findIndex((l) => /^[-*]\s+/.test(l.trim()));
+        if (listStart >= 0) {
+          const before = lines.slice(0, listStart).join(' ').trim();
+          const items = lines
+            .slice(listStart)
+            .map((l) => l.trim())
+            .filter((l) => /^[-*]\s+/.test(l))
+            .map((l) => l.replace(/^[-*]\s+/, ''));
+          return (
+            <Fragment key={i}>
+              {before ? <p>{inline(before)}</p> : null}
+              <ul>
+                {items.map((item, j) => (
+                  <li key={j}>{inline(item)}</li>
+                ))}
+              </ul>
+            </Fragment>
+          );
+        }
+
         return <p key={i}>{inline(block.replace(/\n/g, ' '))}</p>;
       })}
     </div>

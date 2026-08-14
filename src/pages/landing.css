@@ -344,12 +344,12 @@
 }
 
 /* pricing */
-.cv-landing .billing-toggle {
+.cv-landing .tier .billing-toggle {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin-top: 22px;
+  gap: 6px;
+  margin: 4px 0 2px;
 }
 
 .cv-landing .billing-toggle button {
@@ -358,10 +358,10 @@
   background: #fff;
   color: var(--muted);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-radius: 2px;
   cursor: pointer;
 }
@@ -372,11 +372,11 @@
   color: #fff;
 }
 
-.cv-landing .billing-save {
+.cv-landing .tier .billing-save {
   font-size: 13px;
   font-weight: 600;
   color: var(--red);
-  margin-left: 4px;
+  margin: 0 0 4px;
 }
 
 .cv-landing .tiers {
@@ -609,6 +609,18 @@
   line-height: 1.7;
   color: #4b4a47;
   margin: 0 0 18px;
+}
+
+.cv-landing .prose ul {
+  margin: 0 0 18px;
+  padding-left: 1.25rem;
+  color: #4b4a47;
+}
+
+.cv-landing .prose li {
+  font-size: 17px;
+  line-height: 1.7;
+  margin: 0 0 8px;
 }
 
 .cv-landing .prose p:last-child {

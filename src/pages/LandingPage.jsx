@@ -39,6 +39,29 @@ function PlanCta({ tier, billingCycle = 'monthly', className, children }) {
   );
 }
 
+function BillingCycleToggle({ value, onChange }) {
+  return (
+    <div className="billing-toggle" role="group" aria-label="Billing cycle">
+      <button
+        type="button"
+        className={value === 'monthly' ? 'active' : ''}
+        aria-pressed={value === 'monthly'}
+        onClick={() => onChange('monthly')}
+      >
+        Monthly
+      </button>
+      <button
+        type="button"
+        className={value === 'annual' ? 'active' : ''}
+        aria-pressed={value === 'annual'}
+        onClick={() => onChange('annual')}
+      >
+        Annual
+      </button>
+    </div>
+  );
+}
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const [billingCycle, setBillingCycle] = useState('monthly');
@@ -167,27 +190,6 @@ export default function LandingPage() {
           <div className="head">
             <span className="kicker">Pricing</span>
             <h2>Simple plans, real access.</h2>
-            <div className="billing-toggle" role="group" aria-label="Billing cycle">
-              <button
-                type="button"
-                className={billingCycle === 'monthly' ? 'active' : ''}
-                aria-pressed={billingCycle === 'monthly'}
-                onClick={() => setBillingCycle('monthly')}
-              >
-                Monthly
-              </button>
-              <button
-                type="button"
-                className={billingCycle === 'annual' ? 'active' : ''}
-                aria-pressed={billingCycle === 'annual'}
-                onClick={() => setBillingCycle('annual')}
-              >
-                Annual
-              </button>
-              {billingCycle === 'annual' ? (
-                <span className="billing-save">2 months free on Business &amp; Enterprise</span>
-              ) : null}
-            </div>
           </div>
           <div className="tiers">
             <div className="tier">
@@ -196,16 +198,20 @@ export default function LandingPage() {
                 <span className="amt">${PLAN_PRICES.solo.monthly}</span>
                 <span className="per">/ mo</span>
               </div>
-              <p>1 user, 1 workspace. For a solo consultant running a single client rollout.</p>
+              <p>1 user, 1 workspace. For a solo consultant running a single client rollout. Monthly billing only.</p>
               <PlanCta tier="solo" className="btn btn-ghost-navy">Start free trial</PlanCta>
             </div>
             <div className="tier pop">
               <span className="badge">MOST POPULAR</span>
               <h3>Business</h3>
+              <BillingCycleToggle value={billingCycle} onChange={setBillingCycle} />
               <div className="price">
                 <span className="amt">${smallPrice.toLocaleString('en-US')}</span>
                 <span className="per">{pricePer}</span>
               </div>
+              {billingCycle === 'annual' ? (
+                <p className="billing-save">2 months free</p>
+              ) : null}
               <p>5 users, unlimited workspaces. For teams running change across multiple clients or departments.</p>
               <PlanCta tier="small" billingCycle={billingCycle} className="btn btn-red pay">
                 Start free trial
@@ -213,11 +219,15 @@ export default function LandingPage() {
             </div>
             <div className="tier">
               <h3>Enterprise</h3>
+              <BillingCycleToggle value={billingCycle} onChange={setBillingCycle} />
               <div className="price">
                 <span className="amt">${enterprisePrice.toLocaleString('en-US')}</span>
                 <span className="per">{pricePer}</span>
               </div>
-              <p>Unlimited users, unlimited workspaces. Same monthly or annual billing as Business.</p>
+              {billingCycle === 'annual' ? (
+                <p className="billing-save">2 months free</p>
+              ) : null}
+              <p>Unlimited users, unlimited workspaces. Monthly or annual billing.</p>
               <PlanCta tier="enterprise" billingCycle={billingCycle} className="btn btn-ghost-navy">
                 Start free trial
               </PlanCta>
