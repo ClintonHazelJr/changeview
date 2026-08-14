@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { C, HEAD, BODY, tint, PLAN_LABELS } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { DB_TO_MARKETING_TIER, startCheckout, startBillingPortal } from '../../lib/checkout';
+import { DB_TO_MARKETING_TIER, readCheckoutIntent, startCheckout, startBillingPortal } from '../../lib/checkout';
 
 /**
  * Billing gates:
@@ -14,8 +14,14 @@ export default function BillingGate({ mode = 'past_due' }) {
   const { planTier, subscription, reload } = useWorkspace();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const marketingTier = DB_TO_MARKETING_TIER[planTier] || 'solo';
-  const billingCycle = subscription?.billing_cycle === 'annual' && marketingTier !== 'solo'
+  const intent = readCheckoutIntent();
+  const intentTier = intent?.tier && ['solo', 'small', 'enterprise', 'tier_1', 'tier_2'].includes(intent.tier)
+    ? (intent.tier === 'tier_1' ? 'solo' : intent.tier === 'tier_2' ? 'enterprise' : intent.tier)
+    : null;
+  // Prefer the pricing-card intent over a default/stale Solo subscription row.
+  const marketingTier = intentTier || DB_TO_MARKETING_TIER[planTier] || 'solo';
+  const billingCycle = (intent?.billingCycle === 'annual' || subscription?.billing_cycle === 'annual')
+    && marketingTier !== 'solo'
     ? 'annual'
     : 'monthly';
 
@@ -59,7 +65,7 @@ export default function BillingGate({ mode = 'past_due' }) {
               : 'Your trial converted but the charge on file failed. Update your card to restore access — your data is safe.'}
           </p>
           <p className="text-xs font-semibold mb-6" style={{ color: C.purple }}>
-            Plan: {PLAN_LABELS[planTier] || planTier}
+            Plan: {PLAN_LABELS[marketingTier] || PLAN_LABELS[planTier] || planTier}
             {billingCycle === 'annual' ? ' · annual' : ' · monthly'}
           </p>
           {error && <p className="text-sm mb-4" style={{ color: C.coral }}>{error}</p>}

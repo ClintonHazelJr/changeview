@@ -36,6 +36,7 @@ export default async function handler(req, res) {
 
   const { tier: rawTier, billingCycle = 'monthly' } = req.body || {};
   const tier = TIER_ALIASES[rawTier];
+  console.log('[checkout-debug] request body tier/cycle:', { rawTier, billingCycle, resolvedTier: tier || null });
 
   if (!tier) return res.status(400).json({ error: 'Unknown plan tier' });
   if (billingCycle !== 'monthly' && billingCycle !== 'annual') {
@@ -46,6 +47,11 @@ export default async function handler(req, res) {
   }
 
   const priceId = resolvePriceId(tier, billingCycle);
+  console.log('[checkout-debug] resolved price for', `${tier}_${billingCycle}`, {
+    hasPriceId: Boolean(priceId),
+    pricePrefix: priceId ? String(priceId).slice(0, 12) : null,
+    hint: priceEnvHint(tier, billingCycle),
+  });
   if (!priceId) {
     return res.status(500).json({
       error: `Stripe Price not configured for ${tier} (${billingCycle}). Set ${priceEnvHint(tier, billingCycle)}.`,
@@ -97,18 +103,40 @@ export default async function handler(req, res) {
             console.log('[checkout-debug] looking up subscriptions row…');
             const { data: sub, error: subErr } = await admin
               .from('subscriptions')
-              .select('stripe_customer_id, stripe_subscription_id, status')
+              .select('stripe_customer_id, stripe_subscription_id, status, plan_tier')
               .eq('account_id', accountId)
               .maybeSingle();
             console.log('[checkout-debug] subscriptions lookup', {
               hasCustomer: Boolean(sub?.stripe_customer_id),
               hasSubscription: Boolean(sub?.stripe_subscription_id),
               status: sub?.status || null,
+              dbPlanTier: sub?.plan_tier || null,
+              requestedTier: tier,
               error: subErr?.message || null,
             });
             stripeCustomerId = sub?.stripe_customer_id || null;
             // Only first Checkout gets a trial; existing Stripe subs are plan changes.
             if (sub?.stripe_subscription_id) addTrial = false;
+
+            // Persist the pricing-card tier onto the subscription before Checkout,
+            // so we never fall back to a default Solo/tier_1 row.
+            const dbPlanTier = MARKETING_TO_DB[tier];
+            if (dbPlanTier && !sub?.stripe_subscription_id) {
+              const nextBilling = tier === 'solo' ? 'monthly' : billingCycle;
+              const { error: syncErr } = await admin
+                .from('subscriptions')
+                .update({
+                  plan_tier: dbPlanTier,
+                  billing_cycle: nextBilling,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('account_id', accountId);
+              console.log('[checkout-debug] synced plan_tier from request', {
+                dbPlanTier,
+                nextBilling,
+                syncError: syncErr?.message || null,
+              });
+            }
           }
         }
       }

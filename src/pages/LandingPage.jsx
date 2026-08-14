@@ -19,7 +19,10 @@ function formatUsd(n) {
 
 function trialSignupPath(tier, billingCycle = 'monthly') {
   const billing = tier === 'solo' ? 'monthly' : billingCycle;
-  return `/signup?plan=${tier}&billing=${billing}`;
+  // Explicit per-tier paths — never reuse a shared mutable plan variable.
+  if (tier === 'enterprise') return `/signup?plan=enterprise&billing=${billing}`;
+  if (tier === 'small') return `/signup?plan=small&billing=${billing}`;
+  return `/signup?plan=solo&billing=monthly`;
 }
 
 function HeroMockup() {
@@ -277,7 +280,8 @@ export default function LandingPage() {
                 ))}
               </ul>
               <Link
-                to={trialSignupPath('solo')}
+                to="/signup?plan=solo&billing=monthly"
+                data-plan="solo"
                 className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                 style={{ background: C.purple }}
               >
@@ -363,6 +367,7 @@ export default function LandingPage() {
                   </ul>
                   <Link
                     to={trialSignupPath('small', billingCycle)}
+                    data-plan="small"
                     className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                     style={{ background: C.purple }}
                   >
@@ -406,6 +411,7 @@ export default function LandingPage() {
                   </ul>
                   <Link
                     to={trialSignupPath('enterprise', billingCycle)}
+                    data-plan="enterprise"
                     className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                     style={{ background: C.ink }}
                   >

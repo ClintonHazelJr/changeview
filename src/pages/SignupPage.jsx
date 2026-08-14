@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { C, HEAD, BODY, PLAN_LABELS, inputClass, inputStyle } from '../lib/constants';
 import { useAuth } from '../contexts/AuthContext';
-import { startCheckout } from '../lib/checkout';
+import { rememberCheckoutIntent, startCheckout } from '../lib/checkout';
 
 const VALID_PLANS = new Set(['solo', 'small', 'enterprise']);
 
@@ -22,30 +22,35 @@ export default function SignupPage() {
   const [success, setSuccess] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  if (loading) return null;
-  if (session) return <Navigate to="/app" replace />;
+  // Capture whether the user was already signed in when this page loaded (pricing card while logged in).
+  const arrivedLoggedIn = useRef(null);
+  const autoCheckoutStarted = useRef(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setBusy(true);
-    try {
-      const data = await signUp({
-        email, password, fullName, accountName, planTier, billingCycle,
-      });
-      if (data.session?.access_token) {
-        // Card-on-file trial: go straight to Stripe Checkout ($0 now, 7-day trial).
-        await startCheckout(planTier, billingCycle, {
-          accessToken: data.session.access_token,
-        });
-        return;
-      }
-      setSuccess(true);
-    } catch (err) {
-      setError(err.message);
-      setBusy(false);
+  useEffect(() => {
+    rememberCheckoutIntent(planTier, billingCycle);
+  }, [planTier, billingCycle]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (arrivedLoggedIn.current === null) {
+      arrivedLoggedIn.current = Boolean(session);
     }
-  };
+  }, [loading, session]);
+
+  // Logged-in visit from a pricing card: checkout that card's tier (do not dump into /app Solo gate).
+  useEffect(() => {
+    if (loading || !arrivedLoggedIn.current || !session?.access_token) return;
+    if (autoCheckoutStarted.current || success) return;
+    autoCheckoutStarted.current = true;
+    setBusy(true);
+    setError('');
+    startCheckout(planTier, billingCycle, { accessToken: session.access_token }).catch((err) => {
+      setError(err.message || 'Could not start checkout');
+      setBusy(false);
+    });
+  }, [loading, session?.access_token, planTier, billingCycle, success]);
+
+  if (loading) return null;
 
   const brandLink = (
     <Link
@@ -57,6 +62,29 @@ export default function SignupPage() {
     </Link>
   );
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    rememberCheckoutIntent(planTier, billingCycle);
+    try {
+      const data = await signUp({
+        email, password, fullName, accountName, planTier, billingCycle,
+      });
+      if (data.session?.access_token) {
+        await startCheckout(planTier, billingCycle, {
+          accessToken: data.session.access_token,
+        });
+        return;
+      }
+      setSuccess(true);
+      setBusy(false);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  };
+
   if (success) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ ...BODY, background: C.bg }}>
@@ -67,6 +95,27 @@ export default function SignupPage() {
             We sent a confirmation link to {email}. After you confirm, log in and add a card to start your 7-day trial (you will not be charged until it ends).
           </p>
           <Link to="/login" className="text-sm font-bold" style={{ color: C.purple }}>Go to login</Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (busy) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ ...BODY, background: C.bg }}>
+        {brandLink}
+        <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md border text-center" style={{ borderColor: C.border }}>
+          <h1 className="text-xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>Redirecting to checkout…</h1>
+          <p className="text-sm" style={{ color: C.sub }}>
+            Plan: {PLAN_LABELS[planTier] || planTier}
+            {billingCycle === 'annual' ? ' · annual' : ' · monthly'}
+          </p>
+          {error && (
+            <>
+              <p className="text-sm mt-3" style={{ color: C.coral }}>{error}</p>
+              <Link to="/app" className="inline-block mt-4 text-sm font-bold" style={{ color: C.purple }}>Go to app</Link>
+            </>
+          )}
         </div>
       </div>
     );
@@ -95,7 +144,7 @@ export default function SignupPage() {
           <input type="password" required minLength={6} className={`${inputClass} mb-4`} style={inputStyle} value={password} onChange={(e) => setPassword(e.target.value)} />
           {error && <p className="text-xs mb-3" style={{ color: C.coral }}>{error}</p>}
           <button type="submit" disabled={busy} className="w-full text-sm font-bold text-white py-3 rounded-full disabled:opacity-50" style={{ background: C.purple }}>
-            {busy ? 'Redirecting to checkout…' : 'Continue to checkout'}
+            Continue to checkout
           </button>
         </form>
         <p className="text-xs text-center mt-4" style={{ color: C.sub }}>
