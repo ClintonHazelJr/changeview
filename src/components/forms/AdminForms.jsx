@@ -60,12 +60,13 @@ export function FormDepartment({ orgs, onSave }) {
   );
 }
 
-export function FormPerson({ departments, onSave }) {
-  const [departmentId, setDepartmentId] = useState(departments[0]?.id || '');
-  const [name, setName] = useState('');
-  const [title, setTitle] = useState('');
-  const [email, setEmail] = useState('');
+export function FormPerson({ departments, initial, onSave }) {
+  const [departmentId, setDepartmentId] = useState(initial?.department_id || departments[0]?.id || '');
+  const [name, setName] = useState(initial?.name || '');
+  const [title, setTitle] = useState(initial?.title || '');
+  const [email, setEmail] = useState(initial?.email || '');
   const [error, setError] = useState('');
+  const editing = Boolean(initial?.id);
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
@@ -80,7 +81,7 @@ export function FormPerson({ departments, onSave }) {
       <Field label="Title"><input className={inputClass} style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Change Manager" /></Field>
       <Field label="Email"><input className={inputClass} style={inputStyle} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. blackman@software.co" /></Field>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow />
+      <SaveRow label={editing ? 'Save changes' : 'Save'} />
     </form>
   );
 }
@@ -183,7 +184,7 @@ export function FormInitiative({ initial, onSave }) {
       setLoadingPeople(true);
       setLoadingPrograms(true);
       const [peopleRes, deptRes, programsRes] = await Promise.all([
-        supabase.from('people').select('id, name, title, email, department_id').eq('workspace_id', activeWorkspaceId).order('name'),
+        supabase.from('people').select('id, name, title, email, department_id, is_active').eq('workspace_id', activeWorkspaceId).order('name'),
         supabase.from('departments').select('id, name').eq('workspace_id', activeWorkspaceId),
         supabase.from('programs').select('id, name').eq('workspace_id', activeWorkspaceId).order('name'),
       ]);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Building2, MapPin, Users, UserCircle2, Plus, ChevronRight, Mail, Tag,
+  Building2, MapPin, Users, UserCircle2, Plus, ChevronRight, Mail, Tag, UserCheck, UserX,
 } from 'lucide-react';
 import { C, HEAD, BODY, tint, initials, parseDbError } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
@@ -9,6 +9,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { ListCard, TabSection } from '../ui/shared';
 import ListTable from '../ui/ListTable';
+import StatusPill from '../ui/StatusPill';
 import Modal from '../ui/Modal';
 import CsvImportModal from '../ui/CsvImportModal';
 import { findByName } from '../../lib/csvImport';
@@ -26,10 +27,12 @@ export default function SystemAdmin({
   const { profile } = useAuth();
   const {
     orgs, departments, people, teams,
-    addOrg, addDepartment, addPerson, addTeam, addTeamMember, reload,
+    addOrg, addDepartment, addPerson, updatePerson, setPersonActive, addTeam, addTeamMember, reload,
   } = useAdminData();
   const [adminTab, setAdminTab] = useState(initialTab || 'org');
   const [modal, setModal] = useState(null);
+  const [editingPerson, setEditingPerson] = useState(null);
+  const [busyPersonId, setBusyPersonId] = useState(null);
   const [bulk, setBulk] = useState(null);
   const [expandedTeam, setExpandedTeam] = useState(null);
   const [viewMode, setViewMode] = useState('tiles');
@@ -50,6 +53,33 @@ export default function SystemAdmin({
 
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '—';
+  const personIsActive = (p) => p.is_active !== false;
+  const activePeople = people.filter(personIsActive);
+
+  const openAddPerson = () => {
+    setEditingPerson(null);
+    setModal('people');
+  };
+  const openEditPerson = (p) => {
+    setEditingPerson(p);
+    setModal('people');
+  };
+  const closePersonModal = () => {
+    setModal(null);
+    setEditingPerson(null);
+  };
+  const togglePersonActive = async (p) => {
+    const next = !personIsActive(p);
+    if (!next && !window.confirm(`Deactivate ${p.name}? They will no longer appear in assign-to pickers.`)) return;
+    setBusyPersonId(p.id);
+    try {
+      await setPersonActive(p.id, next);
+    } catch (err) {
+      alert(err.message || 'Could not update person');
+    } finally {
+      setBusyPersonId(null);
+    }
+  };
 
   const adminSteps = [
     { key: 'org', label: 'Org', icon: Building2, color: C.purple, count: orgs.length },
@@ -177,7 +207,7 @@ export default function SystemAdmin({
           <TabSection
             title="People"
             subtitle="Your directory. Add someone once here, then reuse them as a Stakeholder or Team Member on any Initiative."
-            onAdd={() => setModal('people')}
+            onAdd={openAddPerson}
             addLabel="Add Person"
             onBulkUpload={() => setBulk('people')}
             color={C.coral}
@@ -202,22 +232,99 @@ export default function SystemAdmin({
                     render: (p) => deptName(p.department_id),
                   },
                   { key: 'email', label: 'Email', sortable: true, render: (p) => p.email || '—' },
+                  {
+                    key: 'is_active',
+                    label: 'Status',
+                    sortable: true,
+                    sortValue: (p) => (personIsActive(p) ? 1 : 0),
+                    render: (p) => (
+                      <StatusPill
+                        label={personIsActive(p) ? 'Active' : 'Inactive'}
+                        color={personIsActive(p) ? C.green : C.sub}
+                      />
+                    ),
+                  },
+                  {
+                    key: 'actions',
+                    label: '',
+                    render: (p) => (
+                      <button
+                        type="button"
+                        disabled={busyPersonId === p.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePersonActive(p);
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full disabled:opacity-50"
+                        style={{
+                          background: personIsActive(p) ? tint(C.coral, '18') : tint(C.green, '18'),
+                          color: personIsActive(p) ? C.coral : C.green,
+                        }}
+                      >
+                        {personIsActive(p) ? <UserX size={12} /> : <UserCheck size={12} />}
+                        {busyPersonId === p.id ? '…' : personIsActive(p) ? 'Deactivate' : 'Reactivate'}
+                      </button>
+                    ),
+                  },
                 ]}
                 rows={people}
+                onRowClick={openEditPerson}
                 initialSortKey="name"
               />
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                {people.map((p) => (
-                  <div key={p.id} className="bg-white rounded-2xl p-4 shadow-sm border flex items-start gap-3" style={{ borderColor: C.border }}>
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: C.coral }}>{initials(p.name)}</div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-bold truncate" style={{ color: C.ink }}>{p.name}</div>
-                      <div className="text-xs truncate" style={{ color: C.sub }}>{p.title || '—'} · {deptName(p.department_id)}</div>
-                      {p.email && <div className="flex items-center gap-1 text-xs mt-1 truncate" style={{ color: C.sub }}><Mail size={11} />{p.email}</div>}
+                {people.map((p) => {
+                  const inactive = !personIsActive(p);
+                  const busy = busyPersonId === p.id;
+                  return (
+                    <div
+                      key={p.id}
+                      className="bg-white rounded-2xl p-4 shadow-sm border flex items-start gap-3"
+                      style={{
+                        borderColor: C.border,
+                        opacity: inactive ? 0.72 : 1,
+                        background: inactive ? tint(C.sub, '08') : '#fff',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => openEditPerson(p)}
+                        className="flex items-start gap-3 min-w-0 flex-1 text-left"
+                      >
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                          style={{ background: inactive ? C.sub : C.coral }}
+                        >
+                          {initials(p.name)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            <div className="text-sm font-bold truncate" style={{ color: inactive ? C.sub : C.ink }}>{p.name}</div>
+                            <StatusPill
+                              label={inactive ? 'Inactive' : 'Active'}
+                              color={inactive ? C.sub : C.green}
+                            />
+                          </div>
+                          <div className="text-xs truncate" style={{ color: C.sub }}>{p.title || '—'} · {deptName(p.department_id)}</div>
+                          {p.email && <div className="flex items-center gap-1 text-xs mt-1 truncate" style={{ color: C.sub }}><Mail size={11} />{p.email}</div>}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => togglePersonActive(p)}
+                        className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-full shrink-0 disabled:opacity-50"
+                        style={{
+                          background: inactive ? tint(C.green, '18') : tint(C.coral, '18'),
+                          color: inactive ? C.green : C.coral,
+                        }}
+                      >
+                        {inactive ? <UserCheck size={12} /> : <UserX size={12} />}
+                        {busy ? '…' : inactive ? 'Reactivate' : 'Deactivate'}
+                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </TabSection>
@@ -229,8 +336,8 @@ export default function SystemAdmin({
             onAdd={() => setModal('team')}
             addLabel="Add Project Team"
             color={C.green}
-            disabled={people.length === 0}
-            disabledText="Add at least one Person first."
+            disabled={activePeople.length === 0}
+            disabledText="Add at least one active Person first."
             empty={teams.length === 0}
             emptyText="No project teams yet."
             emptyIcon={Users}
@@ -306,12 +413,24 @@ export default function SystemAdmin({
 
       {modal === 'org' && <Modal title="Add Org" onClose={() => setModal(null)}><FormOrg onSave={async (n) => { await addOrg(n); setModal(null); }} /></Modal>}
       {modal === 'department' && <Modal title="Add Department" onClose={() => setModal(null)}><FormDepartment orgs={orgs} onSave={async (d) => { await addDepartment(d); setModal(null); }} /></Modal>}
-      {modal === 'people' && <Modal title="Add Person" onClose={() => setModal(null)}><FormPerson departments={departments} onSave={async (p) => { await addPerson(p); setModal(null); }} /></Modal>}
+      {modal === 'people' && (
+        <Modal title={editingPerson ? 'Edit Person' : 'Add Person'} onClose={closePersonModal}>
+          <FormPerson
+            departments={departments}
+            initial={editingPerson}
+            onSave={async (p) => {
+              if (editingPerson) await updatePerson(editingPerson.id, p);
+              else await addPerson(p);
+              closePersonModal();
+            }}
+          />
+        </Modal>
+      )}
       {modal === 'team' && <Modal title="Add Project Team" onClose={() => setModal(null)}><FormTeam onSave={async (n) => { await addTeam(n); setModal(null); }} /></Modal>}
       {modal?.type === 'teamMember' && (
         <Modal title="Add Team Member" onClose={() => setModal(null)}>
           <FormTeamMember
-            people={people}
+            people={activePeople}
             departments={departments}
             onSave={async (personId, role) => { await addTeamMember(modal.teamId, personId, role); setModal(null); }}
           />
@@ -386,6 +505,7 @@ export default function SystemAdmin({
               name: vals.name,
               title: vals.title,
               email: vals.email,
+              is_active: true,
             });
             if (error) throw new Error(parseDbError(error));
           }}

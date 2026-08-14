@@ -28,6 +28,12 @@ function matchesQuery(person, query) {
   return haystack.includes(q);
 }
 
+/** Active people for new assignments; keep current value even if deactivated. */
+function isAssignablePerson(person, currentValue) {
+  if (person.is_active !== false) return true;
+  return Boolean(currentValue && person.id === currentValue);
+}
+
 function emitChange(onChange, id) {
   if (!onChange) return;
   // Drop-in compatible with <select onChange> / set('field') helpers.
@@ -62,9 +68,14 @@ export default function PersonSelect({
     [people, value],
   );
 
+  const assignable = useMemo(
+    () => people.filter((p) => isAssignablePerson(p, value)),
+    [people, value],
+  );
+
   const filtered = useMemo(
-    () => people.filter((p) => matchesQuery(p, query)),
-    [people, query],
+    () => assignable.filter((p) => matchesQuery(p, query)),
+    [assignable, query],
   );
 
   const options = useMemo(() => {

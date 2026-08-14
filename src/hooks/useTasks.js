@@ -33,7 +33,7 @@ export function useTasks() {
         .eq('workspace_id', ws)
         .order('created_at', { ascending: false }),
       supabase.from('initiatives').select('id, name').eq('workspace_id', ws).order('name'),
-      supabase.from('people').select('id, name, title, email, department_id').eq('workspace_id', ws).order('name'),
+      supabase.from('people').select('id, name, title, email, department_id, is_active').eq('workspace_id', ws).order('name'),
       supabase.from('project_teams').select('id, name').eq('workspace_id', ws).order('name'),
       supabase.from('requirements').select('id, description, initiative_id, reference_number').eq('workspace_id', ws).order('created_at', { ascending: false }),
     ]);

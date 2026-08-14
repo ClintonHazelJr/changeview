@@ -62,8 +62,37 @@ export function useAdminData() {
 
   const addPerson = async ({ departmentId, name, title, email }) => {
     const { error } = await supabase.from('people').insert({
-      account_id: accountId, workspace_id: workspaceId, department_id: departmentId, name, title, email,
+      account_id: accountId,
+      workspace_id: workspaceId,
+      department_id: departmentId,
+      name,
+      title,
+      email,
+      is_active: true,
     });
+    if (error) throw error;
+    await load();
+  };
+
+  const updatePerson = async (id, { departmentId, name, title, email }) => {
+    const { error } = await supabase
+      .from('people')
+      .update({
+        department_id: departmentId || null,
+        name,
+        title: title || null,
+        email: email || null,
+      })
+      .eq('id', id);
+    if (error) throw error;
+    await load();
+  };
+
+  const setPersonActive = async (id, isActive) => {
+    const { error } = await supabase
+      .from('people')
+      .update({ is_active: isActive })
+      .eq('id', id);
     if (error) throw error;
     await load();
   };
@@ -86,6 +115,6 @@ export function useAdminData() {
 
   return {
     orgs, departments, people, teams, loading, reload: load,
-    addOrg, addDepartment, addPerson, addTeam, addTeamMember,
+    addOrg, addDepartment, addPerson, updatePerson, setPersonActive, addTeam, addTeamMember,
   };
 }
