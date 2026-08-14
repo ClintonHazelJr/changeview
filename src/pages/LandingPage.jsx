@@ -143,8 +143,12 @@ export default function LandingPage() {
             <span className="micro">No credit card · 14-day trial · Rolls out in a week</span>
           </div>
           <div className="shot">
-            <div className="strike" />
-            <span className="cap">[ product screenshot — change dashboard ]</span>
+            <img
+              src="/assets/changeview_dashboard_screenshot.svg"
+              alt="ChangeView dashboard showing initiatives and workspace stats"
+              width="1160"
+              height="620"
+            />
           </div>
         </div>
       </header>
