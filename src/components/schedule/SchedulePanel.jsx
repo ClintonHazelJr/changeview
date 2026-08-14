@@ -27,10 +27,16 @@ function formatShort(d) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function formatGoLive(value) {
+function formatFullDate(value) {
   const d = parseDate(value);
-  if (!d) return value;
+  if (!d) return value || '—';
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function excerpt(text, n = 72) {
+  const t = String(text || '').trim();
+  if (!t) return 'Untitled';
+  return t.length > n ? `${t.slice(0, n)}…` : t;
 }
 
 const DAY_MS = 86400000;
@@ -38,17 +44,21 @@ const ROW_H = 40;
 const LABEL_W = 280;
 const PX_PER_DAY = 14;
 
-/** Distinct from Program (teal/blue3) and Initiative (coral/red). */
+/** Distinct bar / milestone colors. */
 const COLOR_PROGRAM = C.teal;
 const COLOR_INITIATIVE = C.coral;
 const COLOR_TASK = C.royal;
-const COLOR_MILESTONE = C.navy;
+const COLOR_HYPERCARE = C.darknavy;
+const COLOR_GO_LIVE = C.navy;
+const COLOR_COMMS = C.blue4;
 
 export default function SchedulePanel() {
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const [programs, setPrograms] = useState([]);
   const [initiatives, setInitiatives] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [comms, setComms] = useState([]);
+  const [hypercareRows, setHypercareRows] = useState([]);
   const [loading, setLoading] = useState(true);
   /** Collapsed Program / Initiative ids. Empty = all expanded. */
   const [collapsed, setCollapsed] = useState(() => new Set());
@@ -60,11 +70,19 @@ export default function SchedulePanel() {
         setPrograms([]);
         setInitiatives([]);
         setTasks([]);
+        setComms([]);
+        setHypercareRows([]);
         setLoading(false);
         return;
       }
       setLoading(true);
-      const [{ data: prog }, { data: inits }, { data: taskRows }] = await Promise.all([
+      const [
+        { data: prog },
+        { data: inits },
+        { data: taskRows },
+        { data: commsRows },
+        { data: hcRows },
+      ] = await Promise.all([
         supabase
           .from('programs')
           .select('id, name, start_date, proposed_go_live_date')
@@ -80,11 +98,22 @@ export default function SchedulePanel() {
           .select('id, name, start_date, finish_date, initiative_id')
           .eq('workspace_id', activeWorkspaceId)
           .order('name'),
+        supabase
+          .from('comms')
+          .select('id, initiative_id, delivery_date, key_message')
+          .eq('workspace_id', activeWorkspaceId)
+          .order('delivery_date'),
+        supabase
+          .from('hypercare')
+          .select('id, initiative_id, start_date, end_date')
+          .eq('workspace_id', activeWorkspaceId),
       ]);
       if (cancelled) return;
       setPrograms(prog || []);
       setInitiatives(inits || []);
       setTasks(taskRows || []);
+      setComms(commsRows || []);
+      setHypercareRows(hcRows || []);
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -109,21 +138,36 @@ export default function SchedulePanel() {
       tasksByInit.get(t.initiative_id).push(t);
     });
 
+    const hypercareByInit = new Map();
+    hypercareRows.forEach((h) => {
+      if (h.initiative_id) hypercareByInit.set(h.initiative_id, h);
+    });
+
+    const commsByInit = new Map();
+    comms.forEach((c) => {
+      if (!c.initiative_id || !c.delivery_date) return;
+      if (!commsByInit.has(c.initiative_id)) commsByInit.set(c.initiative_id, []);
+      commsByInit.get(c.initiative_id).push(c);
+    });
+
     const out = [];
 
     const pushInitiative = (init, depth) => {
       const childTasks = tasksByInit.get(init.id) || [];
+      const hc = hypercareByInit.get(init.id);
+      const hasChildren = childTasks.length > 0 || Boolean(hc);
       out.push({
         id: `initiative-${init.id}`,
         entityId: init.id,
         name: init.name,
         kind: 'Initiative',
         depth,
-        collapsible: childTasks.length > 0,
+        collapsible: hasChildren,
         color: COLOR_INITIATIVE,
         start: init.start_date,
         end: init.proposed_go_live_date,
         goLive: init.proposed_go_live_date || null,
+        comms: commsByInit.get(init.id) || [],
       });
       if (collapsed.has(init.id)) return;
       childTasks.forEach((t) => {
@@ -138,8 +182,24 @@ export default function SchedulePanel() {
           start: t.start_date,
           end: t.finish_date,
           goLive: null,
+          comms: [],
         });
       });
+      if (hc) {
+        out.push({
+          id: `hypercare-${hc.id}`,
+          entityId: hc.id,
+          name: 'Hypercare',
+          kind: 'Hypercare',
+          depth: depth + 1,
+          collapsible: false,
+          color: COLOR_HYPERCARE,
+          start: hc.start_date,
+          end: hc.end_date,
+          goLive: null,
+          comms: [],
+        });
+      }
     };
 
     programs.forEach((p) => {
@@ -155,6 +215,7 @@ export default function SchedulePanel() {
         start: p.start_date,
         end: p.proposed_go_live_date,
         goLive: null,
+        comms: [],
       });
       if (collapsed.has(p.id)) return;
       childInits.forEach((init) => pushInitiative(init, 1));
@@ -163,7 +224,7 @@ export default function SchedulePanel() {
     orphans.forEach((init) => pushInitiative(init, 0));
 
     return out;
-  }, [programs, initiatives, tasks, collapsed]);
+  }, [programs, initiatives, tasks, comms, hypercareRows, collapsed]);
 
   const range = useMemo(() => {
     const dates = [];
@@ -183,6 +244,11 @@ export default function SchedulePanel() {
       consider(t.start_date);
       consider(t.finish_date);
     });
+    hypercareRows.forEach((h) => {
+      consider(h.start_date);
+      consider(h.end_date);
+    });
+    comms.forEach((c) => consider(c.delivery_date));
 
     if (!dates.length) {
       const today = new Date();
@@ -194,7 +260,7 @@ export default function SchedulePanel() {
     max = addDays(startOfWeek(max), 28);
     if (max <= min) max = addDays(min, 56);
     return { min, max };
-  }, [programs, initiatives, tasks]);
+  }, [programs, initiatives, tasks, hypercareRows, comms]);
 
   const totalDays = Math.max(1, Math.round((range.max - range.min) / DAY_MS));
   const timelineWidth = totalDays * PX_PER_DAY;
@@ -233,7 +299,8 @@ export default function SchedulePanel() {
     });
   };
 
-  const hasAnyItems = programs.length > 0 || initiatives.length > 0 || tasks.length > 0;
+  const hasAnyItems = programs.length > 0 || initiatives.length > 0 || tasks.length > 0
+    || hypercareRows.length > 0 || comms.length > 0;
 
   return (
     <div className="flex-1 p-6 max-w-[1400px] w-full mx-auto overflow-hidden flex flex-col" style={BODY}>
@@ -246,7 +313,7 @@ export default function SchedulePanel() {
             Schedule — {activeWorkspace?.name}
           </h2>
           <p className="text-sm" style={{ color: C.sub }}>
-            Gantt view of Program, Initiative, and Task timelines. Display only.
+            Gantt view of Program, Initiative, Task, and Hypercare timelines, with Comms and Go Live milestones.
           </p>
         </div>
         <div className="flex flex-wrap gap-3 text-xs font-semibold">
@@ -259,11 +326,14 @@ export default function SchedulePanel() {
           <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: tint(COLOR_TASK, '18'), color: COLOR_TASK }}>
             <span className="w-2.5 h-2.5 rounded-sm" style={{ background: COLOR_TASK }} /> Tasks
           </span>
-          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: tint(COLOR_MILESTONE, '18'), color: COLOR_MILESTONE }}>
-            <span
-              className="inline-block w-2 h-2"
-              style={{ background: COLOR_MILESTONE, transform: 'rotate(45deg)' }}
-            /> Go Live
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: tint(COLOR_HYPERCARE, '18'), color: COLOR_HYPERCARE }}>
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: COLOR_HYPERCARE }} /> Hypercare
+          </span>
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: tint(COLOR_GO_LIVE, '18'), color: COLOR_GO_LIVE }}>
+            <span className="inline-block w-2 h-2" style={{ background: COLOR_GO_LIVE, transform: 'rotate(45deg)' }} /> Go Live
+          </span>
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: tint(COLOR_COMMS, '28'), color: C.navy }}>
+            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: COLOR_COMMS, border: `1.5px solid ${C.navy}` }} /> Comms
           </span>
         </div>
       </div>
@@ -276,7 +346,7 @@ export default function SchedulePanel() {
             <CalendarRange size={20} style={{ color: COLOR_PROGRAM }} />
           </div>
           <div className="text-sm" style={{ color: C.sub }}>
-            Add Programs, Initiatives, and Tasks with dates to populate the Gantt.
+            Add Programs, Initiatives, Tasks, Hypercare, and Comms with dates to populate the Gantt.
           </div>
         </div>
       ) : (
@@ -370,24 +440,53 @@ export default function SchedulePanel() {
                     )}
                     {goLiveX != null && (
                       <div
-                        className="absolute top-1/2 z-[5] pointer-events-auto"
+                        className="absolute top-1/2 z-[5]"
                         style={{ left: goLiveX, transform: 'translate(-50%, -50%)' }}
-                        title={`Go Live: ${formatGoLive(row.goLive)}`}
+                        title={`Go Live: ${formatFullDate(row.goLive)}`}
                       >
                         <span
                           className="block"
                           style={{
                             width: 11,
                             height: 11,
-                            background: COLOR_MILESTONE,
+                            background: COLOR_GO_LIVE,
                             transform: 'rotate(45deg)',
                             border: '2px solid #fff',
                             boxShadow: '0 0 0 1px rgba(15, 22, 51, 0.25)',
                           }}
-                          aria-label={`Go Live: ${formatGoLive(row.goLive)}`}
+                          aria-label={`Go Live: ${formatFullDate(row.goLive)}`}
                         />
                       </div>
                     )}
+                    {(row.comms || []).map((c, cIdx) => {
+                      const x = milestoneLeft(c.delivery_date);
+                      if (x == null) return null;
+                      const offsetY = (cIdx % 3) * 3 - 3;
+                      return (
+                        <div
+                          key={c.id}
+                          className="absolute z-[6]"
+                          style={{
+                            left: x,
+                            top: `calc(50% + ${offsetY}px)`,
+                            transform: 'translate(-50%, -50%)',
+                          }}
+                          title={`Comms: ${excerpt(c.key_message)}`}
+                        >
+                          <span
+                            className="block rounded-full"
+                            style={{
+                              width: 10,
+                              height: 10,
+                              background: COLOR_COMMS,
+                              border: `2px solid ${C.navy}`,
+                              boxShadow: '0 0 0 1px rgba(28, 47, 143, 0.2)',
+                            }}
+                            aria-label={`Comms: ${excerpt(c.key_message)}`}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );

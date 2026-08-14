@@ -399,7 +399,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
           <div>
             <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Hypercare</h2>
             <p className="text-sm mb-5" style={{ color: C.sub }}>
-              One hypercare plan per Initiative — pilot criteria, assumptions, and go-live timing.
+              One hypercare plan per Initiative — dates for the Schedule, plus pilot criteria and assumptions.
             </p>
             <div className="bg-white rounded-3xl border shadow-sm p-5 max-w-xl" style={{ borderColor: C.border }}>
               <FormHypercare

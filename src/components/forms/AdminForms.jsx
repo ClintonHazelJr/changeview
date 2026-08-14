@@ -921,6 +921,8 @@ export function FormHypercare({ initiative, hypercare, onSave }) {
   const [pilotSuccessCriteria, setPilotSuccessCriteria] = useState(hypercare?.pilot_success_criteria || '');
   const [assumptions, setAssumptions] = useState(hypercare?.assumptions || '');
   const [duration, setDuration] = useState(hypercare?.duration || '');
+  const [startDate, setStartDate] = useState(hypercare?.start_date || '');
+  const [endDate, setEndDate] = useState(hypercare?.end_date || '');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -930,7 +932,9 @@ export function FormHypercare({ initiative, hypercare, onSave }) {
     setPilotSuccessCriteria(hypercare?.pilot_success_criteria || '');
     setAssumptions(hypercare?.assumptions || '');
     setDuration(hypercare?.duration || '');
-  }, [initiative?.id, initiative?.proposed_go_live_date, hypercare?.id]);
+    setStartDate(hypercare?.start_date || '');
+    setEndDate(hypercare?.end_date || '');
+  }, [initiative?.id, initiative?.proposed_go_live_date, hypercare?.id, hypercare?.start_date, hypercare?.end_date]);
 
   return (
     <form
@@ -945,6 +949,8 @@ export function FormHypercare({ initiative, hypercare, onSave }) {
             pilotSuccessCriteria,
             assumptions,
             duration,
+            startDate: startDate || null,
+            endDate: endDate || null,
           });
         } catch (err) {
           setError(err.message);
@@ -962,6 +968,26 @@ export function FormHypercare({ initiative, hypercare, onSave }) {
           onChange={(e) => setProposedGoLiveDate(e.target.value)}
         />
       </Field>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Hypercare Start Date">
+          <input
+            type="date"
+            className={inputClass}
+            style={inputStyle}
+            value={startDate || ''}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </Field>
+        <Field label="Hypercare End Date">
+          <input
+            type="date"
+            className={inputClass}
+            style={inputStyle}
+            value={endDate || ''}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </Field>
+      </div>
       <Field label="Pilot">
         <label className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>
           <input type="checkbox" checked={pilot} onChange={(e) => setPilot(e.target.checked)} />
@@ -989,7 +1015,7 @@ export function FormHypercare({ initiative, hypercare, onSave }) {
           placeholder="Key assumptions for hypercare"
         />
       </Field>
-      <Field label="Duration">
+      <Field label="Duration (optional note)">
         <input
           className={inputClass}
           style={inputStyle}
@@ -1007,6 +1033,7 @@ export function FormHypercare({ initiative, hypercare, onSave }) {
 export function FormComms({ initiative, impacts, deptName, initial, onSave, onDelete }) {
   const editing = Boolean(initial?.id);
   const [impactId, setImpactId] = useState(initial?.impact_id || '');
+  const [deliveryDate, setDeliveryDate] = useState(initial?.delivery_date || '');
   const [keyMessage, setKeyMessage] = useState(initial?.key_message || '');
   const [audience, setAudience] = useState((initial?.audience || []).map(titleCase));
   const [tone, setTone] = useState(initial?.tone || 'professional');
@@ -1062,6 +1089,7 @@ export function FormComms({ initiative, impacts, deptName, initial, onSave, onDe
       try {
         await onSave({
           impactId: impactId || null,
+          deliveryDate: deliveryDate || null,
           keyMessage,
           audience,
           tone,
@@ -1077,6 +1105,15 @@ export function FormComms({ initiative, impacts, deptName, initial, onSave, onDe
           <option value="">Initiative-wide</option>
           {impacts.map((i) => <option key={i.id} value={i.id}>{deptName(i.department_id)} impact</option>)}
         </select>
+      </Field>
+      <Field label="Delivery Date">
+        <input
+          type="date"
+          className={inputClass}
+          style={inputStyle}
+          value={deliveryDate || ''}
+          onChange={(e) => setDeliveryDate(e.target.value)}
+        />
       </Field>
       <Field label="Key Message"><input className={inputClass} style={inputStyle} value={keyMessage} onChange={(e) => setKeyMessage(e.target.value)} placeholder="e.g. Laptops arrive next week, training required first" /></Field>
       <div className="grid grid-cols-2 gap-4">

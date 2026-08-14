@@ -426,6 +426,8 @@ create table hypercare (
   pilot_success_criteria text,
   assumptions text,
   duration text,
+  start_date date,
+  end_date date,
   created_at timestamptz not null default now()
 );
 

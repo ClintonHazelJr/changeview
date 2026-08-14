@@ -227,6 +227,7 @@ export function useInitiativeDetail(initiativeId) {
 
   const commsPayload = (vals) => ({
     impact_id: vals.impactId || null,
+    delivery_date: vals.deliveryDate || null,
     key_message: vals.keyMessage,
     audience: vals.audience.map((a) => a.toLowerCase()),
     tone: vals.tone,
@@ -269,6 +270,8 @@ export function useInitiativeDetail(initiativeId) {
       pilot_success_criteria: vals.pilotSuccessCriteria || null,
       assumptions: vals.assumptions || null,
       duration: vals.duration || null,
+      start_date: vals.startDate || null,
+      end_date: vals.endDate || null,
     };
     let error;
     if (hypercare?.id) {
