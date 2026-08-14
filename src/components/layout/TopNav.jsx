@@ -171,7 +171,7 @@ export default function TopNav({ onNavigate }) {
               )}
               {planTier === 'tier_1' && !hasPaidFeatures && (
                 <div className="px-4 py-2 text-[11px] border-t" style={{ color: C.sub, borderColor: C.border }}>
-                  {PLAN_LABELS.tier_1} includes 1 workspace. Upgrade to Small or {PLAN_LABELS.tier_2} for unlimited.
+                  {PLAN_LABELS.tier_1} includes 1 workspace. Upgrade to {PLAN_LABELS.small} or {PLAN_LABELS.tier_2} for unlimited.
                 </div>
               )}
             </div>

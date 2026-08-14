@@ -52,7 +52,7 @@ export default async function handler(req, res) {
     || ((sub?.plan_tier === 'small' || sub?.plan_tier === 'tier_2')
       && (sub?.status === 'active' || sub?.status === 'past_due'));
   if (!canInvite) {
-    return res.status(403).json({ error: 'Inviting users requires Small, Enterprise, or an active trial' });
+    return res.status(403).json({ error: 'Inviting users requires Business, Enterprise, or an active trial' });
   }
 
   const email = String(req.body?.email || '').trim().toLowerCase();

@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Billing cycle must be monthly or annual' });
   }
   if (tier === 'solo' && billingCycle !== 'monthly') {
-    return res.status(400).json({ error: 'Solo is billed monthly only' });
+    return res.status(400).json({ error: 'Sole Proprietor is billed monthly only' });
   }
 
   const priceId = resolvePriceId(tier, billingCycle);

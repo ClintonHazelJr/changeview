@@ -250,9 +250,9 @@ export default function LandingPage() {
           </p>
 
           <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-6 items-start">
-            {/* Solo — monthly only, no billing toggle */}
+            {/* Sole Proprietor — monthly only, no billing toggle */}
             <div className="bg-white rounded-3xl p-8 border shadow-sm flex flex-col h-full" style={{ borderColor: C.border }}>
-              <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>Solo</div>
+              <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>Sole Proprietor</div>
               <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
                 {formatUsd(PRICING.solo.monthly)}
                 <span className="text-base font-medium" style={{ color: C.sub }}>/mo</span>
@@ -286,7 +286,7 @@ export default function LandingPage() {
               <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>Card required · $0 today</p>
             </div>
 
-            {/* Small + Enterprise share a monthly/annual toggle */}
+            {/* Business + Enterprise share a monthly/annual toggle */}
             <div>
               <div className="flex justify-center lg:justify-end mb-4">
                 <div
@@ -330,7 +330,7 @@ export default function LandingPage() {
                   >
                     Most popular
                   </div>
-                  <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.purple }}>Small</div>
+                  <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.purple }}>Business</div>
                   <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
                     {formatUsd(annual ? PRICING.small.annual : PRICING.small.monthly)}
                     <span className="text-base font-medium" style={{ color: C.sub }}>
@@ -354,7 +354,7 @@ export default function LandingPage() {
                       'Up to 5 Users',
                       'Reports',
                       'Tasks & Schedule',
-                      'Everything in Solo',
+                      'Everything in Sole Proprietor',
                     ].map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>
                         <Check size={14} style={{ color: C.green }} /> {f}
@@ -396,7 +396,7 @@ export default function LandingPage() {
                       'Unlimited Users',
                       'Reports',
                       'Tasks & Schedule',
-                      'Everything in Small',
+                      'Everything in Business',
                       'Priority support',
                     ].map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>

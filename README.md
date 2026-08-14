@@ -94,4 +94,4 @@ Push to GitHub and connect to Vercel. Set all env vars in Vercel project setting
 
 ## Pricing
 
-Landing page plans: **Solo** $59/mo (monthly only), **Small** $149/mo or $1,490/yr, **Enterprise** $299/mo or $2,990/yr. Checkout uses the Stripe Price IDs above based on tier + billing cycle.
+Landing page plans: **Sole Proprietor** $59/mo (monthly only), **Business** $149/mo or $1,490/yr, **Enterprise** $299/mo or $2,990/yr. Checkout uses the Stripe Price IDs above based on tier + billing cycle.

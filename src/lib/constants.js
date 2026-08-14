@@ -46,12 +46,12 @@ export const STATUS_COLOR = {
 };
 export const TAG_OPTIONS = ['Training', 'Huddle', 'Email', 'Documentation'];
 
-/** DB: tier_1 / small / tier_2. Marketing: Solo / Small / Enterprise. */
+/** DB: tier_1 / small / tier_2. Display labels only — IDs stay solo/small/enterprise. */
 export const PLAN_LABELS = {
-  tier_1: 'Solo',
-  small: 'Small',
+  tier_1: 'Sole Proprietor',
+  small: 'Business',
   tier_2: 'Enterprise',
-  solo: 'Solo',
+  solo: 'Sole Proprietor',
   enterprise: 'Enterprise',
 };
 export const isSoloPlan = (tier) => tier === 'tier_1' || tier === 'solo';
@@ -87,11 +87,12 @@ export function trialDaysLeft(subscription) {
 }
 
 /**
- * Tasks, Schedule, multi-user — not on Solo when paid.
- * Active Stripe trials get full Enterprise-level access regardless of picked tier.
+ * Tasks, Schedule, multi-user — locked on Sole Proprietor when paid.
+ * Stripe `trialing` unlocks full Enterprise-level access regardless of selected tier.
  */
 export const hasPaidPlanFeatures = (tier, subscription = null) => {
-  if (isTrialingActive(subscription)) return true;
+  // Trial unlocks everything — match banner copy; do not require trial_ends_at here.
+  if (subscription?.status === 'trialing') return true;
   if (!subscription || subscription.status === 'incomplete' || isPastDue(subscription)) return false;
   if (subscription.status === 'cancelled') return false;
   if (isTrialExpired(subscription)) return false;
@@ -116,7 +117,7 @@ export function formatReference(num) {
 export function parseDbError(err) {
   const msg = err?.message || err?.error_description || 'Something went wrong';
   if (msg.includes('Tier 1 accounts are limited')) {
-    return 'Sole Practitioner plans are limited to a single Workspace. Upgrade to Enterprise to add more.';
+    return 'Sole Proprietor plans are limited to a single Workspace. Upgrade to Enterprise to add more.';
   }
   return msg;
 }

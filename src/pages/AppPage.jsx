@@ -22,11 +22,14 @@ function AppShell() {
   const { profile, session } = useAuth();
   const {
     hasPaidFeatures: paid,
+    trialActive,
     pastDue,
     needsCheckout: checkoutNeeded,
     reload,
   } = useWorkspace();
   const isOwner = profile?.role === 'owner';
+  // Trial must unlock Schedule/Tasks/Users even on Sole Proprietor tier.
+  const featuresUnlocked = paid || trialActive;
   const [params, setParams] = useSearchParams();
   const [checkoutMsg, setCheckoutMsg] = useState('');
 
@@ -105,24 +108,24 @@ function AppShell() {
     );
   } else if (section === 'requirements') body = <RequirementsPanel />;
   else if (section === 'tasks') {
-    body = paid
+    body = featuresUnlocked
       ? <TasksPanel />
       : <UpgradePrompt feature="Tasks" />;
   } else if (section === 'schedule') {
-    body = paid
+    body = featuresUnlocked
       ? <SchedulePanel />
       : <UpgradePrompt feature="Schedule" />;
   } else if (section === 'reports') {
     body = <ReportsPanel />;
   } else if (section === 'users') {
-    if (!paid) {
+    if (!featuresUnlocked) {
       body = (
         <UpgradePrompt
           feature="Users"
           title="Multi-user access requires a paid plan"
           body={(
             <>
-              {PLAN_LABELS.tier_1} is single-user. Upgrade to Small or {PLAN_LABELS.tier_2} to invite
+              {PLAN_LABELS.tier_1} is single-user. Upgrade to {PLAN_LABELS.small} or {PLAN_LABELS.tier_2} to invite
               colleagues and assign them to workspaces.
             </>
           )}

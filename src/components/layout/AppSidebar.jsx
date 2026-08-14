@@ -17,9 +17,10 @@ const NAV = [
 ];
 
 export default function AppSidebar({ section, setSection }) {
-  const { hasPaidFeatures: paid } = useWorkspace();
+  const { hasPaidFeatures: paid, trialActive } = useWorkspace();
   const { profile } = useAuth();
   const isOwner = profile?.role === 'owner';
+  const featuresUnlocked = paid || trialActive;
 
   return (
     <aside
@@ -32,7 +33,7 @@ export default function AppSidebar({ section, setSection }) {
       <nav className="flex-1 px-2 space-y-0.5 overflow-y-auto">
         {NAV.map((item) => {
           const active = section === item.key;
-          const locked = item.paid && !paid;
+          const locked = item.paid && !featuresUnlocked;
           return (
             <button
               key={item.key}
@@ -69,9 +70,9 @@ export default function AppSidebar({ section, setSection }) {
         >
           <Users size={16} style={{ color: section === 'users' ? C.purple : C.sub }} />
           <span className="flex-1" style={HEAD}>Users</span>
-          {(!paid || !isOwner) && (
+          {(!featuresUnlocked || !isOwner) && (
             <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: tint(C.purple, '14'), color: C.purple }}>
-              {!paid ? 'Pro' : 'Owner'}
+              {!featuresUnlocked ? 'Pro' : 'Owner'}
             </span>
           )}
         </button>
