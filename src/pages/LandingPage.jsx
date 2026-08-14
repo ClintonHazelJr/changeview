@@ -1,452 +1,332 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  ArrowRight, Target, MessageSquare, TrendingUp, Check, GraduationCap,
-  RefreshCw, Building2, Sparkles, Network, X,
-} from 'lucide-react';
-import { C, HEAD, BODY, tint } from '../lib/constants';
 import { hasAuthRedirectParams } from '../lib/authUrls';
 import { rememberCheckoutIntent } from '../lib/checkout';
+import './landing.css';
 
-const PRICING = {
-  solo: { monthly: 59 },
-  small: { monthly: 149, annual: 1490, save: 298 },
-  enterprise: { monthly: 299, annual: 2990, save: 598 },
-};
+const PAGE_TITLE = 'ChangeView — Change that people actually adopt';
 
-function formatUsd(n) {
-  return `$${n.toLocaleString('en-US')}`;
+function trialSignupPath(tier) {
+  if (tier === 'enterprise') return '/signup?plan=enterprise&billing=monthly';
+  if (tier === 'small') return '/signup?plan=small&billing=monthly';
+  return '/signup?plan=solo&billing=monthly';
 }
 
-function trialSignupPath(tier, billingCycle = 'monthly') {
-  const billing = tier === 'solo' ? 'monthly' : billingCycle;
-  // Explicit per-tier paths — never reuse a shared mutable plan variable.
-  if (tier === 'enterprise') return `/signup?plan=enterprise&billing=${billing}`;
-  if (tier === 'small') return `/signup?plan=small&billing=${billing}`;
-  return `/signup?plan=solo&billing=monthly`;
-}
+/** Logo mark — same SVG system as the design file (full / mono / footer). */
+function Mark({ variant = 'full', color, style, className }) {
+  const mono = variant === 'mono';
+  const footer = variant === 'footer';
+  const full = variant === 'full';
 
-function HeroMockup() {
+  let c1;
+  let c2;
+  let c3;
+  let c4;
+  if (mono) {
+    c1 = c2 = c3 = c4 = color || '#1c2f8f';
+  } else if (footer) {
+    c1 = '#93a6ee';
+    c2 = '#93a6ee';
+    c3 = '#93a6ee';
+    c4 = '#ffffff';
+  } else {
+    c1 = '#1c2f8f';
+    c2 = '#3a54c4';
+    c3 = '#5f79df';
+    c4 = '#93a6ee';
+  }
+
   return (
-    <div
-      className="relative w-full max-w-lg mx-auto rounded-3xl border shadow-2xl overflow-hidden"
-      style={{
-        borderColor: 'rgba(255,255,255,0.35)',
-        background: '#fff',
-        transform: 'perspective(1200px) rotateY(-6deg) rotateX(4deg)',
+    <span className={className} style={style} aria-hidden>
+      <svg
+        viewBox="0 0 124 100"
+        width="100%"
+        height="100%"
+        style={{ display: 'block', overflow: 'visible' }}
+        aria-label="changeview"
+      >
+        {full && <circle cx="87" cy="50" r="33" fill="#ff1717" />}
+        <g fill="none" strokeLinejoin="round" strokeLinecap="butt" strokeWidth="19">
+          <polyline points="54,10 88,50 54,90" stroke={c4} />
+          <polyline points="36,10 70,50 36,90" stroke={c3} />
+          <polyline points="18,10 52,50 18,90" stroke={c2} />
+          <polyline points="0,10 34,50 0,90" stroke={c1} />
+        </g>
+      </svg>
+    </span>
+  );
+}
+
+function PlanCta({ tier, className, children }) {
+  return (
+    <Link
+      to={trialSignupPath(tier)}
+      data-plan={tier}
+      className={className}
+      onClick={() => {
+        console.log('[pricing-click] tier=', tier);
+        rememberCheckoutIntent(tier, 'monthly');
       }}
-      aria-hidden
     >
-      <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: C.border, background: C.bg }}>
-        <div className="w-2 h-2 rounded-full" style={{ background: C.coral }} />
-        <div className="w-2 h-2 rounded-full" style={{ background: C.amber }} />
-        <div className="w-2 h-2 rounded-full" style={{ background: C.green }} />
-        <span className="ml-2 text-[11px] font-bold" style={{ ...HEAD, color: C.ink }}>Impact — Operations</span>
-      </div>
-      <div className="p-4 space-y-3">
-        <div className="flex gap-2 flex-wrap">
-          {[
-            { t: 'People · High', c: C.coral },
-            { t: 'Process · Medium', c: C.amber },
-            { t: 'System · Low', c: C.green },
-          ].map((tag) => (
-            <span
-              key={tag.t}
-              className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-              style={{ background: tint(tag.c, '22'), color: tag.c }}
-            >
-              {tag.t}
-            </span>
-          ))}
-        </div>
-        <div className="rounded-2xl p-3 border" style={{ borderColor: C.border, background: C.bg }}>
-          <div className="text-[10px] font-bold uppercase mb-1" style={{ color: C.sub }}>Current → Future</div>
-          <div className="text-xs font-semibold" style={{ color: C.ink }}>Paper credit packs → digital underwriting</div>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 rounded-xl p-2.5 text-white text-[11px] font-bold" style={{ background: C.purple }}>
-            <MessageSquare size={12} className="inline mr-1" /> Draft comms
-          </div>
-          <div className="flex-1 rounded-xl p-2.5 text-[11px] font-bold" style={{ background: tint(C.amber, '22'), color: C.amber }}>
-            <GraduationCap size={12} className="inline mr-1" /> 2 learning needs
-          </div>
-        </div>
-        <div className="flex -space-x-2">
-          {[C.coral, C.teal, C.purple].map((bg, i) => (
-            <div
-              key={bg}
-              className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[9px] font-bold text-white"
-              style={{ background: bg }}
-            >
-              {['AK', 'JM', 'RL'][i]}
-            </div>
-          ))}
-          <span className="ml-3 self-center text-[10px] font-semibold" style={{ color: C.sub }}>3 stakeholders</span>
-        </div>
-      </div>
-    </div>
+      {children}
+    </Link>
   );
 }
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const [billingCycle, setBillingCycle] = useState('monthly');
-  const annual = billingCycle === 'annual';
   const accountDeleted = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('account') === 'deleted';
 
-  // If an Auth email still points at Site URL (/), forward into the callback handler.
+  useEffect(() => {
+    document.title = PAGE_TITLE;
+    const id = 'cv-sora-font';
+    if (!document.getElementById(id)) {
+      const link = document.createElement('link');
+      link.id = id;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap';
+      document.head.appendChild(link);
+    }
+    return () => {
+      document.title = 'ChangeView';
+    };
+  }, []);
+
   useEffect(() => {
     if (!hasAuthRedirectParams()) return;
     navigate(`/auth/callback${window.location.search}${window.location.hash}`, { replace: true });
   }, [navigate]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden" style={{ ...BODY, background: C.bg, color: C.ink }}>
+    <div className="cv-landing">
       {accountDeleted && (
-        <div className="px-6 py-2.5 text-xs font-semibold text-center" style={{ background: tint(C.amber, '22'), color: C.ink }}>
+        <div className="notice">
           Your account has been deleted. Billing is cancelled and all data was removed.
         </div>
       )}
-      {/* Nav */}
-      <nav className="relative z-20 flex items-center justify-between px-6 md:px-10 py-5">
-        <span className="font-extrabold text-xl tracking-tight" style={{ ...HEAD, color: C.ink }}>ChangeView</span>
-        <div className="flex items-center gap-3">
-          <Link to="/login" className="text-sm font-semibold no-underline px-3 py-2" style={{ color: C.sub }}>Log in</Link>
-          <Link
-            to="/signup?plan=solo"
-            className="text-sm font-bold text-white px-5 py-2.5 rounded-full no-underline shadow-sm"
-            style={{ background: C.purple }}
-          >
-            Start free trial
+
+      <nav className="site">
+        <div className="wrap row">
+          <Link className="brand" to="/">
+            <Mark variant="full" style={{ width: 38, height: 30, display: 'block' }} />
+            <span>changeview</span>
           </Link>
+          <div className="navlinks">
+            <a href="#features">Product</a>
+            <a href="#how">How it works</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#features">Resources</a>
+          </div>
+          <div className="navright">
+            <Link className="signin" to="/login">Sign in</Link>
+            <Link className="btn btn-navy" style={{ padding: '11px 22px', fontSize: 15 }} to="/signup?plan=solo&billing=monthly">
+              Start free
+            </Link>
+          </div>
         </div>
       </nav>
 
-      {/* Hero — one composition, brand-first */}
-      <section
-        className="relative px-6 md:px-10 pt-6 pb-20 md:pb-28"
-        style={{
-          background: `linear-gradient(145deg, ${tint(C.purple, '28')} 0%, ${C.bg} 42%, ${tint(C.teal, '18')} 100%)`,
-        }}
-      >
-        <div
-          className="pointer-events-none absolute inset-0 opacity-40"
-          style={{
-            backgroundImage: `radial-gradient(circle at 20% 20%, ${tint(C.coral, '35')}, transparent 40%), radial-gradient(circle at 80% 10%, ${tint(C.purple, '40')}, transparent 45%)`,
-          }}
-        />
-        <div className="relative max-w-6xl mx-auto grid md:grid-cols-2 gap-12 md:gap-16 items-center">
-          <div>
-            <div className="text-4xl md:text-5xl font-extrabold tracking-tight mb-5" style={{ ...HEAD, color: C.ink }}>
-              ChangeView
-            </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold leading-tight mb-4" style={{ ...HEAD, color: C.ink }}>
-              Change, without the chaos.<br />
-              Scope the impact. Plan the comms.<br />
-              <span style={{ color: C.purple }}>Track the adoption.</span>
+      <header className="hero">
+        <div className="wrap">
+          <div className="stack">
+            <span className="eyebrow"><span className="dot" /> Organizational change, adopted</span>
+            <h1>
+              Change that people <em>actually</em> adopt.
             </h1>
-            <p className="text-base md:text-lg mb-8 max-w-md" style={{ color: C.sub }}>
-              Built for independent change consultants and internal change managers who need one place for impacts, training, and communications.
+            <p className="lede">
+              changeview gives transformation leaders one place to plan, launch, and measure organizational change — so every rollout lands, and nothing stalls in the middle.
             </p>
-            <Link
-              to="/signup?plan=solo"
-              className="inline-flex items-center gap-2 text-sm font-bold text-white px-8 py-3.5 rounded-full no-underline shadow-lg"
-              style={{ background: C.purple }}
-            >
-              Start free trial <ArrowRight size={16} />
-            </Link>
-          </div>
-          <HeroMockup />
-        </div>
-      </section>
-
-      {/* Core loop */}
-      <section className="px-6 md:px-10 py-20 max-w-5xl mx-auto">
-        <h2 className="text-2xl md:text-3xl font-extrabold text-center mb-3" style={{ ...HEAD, color: C.ink }}>
-          The change loop, end to end
-        </h2>
-        <p className="text-sm text-center mb-12 max-w-xl mx-auto" style={{ color: C.sub }}>
-          One workspace from first impact map through go-live — not three disconnected tools.
-        </p>
-        <div className="grid md:grid-cols-3 gap-8 relative">
-          <div className="hidden md:block absolute top-10 left-[16%] right-[16%] h-0.5" style={{ background: tint(C.purple, '30') }} />
-          {[
-            { icon: Target, color: C.coral, step: '01', title: 'Scope the impact', desc: 'Departments, headcount, and severity across org, people, process, system, and environment.' },
-            { icon: MessageSquare, color: C.purple, step: '02', title: 'Plan comms & training', desc: 'AI drafts change communications from your impact data. Learning needs feed the delivery plan.' },
-            { icon: TrendingUp, color: C.teal, step: '03', title: 'Track adoption', desc: 'Stakeholders, RACI, schedule, and reports keep everyone aligned through go-live.' },
-          ].map(({ icon: Icon, color, step, title, desc }) => (
-            <div key={title} className="relative text-center md:text-left">
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto md:mx-0 mb-4 shadow-sm"
-                style={{ background: tint(color, '22') }}
-              >
-                <Icon size={26} style={{ color }} />
-              </div>
-              <div className="text-[11px] font-bold tracking-widest mb-1" style={{ color }}>{step}</div>
-              <h3 className="text-lg font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>{title}</h3>
-              <p className="text-sm leading-relaxed" style={{ color: C.sub }}>{desc}</p>
+            <div className="cta-row">
+              <Link className="btn btn-red" to="/signup?plan=solo&billing=monthly">Start free</Link>
+              <a className="btn btn-outline" href="#pricing">Book a demo</a>
             </div>
-          ))}
+            <span className="micro">No credit card · 14-day trial · Rolls out in a week</span>
+          </div>
+          <div className="shot">
+            <div className="strike" />
+            <span className="cap">[ product screenshot — change dashboard ]</span>
+          </div>
+        </div>
+      </header>
+
+      <section className="trust">
+        <div className="wrap row">
+          <span className="label">Trusted by change teams at</span>
+          <div className="logos">
+            <span>NORTHWIND</span>
+            <span>Meridian</span>
+            <span>ATLAS CO</span>
+            <span>Kestrel</span>
+            <span>Vantage</span>
+          </div>
         </div>
       </section>
 
-      {/* Built for — example scenarios, not testimonials */}
-      <section className="px-6 md:px-10 py-20" style={{ background: '#fff' }}>
-        <div className="max-w-5xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-extrabold text-center mb-3" style={{ ...HEAD, color: C.ink }}>
-            Built for
+      <section className="section" id="features">
+        <div className="wrap">
+          <div className="head">
+            <span className="kicker">The platform</span>
+            <h2>Everything a rollout needs, in one view.</h2>
+          </div>
+          <div className="features">
+            <div className="feature">
+              <Mark className="ic" variant="mono" color="#1c2f8f" />
+              <h3>Change plans</h3>
+              <p>Phased rollout plans with owners, milestones, and dependencies you can actually track.</p>
+            </div>
+            <div className="feature">
+              <Mark className="ic" variant="mono" color="#3a54c4" />
+              <h3>Stakeholder maps</h3>
+              <p>See who&apos;s impacted, who&apos;s resisting, and who&apos;s championing — before it becomes a problem.</p>
+            </div>
+            <div className="feature">
+              <Mark className="ic" variant="mono" color="#5f79df" />
+              <h3>Adoption analytics</h3>
+              <p>Track readiness, sentiment, and real usage in real time — not in a quarterly survey.</p>
+            </div>
+            <div className="feature">
+              <Mark className="ic" variant="mono" color="#1c2f8f" />
+              <h3>Comms hub</h3>
+              <p>The right message to the right team at the right moment, across every channel.</p>
+            </div>
+            <div className="feature">
+              <Mark className="ic" variant="mono" color="#3a54c4" />
+              <h3>Readiness surveys</h3>
+              <p>Pulse-check confidence before and after each phase, and act on it instantly.</p>
+            </div>
+            <div className="feature">
+              <Mark className="ic" variant="mono" color="#ff1717" />
+              <h3>Playbooks</h3>
+              <p>Reusable templates from proven frameworks — ADKAR, Kotter, and your own.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section how" id="how">
+        <div className="wrap">
+          <div className="head">
+            <span className="kicker">How it works</span>
+            <h2>Four moves, one direction: forward.</h2>
+          </div>
+          <div className="steps">
+            <div className="step">
+              <span className="n">01</span>
+              <h3>Map</h3>
+              <p>Import your org and surface every group the change touches.</p>
+            </div>
+            <div className="step">
+              <span className="n">02</span>
+              <h3>Plan</h3>
+              <p>Build the phased plan with owners, comms, and readiness gates.</p>
+            </div>
+            <div className="step">
+              <span className="n">03</span>
+              <h3>Launch</h3>
+              <p>Roll out in waves, with the right message reaching each team on cue.</p>
+            </div>
+            <div className="step">
+              <span className="n">04</span>
+              <h3>Measure</h3>
+              <p>Watch adoption climb and step in the moment a group falls behind.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section" id="pricing">
+        <div className="wrap">
+          <div className="head">
+            <span className="kicker">Pricing</span>
+            <h2>Simple plans, real access.</h2>
+          </div>
+          <div className="tiers">
+            <div className="tier">
+              <h3>Sole Proprietor</h3>
+              <div className="price"><span className="amt">$59</span><span className="per">/ mo</span></div>
+              <p>1 user, 1 workspace. For a solo consultant running a single client rollout.</p>
+              <PlanCta tier="solo" className="btn btn-ghost-navy">Start free trial</PlanCta>
+            </div>
+            <div className="tier pop">
+              <span className="badge">MOST POPULAR</span>
+              <h3>Business</h3>
+              <div className="price"><span className="amt">$149</span><span className="per">/ mo</span></div>
+              <p>5 users, unlimited workspaces. For teams running change across multiple clients or departments.</p>
+              <PlanCta tier="small" className="btn btn-red pay">Start free trial</PlanCta>
+            </div>
+            <div className="tier">
+              <h3>Enterprise</h3>
+              <div className="price"><span className="amt">$299</span><span className="per">/ mo</span></div>
+              <p>Unlimited users, unlimited workspaces. Annual billing available.</p>
+              <PlanCta tier="enterprise" className="btn btn-ghost-navy">Start free trial</PlanCta>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section faq" style={{ paddingTop: 0 }}>
+        <div className="wrap">
+          <h2 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em', marginBottom: 36 }}>
+            Questions, answered.
           </h2>
-          <p className="text-sm text-center mb-12 max-w-xl mx-auto" style={{ color: C.sub }}>
-            A few situations ChangeView is built for:
-          </p>
-          <div className="grid md:grid-cols-2 gap-8">
-            {[
-              {
-                icon: RefreshCw,
-                color: C.coral,
-                title: 'New system rollout',
-                body: 'Migrating from one CRM, ERP, or collaboration suite to another? Scope who\'s affected, plan training by department, and draft comms in minutes instead of hours.',
-              },
-              {
-                icon: Building2,
-                color: C.purple,
-                title: 'Mergers and acquisitions',
-                body: 'Integration always means change. Track impact across every team the deal touches, on a deadline you don\'t control.',
-              },
-              {
-                icon: Sparkles,
-                color: C.teal,
-                title: 'AI tool adoption',
-                body: 'Rolling out a new AI tool across the org? Structure the training plan and the comms before resistance sets in.',
-              },
-              {
-                icon: Network,
-                color: C.amber,
-                title: 'Restructures and new operating models',
-                body: 'When reporting lines and processes shift, give every impacted team a clear picture of what\'s changing and why.',
-              },
-            ].map(({ icon: Icon, color, title, body }) => (
-              <div key={title} className="flex gap-4">
-                <div
-                  className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
-                  style={{ background: tint(color, '20') }}
-                >
-                  <Icon size={22} style={{ color }} />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold mb-1.5" style={{ ...HEAD, color: C.ink }}>{title}</h3>
-                  <p className="text-sm leading-relaxed" style={{ color: C.sub }}>{body}</p>
-                </div>
-              </div>
-            ))}
+          <div className="qa">
+            <h3>Is this only for big transformations?</h3>
+            <p>No. changeview works for a single team&apos;s process change up to a company-wide reorg — the plan just scales with you.</p>
+          </div>
+          <div className="qa">
+            <h3>How fast can we get started?</h3>
+            <p>Most teams import their org and launch a first plan within a week, using a built-in playbook.</p>
+          </div>
+          <div className="qa">
+            <h3>Does it integrate with our tools?</h3>
+            <p>Yes — Slack, Teams, email, HRIS, and SSO. Comms and readiness data flow both ways.</p>
+          </div>
+          <div className="qa">
+            <h3>How is adoption measured?</h3>
+            <p>A blend of real product usage, readiness pulses, and stakeholder sentiment, rolled into one adoption score per group.</p>
           </div>
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="px-6 md:px-10 py-20" style={{ background: `linear-gradient(180deg, ${C.bg}, ${tint(C.purple, '08')})` }}>
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-extrabold text-center mb-3" style={{ ...HEAD, color: C.ink }}>Simple pricing</h2>
-          <p className="text-sm text-center mb-2" style={{ color: C.sub }}>Start alone. Scale to your whole change practice.</p>
-          <p className="text-xs text-center font-semibold mb-10" style={{ color: C.purple }}>
-            7-day free trial · Card required · Charged only when the trial ends
-          </p>
-
-          <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-6 items-start">
-            {/* Sole Proprietor — monthly only, no billing toggle */}
-            <div className="bg-white rounded-3xl p-8 border shadow-sm flex flex-col h-full" style={{ borderColor: C.border }}>
-              <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>Sole Proprietor</div>
-              <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
-                {formatUsd(PRICING.solo.monthly)}
-                <span className="text-base font-medium" style={{ color: C.sub }}>/mo</span>
-              </div>
-              <p className="text-sm mb-6" style={{ color: C.sub }}>Billed monthly. One workspace, one user.</p>
-              <ul className="space-y-2.5 mb-8 flex-1">
-                {[
-                  { ok: true, text: '1 Workspace' },
-                  { ok: true, text: '1 User' },
-                  { ok: true, text: 'Reports' },
-                  { ok: true, text: 'Initiatives, Impacts & Requirements' },
-                  { ok: true, text: 'Stakeholders, Learning Needs & AI Comms' },
-                  { ok: false, text: 'Schedule' },
-                  { ok: false, text: 'Tasks' },
-                ].map((f) => (
-                  <li key={f.text} className="flex items-center gap-2 text-sm" style={{ color: f.ok ? C.ink : C.sub }}>
-                    {f.ok
-                      ? <Check size={14} style={{ color: C.green }} />
-                      : <X size={14} style={{ color: C.sub }} />}
-                    {f.text}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                to="/signup?plan=solo&billing=monthly"
-                data-plan="solo"
-                onClick={() => {
-                  console.log('[pricing-click] tier=', 'solo');
-                  rememberCheckoutIntent('solo', 'monthly');
-                }}
-                className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
-                style={{ background: C.purple }}
-              >
-                Start your 7-day free trial
-              </Link>
-              <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>Card required · $0 today</p>
-            </div>
-
-            {/* Business + Enterprise share a monthly/annual toggle */}
-            <div>
-              <div className="flex justify-center lg:justify-end mb-4">
-                <div
-                  className="inline-flex p-1 rounded-full border bg-white shadow-sm"
-                  style={{ borderColor: C.border }}
-                  role="group"
-                  aria-label="Billing cycle"
-                >
-                  {[
-                    { key: 'monthly', label: 'Monthly' },
-                    { key: 'annual', label: 'Annual' },
-                  ].map((opt) => (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      onClick={() => setBillingCycle(opt.key)}
-                      className="text-xs font-bold px-4 py-2 rounded-full transition-colors"
-                      style={{
-                        background: billingCycle === opt.key ? C.purple : 'transparent',
-                        color: billingCycle === opt.key ? '#fff' : C.sub,
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6 items-stretch">
-                <div
-                  className="rounded-3xl p-8 border-2 shadow-md relative flex flex-col overflow-hidden bg-white"
-                  style={{ borderColor: C.purple }}
-                >
-                  <div
-                    className="absolute top-0 inset-x-0 h-1.5"
-                    style={{ background: `linear-gradient(90deg, ${C.purple}, ${C.teal})` }}
-                  />
-                  <div
-                    className="absolute top-4 right-4 text-[10px] font-bold px-2.5 py-1 rounded-full text-white"
-                    style={{ background: C.purple }}
-                  >
-                    Most popular
-                  </div>
-                  <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.purple }}>Business</div>
-                  <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
-                    {formatUsd(annual ? PRICING.small.annual : PRICING.small.monthly)}
-                    <span className="text-base font-medium" style={{ color: C.sub }}>
-                      {annual ? '/yr' : '/mo'}
-                    </span>
-                  </div>
-                  {annual ? (
-                    <p className="text-sm mb-6" style={{ color: C.sub }}>
-                      <span className="font-semibold" style={{ color: C.green }}>2 months free</span>
-                      {' · '}
-                      Save {formatUsd(PRICING.small.save)} vs monthly
-                    </p>
-                  ) : (
-                    <p className="text-sm mb-6" style={{ color: C.sub }}>
-                      Or {formatUsd(PRICING.small.annual)}/yr (2 months free)
-                    </p>
-                  )}
-                  <ul className="space-y-2.5 mb-8 flex-1">
-                    {[
-                      'Unlimited Workspaces',
-                      'Up to 5 Users',
-                      'Reports',
-                      'Tasks & Schedule',
-                      'Everything in Sole Proprietor',
-                    ].map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>
-                        <Check size={14} style={{ color: C.green }} /> {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link
-                    to={trialSignupPath('small', billingCycle)}
-                    data-plan="small"
-                    onClick={() => {
-                      console.log('[pricing-click] tier=', 'small');
-                      rememberCheckoutIntent('small', billingCycle);
-                    }}
-                    className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
-                    style={{ background: C.purple }}
-                  >
-                    Start your 7-day free trial
-                  </Link>
-                  <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>Card required · $0 today</p>
-                </div>
-
-                <div className="bg-white rounded-3xl p-8 border shadow-sm flex flex-col" style={{ borderColor: C.border }}>
-                  <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>Enterprise</div>
-                  <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
-                    {formatUsd(annual ? PRICING.enterprise.annual : PRICING.enterprise.monthly)}
-                    <span className="text-base font-medium" style={{ color: C.sub }}>
-                      {annual ? '/yr' : '/mo'}
-                    </span>
-                  </div>
-                  {annual ? (
-                    <p className="text-sm mb-6" style={{ color: C.sub }}>
-                      <span className="font-semibold" style={{ color: C.green }}>2 months free</span>
-                      {' · '}
-                      Save {formatUsd(PRICING.enterprise.save)} vs monthly
-                    </p>
-                  ) : (
-                    <p className="text-sm mb-6" style={{ color: C.sub }}>
-                      Or {formatUsd(PRICING.enterprise.annual)}/yr (2 months free)
-                    </p>
-                  )}
-                  <ul className="space-y-2.5 mb-8 flex-1">
-                    {[
-                      'Unlimited Workspaces',
-                      'Unlimited Users',
-                      'Reports',
-                      'Tasks & Schedule',
-                      'Everything in Business',
-                      'Priority support',
-                    ].map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>
-                        <Check size={14} style={{ color: C.green }} /> {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link
-                    to={trialSignupPath('enterprise', billingCycle)}
-                    data-plan="enterprise"
-                    onClick={() => {
-                      console.log('[pricing-click] tier=', 'enterprise');
-                      rememberCheckoutIntent('enterprise', billingCycle);
-                    }}
-                    className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
-                    style={{ background: C.ink }}
-                  >
-                    Start your 7-day free trial
-                  </Link>
-                  <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>Card required · $0 today</p>
-                </div>
-              </div>
-            </div>
+      <section className="band">
+        <div className="wrap row">
+          <div>
+            <h2>Make your next change the one that sticks.</h2>
+            <p>Start free today — bring your first rollout live this week.</p>
           </div>
+          <Link className="btn btn-red" to="/signup?plan=solo&billing=monthly">Start free</Link>
         </div>
       </section>
 
-      <footer className="px-6 md:px-10 py-10 border-t" style={{ borderColor: C.border, background: '#fff' }}>
-        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="font-extrabold" style={{ ...HEAD, color: C.ink }}>ChangeView</span>
-            <span className="text-xs" style={{ color: C.sub }}>© {new Date().getFullYear()}</span>
+      <footer>
+        <div className="wrap row">
+          <div className="about">
+            <span className="brand">
+              <Mark variant="footer" style={{ width: 32, height: 26, display: 'block' }} />
+              <span>changeview</span>
+            </span>
+            <span className="tag">Change management that people actually adopt.</span>
           </div>
-          <div className="flex items-center gap-4 text-sm font-semibold">
-            <Link to="/login" className="no-underline" style={{ color: C.sub }}>Log in</Link>
-            <Link to="/signup?plan=solo" className="no-underline" style={{ color: C.purple }}>Start free trial</Link>
+          <div className="cols">
+            <div className="col">
+              <span className="h">Product</span>
+              <a href="#features">Features</a>
+              <a href="#pricing">Pricing</a>
+              <a href="#features">Integrations</a>
+            </div>
+            <div className="col">
+              <span className="h">Company</span>
+              <a href="#how">About</a>
+              <a href="#how">Careers</a>
+              <a href="#pricing">Contact</a>
+            </div>
+            <div className="col">
+              <span className="h">Resources</span>
+              <a href="#features">Playbooks</a>
+              <a href="#features">Blog</a>
+              <a href="#features">Help center</a>
+            </div>
           </div>
         </div>
       </footer>

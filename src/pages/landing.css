@@ -1,0 +1,621 @@
+/* Scoped to .cv-landing so app chrome is unaffected. */
+
+.cv-landing,
+.cv-landing * ,
+.cv-landing *::before,
+.cv-landing *::after {
+  box-sizing: border-box;
+}
+
+.cv-landing {
+  --ink: #17181c;
+  --paper: #f7f7f6;
+  --navy: #1c2f8f;
+  --royal: #3a54c4;
+  --blue: #5f79df;
+  --peri: #93a6ee;
+  --red: #ff1717;
+  --dark: #0f1633;
+  --line: #e6e5e2;
+  --muted: #575653;
+  --faint: #8a8986;
+  --wrap: 1180px;
+
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'Sora', system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+.cv-landing a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.cv-landing h1,
+.cv-landing h2,
+.cv-landing h3,
+.cv-landing p {
+  margin: 0;
+}
+
+.cv-landing .wrap {
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 0 56px;
+}
+
+.cv-landing .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+  font-family: inherit;
+}
+
+.cv-landing .btn:hover {
+  transform: translateY(-1px);
+}
+
+.cv-landing .btn-red {
+  background: var(--red);
+  color: #fff;
+}
+
+.cv-landing .btn-navy {
+  background: var(--navy);
+  color: #fff;
+}
+
+.cv-landing .btn-outline {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid #d8d7d4;
+  font-weight: 600;
+}
+
+.cv-landing .btn-ghost-navy {
+  background: transparent;
+  color: var(--navy);
+  border: 1px solid var(--navy);
+  font-weight: 600;
+}
+
+.cv-landing .strike {
+  background-image: linear-gradient(
+    90deg,
+    #93a6ee14 25%,
+    transparent 25%,
+    transparent 50%,
+    #93a6ee14 50%,
+    #93a6ee14 75%,
+    transparent 75%
+  );
+  background-size: 16px 16px;
+}
+
+/* nav */
+.cv-landing nav.site {
+  border-bottom: 1px solid var(--line);
+  background: rgba(247, 247, 246, 0.9);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.cv-landing nav.site .row {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+  padding: 20px 0;
+}
+
+.cv-landing .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cv-landing .brand > span:last-child {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.cv-landing .navlinks {
+  display: flex;
+  gap: 28px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #4b4a47;
+}
+
+.cv-landing .navlinks a:hover {
+  color: var(--navy);
+}
+
+.cv-landing .navright {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.cv-landing .navright .signin {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* hero */
+.cv-landing .hero {
+  padding: 84px 0 72px;
+}
+
+.cv-landing .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+
+.cv-landing .eyebrow .dot {
+  width: 8px;
+  height: 8px;
+  background: var(--red);
+  border-radius: 50%;
+}
+
+.cv-landing .hero h1 {
+  font-size: 68px;
+  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.cv-landing .hero h1 em {
+  font-style: normal;
+  color: var(--royal);
+}
+
+.cv-landing .lede {
+  font-size: 20px;
+  line-height: 1.55;
+  color: #4b4a47;
+  max-width: 560px;
+}
+
+.cv-landing .hero .stack {
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.cv-landing .cta-row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.cv-landing .cta-row .btn {
+  padding: 15px 30px;
+  font-size: 16px;
+}
+
+.cv-landing .micro {
+  font-size: 13px;
+  color: var(--faint);
+}
+
+.cv-landing .shot {
+  margin-top: 56px;
+  height: 360px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 20px 50px rgba(28, 47, 143, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.cv-landing .shot .strike {
+  position: absolute;
+  inset: 0;
+  opacity: 0.6;
+}
+
+.cv-landing .shot .cap {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  color: #9a9895;
+  z-index: 1;
+  letter-spacing: 0.04em;
+}
+
+/* trust */
+.cv-landing .trust {
+  background: #eef0f7;
+}
+
+.cv-landing .trust .row {
+  display: flex;
+  align-items: center;
+  gap: 38px;
+  padding: 26px 0;
+  flex-wrap: wrap;
+}
+
+.cv-landing .trust .label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #7d7c79;
+}
+
+.cv-landing .trust .logos {
+  display: flex;
+  gap: 40px;
+  flex-wrap: wrap;
+  font-size: 17px;
+  font-weight: 700;
+  color: #a9a8a5;
+  letter-spacing: -0.02em;
+}
+
+/* sections */
+.cv-landing .section {
+  padding: 80px 0;
+}
+
+.cv-landing .kicker {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--royal);
+}
+
+.cv-landing .section h2 {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+  margin-top: 12px;
+}
+
+.cv-landing .head {
+  max-width: 620px;
+  margin-bottom: 48px;
+}
+
+/* features */
+.cv-landing .features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  background: var(--line);
+}
+
+.cv-landing .feature {
+  background: var(--paper);
+  padding: 34px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cv-landing .feature .ic {
+  width: 32px;
+  height: 26px;
+}
+
+.cv-landing .feature h3 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 8px;
+}
+
+.cv-landing .feature p {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+/* how */
+.cv-landing .how {
+  background: var(--dark);
+  color: #fff;
+}
+
+.cv-landing .how .kicker {
+  color: var(--peri);
+}
+
+.cv-landing .steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 32px;
+}
+
+.cv-landing .step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cv-landing .step .n {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--red);
+}
+
+.cv-landing .step h3 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.cv-landing .step p {
+  font-size: 15px;
+  line-height: 1.55;
+  color: #b6bdd8;
+}
+
+/* pricing */
+.cv-landing .tiers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.cv-landing .tier {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+}
+
+.cv-landing .tier.pop {
+  border: 2px solid var(--red);
+  position: relative;
+}
+
+.cv-landing .tier .badge {
+  position: absolute;
+  top: -12px;
+  left: 34px;
+  background: var(--red);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 2px;
+  letter-spacing: 0.04em;
+}
+
+.cv-landing .tier h3 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.cv-landing .price {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.cv-landing .price .amt {
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.cv-landing .price .per {
+  font-size: 15px;
+  color: var(--faint);
+}
+
+.cv-landing .tier p {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.cv-landing .tier .btn {
+  padding: 12px;
+  font-size: 15px;
+  width: 100%;
+}
+
+.cv-landing .tier .btn.pay {
+  padding: 13px;
+}
+
+/* faq */
+.cv-landing .faq .qa {
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 40px;
+}
+
+.cv-landing .faq .qa:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.cv-landing .faq .qa h3 {
+  flex: 0 0 300px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.cv-landing .faq .qa p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* cta band */
+.cv-landing .band {
+  background: var(--navy);
+  color: #fff;
+}
+
+.cv-landing .band .row {
+  padding: 70px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+
+.cv-landing .band h2 {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  max-width: 560px;
+}
+
+.cv-landing .band p {
+  font-size: 17px;
+  color: #c3cbef;
+  margin-top: 10px;
+}
+
+.cv-landing .band .btn {
+  padding: 16px 34px;
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+/* footer */
+.cv-landing footer {
+  background: var(--dark);
+  color: #8a93b8;
+}
+
+.cv-landing footer .row {
+  padding: 48px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+
+.cv-landing footer .about {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 280px;
+}
+
+.cv-landing footer .about .brand > span:last-child {
+  color: #fff;
+  font-size: 18px;
+}
+
+.cv-landing footer .about .tag {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cv-landing footer .cols {
+  display: flex;
+  gap: 56px;
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+
+.cv-landing footer .col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cv-landing footer .col .h {
+  color: #fff;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.cv-landing footer .col a:hover {
+  color: #fff;
+}
+
+.cv-landing .notice {
+  padding: 12px 56px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  background: #fff3cd;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+
+@media (max-width: 900px) {
+  .cv-landing .wrap {
+    padding: 0 24px;
+  }
+
+  .cv-landing .hero h1 {
+    font-size: 44px;
+  }
+
+  .cv-landing .section h2,
+  .cv-landing .band h2 {
+    font-size: 30px;
+  }
+
+  .cv-landing .features,
+  .cv-landing .steps,
+  .cv-landing .tiers {
+    grid-template-columns: 1fr;
+  }
+
+  .cv-landing .navlinks {
+    display: none;
+  }
+
+  .cv-landing .faq .qa {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .cv-landing .faq .qa h3 {
+    flex: none;
+  }
+
+  .cv-landing .band .row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cv-landing .notice {
+    padding: 12px 24px;
+  }
+}
