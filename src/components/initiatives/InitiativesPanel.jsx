@@ -3,11 +3,16 @@ import {
   ChevronLeft, FileText, AlertTriangle, Users, GraduationCap, MessageSquare,
   CircleDot, Rocket, HeartPulse, CheckCircle2,
 } from 'lucide-react';
-import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, STATUS_COLOR, isRatedSeverity, parseInitiativeMeta } from '../../lib/constants';
+import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, STATUS_COLOR, isRatedSeverity, parseInitiativeMeta, parseDbError } from '../../lib/constants';
+import { supabase } from '../../lib/supabase';
 import { useInitiatives, useInitiativeDetail } from '../../hooks/useInitiatives';
 import { useAdminData } from '../../hooks/useAdminData';
+import { useAuth } from '../../contexts/AuthContext';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { TabSection } from '../ui/shared';
 import Modal from '../ui/Modal';
+import CsvImportModal from '../ui/CsvImportModal';
+import { findPerson, parseYesNo } from '../../lib/csvImport';
 import {
   FormInitiative, FormImpact, FormStakeholder, FormLearningNeed, FormComms, FormHypercare,
 } from '../forms/AdminForms';
@@ -33,12 +38,15 @@ function formatDate(value) {
 export default function InitiativesPanel({ initialSelectedId = null, onSelectedConsumed }) {
   const { initiatives, programs, addInitiative, reload: reloadInitiatives } = useInitiatives();
   const { departments, people } = useAdminData();
+  const { profile } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
   const [selectedInitId, setSelectedInitId] = useState(initialSelectedId);
   const [initTab, setInitTab] = useState('details');
   const [modal, setModal] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [viewMode, setViewMode] = useState('tiles');
+  const [bulkStakeholders, setBulkStakeholders] = useState(false);
 
   const openCreate = (type) => {
     setEditingRecord(null);
@@ -334,7 +342,19 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
         )}
 
         {initTab === 'stakeholders' && (
-          <TabSection title="Stakeholders" subtitle="Who's involved, and their RACI role on this Initiative." onAdd={() => openCreate('stakeholder')} addLabel="Add Stakeholder" color={C.teal} disabled={people.length === 0} disabledText="Add People in Settings first." empty={initData.stakeholders.length === 0} emptyText="No stakeholders added yet." emptyIcon={Users}>
+          <TabSection
+            title="Stakeholders"
+            subtitle="Who's involved, and their RACI role on this Initiative."
+            onAdd={() => openCreate('stakeholder')}
+            addLabel="Add Stakeholder"
+            onBulkUpload={() => setBulkStakeholders(true)}
+            color={C.teal}
+            disabled={people.length === 0}
+            disabledText="Add People in Settings first."
+            empty={initData.stakeholders.length === 0}
+            emptyText="No stakeholders added yet."
+            emptyIcon={Users}
+          >
             <div className="grid grid-cols-2 gap-3">
               {initData.stakeholders.map((s) => {
                 const raci = { r: s.raci_responsible, a: s.raci_accountable, c: s.raci_consulted, i: s.raci_informed };
@@ -469,6 +489,54 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
             onDelete={editingRecord ? async () => { await detail.deleteStakeholder(editingRecord.id); closeModal(); } : undefined}
           />
         </Modal>
+      )}
+      {bulkStakeholders && selectedInitId && (
+        <CsvImportModal
+          title="Bulk Upload Stakeholders"
+          headers={['Person', 'Project Role', 'Responsible', 'Accountable', 'Consulted', 'Informed']}
+          exampleRow={{
+            Person: 'Alex Rivera',
+            'Project Role': 'Sponsor',
+            Responsible: 'N',
+            Accountable: 'Y',
+            Consulted: 'Y',
+            Informed: 'N',
+          }}
+          templateFilename="stakeholders-template.csv"
+          onClose={() => setBulkStakeholders(false)}
+          onComplete={async () => { await detail.reload(); }}
+          mapRow={(row) => {
+            const personVal = row.Person;
+            if (!personVal) throw new Error('Person is required');
+            const person = findPerson(people, personVal);
+            if (!person) throw new Error(`Person '${personVal}' not found`);
+            if (person.ambiguous) throw new Error(person.reason || `Multiple people match '${personVal}'`);
+            return {
+              personId: person.id,
+              role: row['Project Role'] || null,
+              raci: {
+                r: parseYesNo(row.Responsible),
+                a: parseYesNo(row.Accountable),
+                c: parseYesNo(row.Consulted),
+                i: parseYesNo(row.Informed),
+              },
+            };
+          }}
+          importRow={async (vals) => {
+            const { error } = await supabase.from('stakeholders').insert({
+              account_id: profile.account_id,
+              workspace_id: activeWorkspaceId,
+              initiative_id: selectedInitId,
+              person_id: vals.personId,
+              project_role: vals.role,
+              raci_responsible: vals.raci.r,
+              raci_accountable: vals.raci.a,
+              raci_consulted: vals.raci.c,
+              raci_informed: vals.raci.i,
+            });
+            if (error) throw new Error(parseDbError(error));
+          }}
+        />
       )}
       {modal === 'learning' && (
         <Modal title={editingRecord ? 'Edit Learning Need' : 'Add Learning Need'} onClose={closeModal}>

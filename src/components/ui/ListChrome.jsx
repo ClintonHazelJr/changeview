@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Bell, Plus, ChevronDown } from 'lucide-react';
+import { Bell, Plus, ChevronDown, Upload } from 'lucide-react';
 import { C, HEAD, BODY, tint, initials, STATUS_COLOR } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
 import ViewToggle from './ViewToggle';
@@ -15,6 +15,7 @@ export function statusColor(status) {
 export function ListTopBar({
   title, addLabel, onAdd, addDisabled,
   viewMode = 'tiles', onViewChange, viewModes = ['tiles', 'list'],
+  onBulkUpload, bulkLabel = 'Bulk Upload', bulkDisabled,
 }) {
   const { profile } = useAuth();
   return (
@@ -27,6 +28,17 @@ export function ListTopBar({
         <ViewToggle value={viewMode} onChange={onViewChange} modes={viewModes} />
       )}
       <div className="flex-1" />
+      {typeof onBulkUpload === 'function' && (
+        <button
+          type="button"
+          onClick={onBulkUpload}
+          disabled={bulkDisabled ?? addDisabled}
+          className="flex items-center gap-1.5 text-sm font-bold px-4 py-2 rounded-full border disabled:opacity-40 shadow-sm"
+          style={{ borderColor: C.border, color: C.ink, background: '#fff' }}
+        >
+          <Upload size={15} /> {bulkLabel}
+        </button>
+      )}
       <button
         type="button"
         onClick={onAdd}

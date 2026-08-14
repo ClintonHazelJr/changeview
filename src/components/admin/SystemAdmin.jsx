@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react';
 import {
   Building2, MapPin, Users, UserCircle2, Plus, ChevronRight, Mail, Tag,
 } from 'lucide-react';
-import { C, HEAD, BODY, tint, initials } from '../../lib/constants';
+import { C, HEAD, BODY, tint, initials, parseDbError } from '../../lib/constants';
+import { supabase } from '../../lib/supabase';
 import { useAdminData } from '../../hooks/useAdminData';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { ListCard, TabSection } from '../ui/shared';
 import ListTable from '../ui/ListTable';
 import Modal from '../ui/Modal';
+import CsvImportModal from '../ui/CsvImportModal';
+import { findByName } from '../../lib/csvImport';
 import {
   FormOrg, FormDepartment, FormPerson, FormTeam, FormTeamMember,
 } from '../forms/AdminForms';
@@ -18,15 +22,18 @@ export default function SystemAdmin({
   initialOpenAddOrg = false,
   onInitialOpenAddOrgConsumed,
 }) {
-  const { activeWorkspace } = useWorkspace();
+  const { activeWorkspace, activeWorkspaceId } = useWorkspace();
+  const { profile } = useAuth();
   const {
     orgs, departments, people, teams,
-    addOrg, addDepartment, addPerson, addTeam, addTeamMember,
+    addOrg, addDepartment, addPerson, addTeam, addTeamMember, reload,
   } = useAdminData();
   const [adminTab, setAdminTab] = useState(initialTab || 'org');
   const [modal, setModal] = useState(null);
+  const [bulk, setBulk] = useState(null);
   const [expandedTeam, setExpandedTeam] = useState(null);
   const [viewMode, setViewMode] = useState('tiles');
+  const accountId = profile?.account_id;
 
   useEffect(() => {
     if (!initialTab) return;
@@ -135,6 +142,7 @@ export default function SystemAdmin({
             subtitle="Departments sit under an Org and tag who's impacted on every Impact record."
             onAdd={() => setModal('department')}
             addLabel="Add Department"
+            onBulkUpload={() => setBulk('departments')}
             color={C.teal}
             disabled={orgs.length === 0}
             disabledText="Add an Org first."
@@ -171,6 +179,7 @@ export default function SystemAdmin({
             subtitle="Your directory. Add someone once here, then reuse them as a Stakeholder or Team Member on any Initiative."
             onAdd={() => setModal('people')}
             addLabel="Add Person"
+            onBulkUpload={() => setBulk('people')}
             color={C.coral}
             disabled={departments.length === 0}
             disabledText="Add a Department first."
@@ -307,6 +316,80 @@ export default function SystemAdmin({
             onSave={async (personId, role) => { await addTeamMember(modal.teamId, personId, role); setModal(null); }}
           />
         </Modal>
+      )}
+
+      {bulk === 'departments' && (
+        <CsvImportModal
+          title="Bulk Upload Departments"
+          headers={['Org', 'Department', 'Location']}
+          exampleRow={{ Org: 'Acme Corp', Department: 'Operations', Location: 'Sydney' }}
+          templateFilename="departments-template.csv"
+          onClose={() => setBulk(null)}
+          onComplete={async () => { await reload(); }}
+          mapRow={(row) => {
+            const orgName = row.Org;
+            const name = row.Department;
+            const location = row.Location || null;
+            if (!name) throw new Error('Department name is required');
+            if (!orgName) throw new Error('Org is required');
+            const org = findByName(orgs, orgName);
+            if (!org) throw new Error(`Org '${orgName}' not found`);
+            if (org.ambiguous) throw new Error(`Multiple orgs named '${orgName}'`);
+            return { orgId: org.id, name, location };
+          }}
+          importRow={async (vals) => {
+            const { error } = await supabase.from('departments').insert({
+              account_id: accountId,
+              workspace_id: activeWorkspaceId,
+              org_id: vals.orgId,
+              name: vals.name,
+              location: vals.location,
+            });
+            if (error) throw new Error(parseDbError(error));
+          }}
+        />
+      )}
+
+      {bulk === 'people' && (
+        <CsvImportModal
+          title="Bulk Upload People"
+          headers={['Name', 'Department', 'Title', 'Email']}
+          exampleRow={{
+            Name: 'Alex Rivera',
+            Department: 'Operations',
+            Title: 'Change Lead',
+            Email: 'alex@example.com',
+          }}
+          templateFilename="people-template.csv"
+          onClose={() => setBulk(null)}
+          onComplete={async () => { await reload(); }}
+          mapRow={(row) => {
+            const name = row.Name;
+            const deptNameVal = row.Department;
+            if (!name) throw new Error('Name is required');
+            if (!deptNameVal) throw new Error('Department is required');
+            const dept = findByName(departments, deptNameVal);
+            if (!dept) throw new Error(`Department '${deptNameVal}' not found`);
+            if (dept.ambiguous) throw new Error(`Multiple departments named '${deptNameVal}'`);
+            return {
+              name,
+              departmentId: dept.id,
+              title: row.Title || null,
+              email: row.Email || null,
+            };
+          }}
+          importRow={async (vals) => {
+            const { error } = await supabase.from('people').insert({
+              account_id: accountId,
+              workspace_id: activeWorkspaceId,
+              department_id: vals.departmentId,
+              name: vals.name,
+              title: vals.title,
+              email: vals.email,
+            });
+            if (error) throw new Error(parseDbError(error));
+          }}
+        />
       )}
     </div>
   );

@@ -1,9 +1,13 @@
 import { useMemo, useState } from 'react';
 import { CircleDot, Play, Loader, Ban, CheckCircle2 } from 'lucide-react';
-import { C, HEAD, BODY, SEVERITY_COLOR, TASK_STATUSES, tint } from '../../lib/constants';
+import { C, HEAD, BODY, SEVERITY_COLOR, TASK_STATUSES, tint, parseDbError, inputClass, inputStyle } from '../../lib/constants';
+import { supabase } from '../../lib/supabase';
 import { useTasks } from '../../hooks/useTasks';
 import { useAdminData } from '../../hooks/useAdminData';
+import { useAuth } from '../../contexts/AuthContext';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
 import Modal from '../ui/Modal';
+import CsvImportModal from '../ui/CsvImportModal';
 import { FormTask } from '../forms/AdminForms';
 import ListTable from '../ui/ListTable';
 import StatusPill from '../ui/StatusPill';
@@ -11,6 +15,7 @@ import {
   ListPageShell, ListTopBar, StatusFilterRow, GroupSection, CompactListCard,
   ListBody, countByStatus, statusColor,
 } from '../ui/ListChrome';
+import { findByName, findPerson, parseImportDate, requireEnum } from '../../lib/csvImport';
 
 const STATUS_META = [
   { key: 'backlog', label: 'Backlog', icon: CircleDot },
@@ -20,17 +25,26 @@ const STATUS_META = [
   { key: 'done', label: 'Done', icon: CheckCircle2 },
 ];
 
+const TASK_HEADERS = [
+  'Name', 'Description', 'Assignee', 'Project Team', 'Status', 'Priority',
+  'Effort Estimate', 'Start Date', 'Finish Date', 'Sprint', 'PI',
+];
+
 export default function TasksPanel() {
   const {
     tasks, initiatives, people, teams, requirements,
-    saveTask, updateTaskStatus, deleteTask,
+    saveTask, updateTaskStatus, deleteTask, reload,
   } = useTasks();
   const { departments } = useAdminData();
+  const { profile } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
   const [view, setView] = useState('tiles');
   const [modal, setModal] = useState(null);
   const [editing, setEditing] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [dragOverCol, setDragOverCol] = useState(null);
+  const [bulk, setBulk] = useState(false);
+  const [bulkInitiativeId, setBulkInitiativeId] = useState('');
 
   const getStatus = (t) => t.status || 'backlog';
   const counts = countByStatus(tasks, getStatus, TASK_STATUSES.map((s) => s.key));
@@ -123,6 +137,11 @@ export default function TasksPanel() {
         addLabel="Add Task"
         onAdd={openAdd}
         addDisabled={initiatives.length === 0}
+        onBulkUpload={() => {
+          setBulkInitiativeId(initiatives[0]?.id || '');
+          setBulk(true);
+        }}
+        bulkDisabled={initiatives.length === 0}
         viewMode={view}
         onViewChange={setView}
         viewModes={['tiles', 'list', 'board']}
@@ -258,6 +277,110 @@ export default function TasksPanel() {
             }}
           />
         </Modal>
+      )}
+
+      {bulk && (
+        <CsvImportModal
+          title="Bulk Upload Tasks"
+          headers={TASK_HEADERS}
+          exampleRow={{
+            Name: 'Draft go-live email',
+            Description: 'First draft for all impacted teams',
+            Assignee: 'Alex Rivera',
+            'Project Team': 'Change Core',
+            Status: 'backlog',
+            Priority: 'medium',
+            'Effort Estimate': '2 days',
+            'Start Date': '2026-09-01',
+            'Finish Date': '2026-09-05',
+            Sprint: 'Sprint 12',
+            PI: 'PI 3',
+          }}
+          templateFilename="tasks-template.csv"
+          onClose={() => setBulk(false)}
+          canImport={Boolean(bulkInitiativeId)}
+          disabledReason="Select an Initiative for this import."
+          preamble={(
+            <div className="mb-4">
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: C.sub }}>Initiative</label>
+              <select
+                className={inputClass}
+                style={inputStyle}
+                value={bulkInitiativeId}
+                onChange={(e) => setBulkInitiativeId(e.target.value)}
+              >
+                <option value="">Select initiative…</option>
+                {initiatives.map((i) => (
+                  <option key={i.id} value={i.id}>{i.name}</option>
+                ))}
+              </select>
+              <p className="text-[11px] mt-1.5" style={{ color: C.sub }}>
+                All rows import into this Initiative (not included as a CSV column).
+              </p>
+            </div>
+          )}
+          onComplete={async () => { await reload(); }}
+          mapRow={(row) => {
+            const name = row.Name;
+            if (!name) throw new Error('Name is required');
+            const status = requireEnum(
+              row.Status,
+              ['backlog', 'ready', 'in_progress', 'blocked', 'done'],
+              { field: 'Status', defaultValue: 'backlog' },
+            );
+            let priority = null;
+            if (String(row.Priority || '').trim()) {
+              priority = requireEnum(row.Priority, ['low', 'medium', 'high'], { field: 'Priority' });
+            }
+            let assigneeId = null;
+            if (String(row.Assignee || '').trim()) {
+              const person = findPerson(people, row.Assignee);
+              if (!person) throw new Error(`Assignee '${row.Assignee}' not found`);
+              if (person.ambiguous) throw new Error(person.reason || `Multiple people match '${row.Assignee}'`);
+              assigneeId = person.id;
+            }
+            let projectTeamId = null;
+            if (String(row['Project Team'] || '').trim()) {
+              const team = findByName(teams, row['Project Team']);
+              if (!team) throw new Error(`Project Team '${row['Project Team']}' not found`);
+              if (team.ambiguous) throw new Error(`Multiple project teams named '${row['Project Team']}'`);
+              projectTeamId = team.id;
+            }
+            return {
+              name: name.trim(),
+              description: row.Description || null,
+              assigneeId,
+              projectTeamId,
+              status,
+              priority,
+              effortEstimate: row['Effort Estimate'] || null,
+              startDate: parseImportDate(row['Start Date']),
+              finishDate: parseImportDate(row['Finish Date']),
+              sprint: row.Sprint || null,
+              pi: row.PI || null,
+            };
+          }}
+          importRow={async (vals) => {
+            const { error } = await supabase.from('tasks').insert({
+              account_id: profile.account_id,
+              workspace_id: activeWorkspaceId,
+              initiative_id: bulkInitiativeId,
+              name: vals.name,
+              description: vals.description,
+              assignee_id: vals.assigneeId,
+              project_team_id: vals.projectTeamId,
+              status: vals.status,
+              priority: vals.priority,
+              effort_estimate: vals.effortEstimate,
+              start_date: vals.startDate,
+              finish_date: vals.finishDate,
+              sprint: vals.sprint,
+              pi: vals.pi,
+              updated_at: new Date().toISOString(),
+            });
+            if (error) throw new Error(parseDbError(error));
+          }}
+        />
       )}
     </ListPageShell>
   );

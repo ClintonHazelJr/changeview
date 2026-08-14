@@ -1,9 +1,13 @@
 import { useMemo, useState } from 'react';
 import { FilePenLine, BadgeCheck, Ban } from 'lucide-react';
-import { SEVERITY_COLOR } from '../../lib/constants';
+import { SEVERITY_COLOR, parseDbError, C, inputClass, inputStyle } from '../../lib/constants';
+import { supabase } from '../../lib/supabase';
 import { useRequirements } from '../../hooks/useRequirements';
 import { useAdminData } from '../../hooks/useAdminData';
+import { useAuth } from '../../contexts/AuthContext';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
 import Modal from '../ui/Modal';
+import CsvImportModal from '../ui/CsvImportModal';
 import { FormRequirement } from '../forms/AdminForms';
 import ListTable from '../ui/ListTable';
 import StatusPill from '../ui/StatusPill';
@@ -11,6 +15,7 @@ import {
   ListPageShell, ListTopBar, StatusFilterRow, GroupSection, CompactListCard,
   ListBody, countByStatus, statusColor,
 } from '../ui/ListChrome';
+import { findPerson, requireEnum } from '../../lib/csvImport';
 
 const STATUSES = [
   { key: 'draft', label: 'Draft', icon: FilePenLine },
@@ -18,13 +23,19 @@ const STATUSES = [
   { key: 'rejected', label: 'Rejected', icon: Ban },
 ];
 
+const REQ_HEADERS = ['Description', 'Status', 'Priority', 'Author', 'Business Approver'];
+
 export default function RequirementsPanel() {
-  const { requirements, initiatives, people, impacts, tasks, saveRequirement } = useRequirements();
+  const { requirements, initiatives, people, impacts, tasks, saveRequirement, reload } = useRequirements();
   const { departments } = useAdminData();
+  const { profile } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
   const [modal, setModal] = useState(null);
   const [editing, setEditing] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [viewMode, setViewMode] = useState('tiles');
+  const [bulk, setBulk] = useState(false);
+  const [bulkInitiativeId, setBulkInitiativeId] = useState('');
 
   const initiativeName = (id) => initiatives.find((i) => i.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '';
@@ -99,6 +110,11 @@ export default function RequirementsPanel() {
         addLabel="Add Requirement"
         onAdd={openAdd}
         addDisabled={initiatives.length === 0}
+        onBulkUpload={() => {
+          setBulkInitiativeId(initiatives[0]?.id || '');
+          setBulk(true);
+        }}
+        bulkDisabled={initiatives.length === 0}
         viewMode={viewMode}
         onViewChange={setViewMode}
       />
@@ -167,6 +183,86 @@ export default function RequirementsPanel() {
             }}
           />
         </Modal>
+      )}
+
+      {bulk && (
+        <CsvImportModal
+          title="Bulk Upload Requirements"
+          headers={REQ_HEADERS}
+          exampleRow={{
+            Description: 'Update SOP for new CRM login',
+            Status: 'draft',
+            Priority: 'medium',
+            Author: 'Alex Rivera',
+            'Business Approver': 'Sam Chen',
+          }}
+          templateFilename="requirements-template.csv"
+          onClose={() => setBulk(false)}
+          canImport={Boolean(bulkInitiativeId)}
+          disabledReason="Select an Initiative for this import."
+          preamble={(
+            <div className="mb-4">
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: C.sub }}>Initiative</label>
+              <select
+                className={inputClass}
+                style={inputStyle}
+                value={bulkInitiativeId}
+                onChange={(e) => setBulkInitiativeId(e.target.value)}
+              >
+                <option value="">Select initiative…</option>
+                {initiatives.map((i) => (
+                  <option key={i.id} value={i.id}>{i.name}</option>
+                ))}
+              </select>
+              <p className="text-[11px] mt-1.5" style={{ color: C.sub }}>
+                All rows import into this Initiative (not included as a CSV column).
+              </p>
+            </div>
+          )}
+          onComplete={async () => { await reload(); }}
+          mapRow={(row) => {
+            const description = row.Description;
+            if (!description) throw new Error('Description is required');
+            const status = requireEnum(row.Status, ['draft', 'approved', 'rejected'], {
+              field: 'Status',
+              defaultValue: 'draft',
+            });
+            let priority = null;
+            if (String(row.Priority || '').trim()) {
+              priority = requireEnum(row.Priority, ['low', 'medium', 'high'], { field: 'Priority' });
+            }
+            let authorId = null;
+            if (String(row.Author || '').trim()) {
+              const person = findPerson(people, row.Author);
+              if (!person) throw new Error(`Author '${row.Author}' not found`);
+              if (person.ambiguous) throw new Error(person.reason || `Multiple people match '${row.Author}'`);
+              authorId = person.id;
+            }
+            let approverId = null;
+            if (String(row['Business Approver'] || '').trim()) {
+              const person = findPerson(people, row['Business Approver']);
+              if (!person) throw new Error(`Business Approver '${row['Business Approver']}' not found`);
+              if (person.ambiguous) {
+                throw new Error(person.reason || `Multiple people match '${row['Business Approver']}'`);
+              }
+              approverId = person.id;
+            }
+            return { description, status, priority, authorId, approverId };
+          }}
+          importRow={async (vals) => {
+            const { error } = await supabase.from('requirements').insert({
+              account_id: profile.account_id,
+              workspace_id: activeWorkspaceId,
+              initiative_id: bulkInitiativeId,
+              description: vals.description,
+              status: vals.status,
+              priority: vals.priority,
+              author_id: vals.authorId,
+              business_approver_id: vals.approverId,
+            });
+            if (error) throw new Error(parseDbError(error));
+          }}
+        />
       )}
     </ListPageShell>
   );
