@@ -140,15 +140,6 @@ export default function LandingPage() {
             <div className="cta-row">
               <Link className="btn btn-red" to="/signup?plan=solo&billing=monthly">Start free</Link>
             </div>
-            <span className="micro">No credit card · 14-day trial · Rolls out in a week</span>
-          </div>
-          <div className="shot">
-            <img
-              src="/assets/changeview_dashboard_hero.png"
-              alt="ChangeView dashboard showing initiatives and workspace stats"
-              width="1160"
-              height="620"
-            />
           </div>
         </div>
       </header>
