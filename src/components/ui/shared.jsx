@@ -64,13 +64,13 @@ export function SaveRow({ label = 'Save', disabled, onDelete }) {
   );
 }
 
-export function ListCard({ icon: Icon, color, title, subtitle, tag }) {
-  return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border flex items-center gap-3" style={{ borderColor: C.border }}>
+export function ListCard({ icon: Icon, color, title, subtitle, tag, onClick }) {
+  const body = (
+    <>
       <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: color + '18' }}>
         <Icon size={16} style={{ color }} />
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 text-left">
         <div className="text-sm font-bold truncate" style={{ color: C.ink }}>{title}</div>
         {subtitle && <div className="text-xs truncate" style={{ color: C.sub }}>{subtitle}</div>}
       </div>
@@ -79,6 +79,23 @@ export function ListCard({ icon: Icon, color, title, subtitle, tag }) {
           {tag}
         </span>
       )}
+    </>
+  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="bg-white rounded-2xl p-4 shadow-sm border flex items-center gap-3 w-full hover:brightness-[0.99]"
+        style={{ borderColor: C.border }}
+      >
+        {body}
+      </button>
+    );
+  }
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm border flex items-center gap-3" style={{ borderColor: C.border }}>
+      {body}
     </div>
   );
 }

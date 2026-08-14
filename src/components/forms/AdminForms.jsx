@@ -37,11 +37,12 @@ export function FormOrg({ onSave }) {
   );
 }
 
-export function FormDepartment({ orgs, onSave }) {
-  const [orgId, setOrgId] = useState(orgs[0]?.id || '');
-  const [name, setName] = useState('');
-  const [location, setLocation] = useState('');
+export function FormDepartment({ orgs, initial, onSave }) {
+  const [orgId, setOrgId] = useState(initial?.org_id || orgs[0]?.id || '');
+  const [name, setName] = useState(initial?.name || '');
+  const [location, setLocation] = useState(initial?.location || '');
   const [error, setError] = useState('');
+  const editing = Boolean(initial?.id);
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
@@ -52,10 +53,10 @@ export function FormDepartment({ orgs, onSave }) {
           {orgs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </Field>
-      <Field label="Department"><input className={inputClass} style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Operations" /></Field>
+      <Field label="Department"><input className={inputClass} style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Operations" autoFocus /></Field>
       <Field label="Location"><input className={inputClass} style={inputStyle} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. 123 Anytown US" /></Field>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow />
+      <SaveRow label={editing ? 'Save changes' : 'Save'} />
     </form>
   );
 }

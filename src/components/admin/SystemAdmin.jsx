@@ -27,11 +27,12 @@ export default function SystemAdmin({
   const { profile } = useAuth();
   const {
     orgs, departments, people, teams,
-    addOrg, addDepartment, addPerson, updatePerson, setPersonActive, addTeam, addTeamMember, reload,
+    addOrg, addDepartment, updateDepartment, addPerson, updatePerson, setPersonActive, addTeam, addTeamMember, reload,
   } = useAdminData();
   const [adminTab, setAdminTab] = useState(initialTab || 'org');
   const [modal, setModal] = useState(null);
   const [editingPerson, setEditingPerson] = useState(null);
+  const [editingDepartment, setEditingDepartment] = useState(null);
   const [busyPersonId, setBusyPersonId] = useState(null);
   const [bulk, setBulk] = useState(null);
   const [expandedTeam, setExpandedTeam] = useState(null);
@@ -68,6 +69,20 @@ export default function SystemAdmin({
     setModal(null);
     setEditingPerson(null);
   };
+
+  const openAddDepartment = () => {
+    setEditingDepartment(null);
+    setModal('department');
+  };
+  const openEditDepartment = (d) => {
+    setEditingDepartment(d);
+    setModal('department');
+  };
+  const closeDepartmentModal = () => {
+    setModal(null);
+    setEditingDepartment(null);
+  };
+
   const togglePersonActive = async (p) => {
     const next = !personIsActive(p);
     if (!next && !window.confirm(`Deactivate ${p.name}? They will no longer appear in assign-to pickers.`)) return;
@@ -170,7 +185,7 @@ export default function SystemAdmin({
           <TabSection
             title="Department"
             subtitle="Departments sit under an Org and tag who's impacted on every Impact record."
-            onAdd={() => setModal('department')}
+            onAdd={openAddDepartment}
             addLabel="Add Department"
             onBulkUpload={() => setBulk('departments')}
             color={C.teal}
@@ -196,10 +211,23 @@ export default function SystemAdmin({
                   { key: 'location', label: 'Location', sortable: true, render: (d) => d.location || '—' },
                 ]}
                 rows={departments}
+                onRowClick={openEditDepartment}
                 initialSortKey="name"
               />
             ) : (
-              <div className="grid grid-cols-2 gap-3">{departments.map((d) => <ListCard key={d.id} icon={MapPin} color={C.teal} title={d.name} subtitle={orgs.find((c) => c.id === d.org_id)?.name} tag={d.location} />)}</div>
+              <div className="grid grid-cols-2 gap-3">
+                {departments.map((d) => (
+                  <ListCard
+                    key={d.id}
+                    icon={MapPin}
+                    color={C.teal}
+                    title={d.name}
+                    subtitle={orgs.find((c) => c.id === d.org_id)?.name}
+                    tag={d.location}
+                    onClick={() => openEditDepartment(d)}
+                  />
+                ))}
+              </div>
             )}
           </TabSection>
         )}
@@ -412,7 +440,19 @@ export default function SystemAdmin({
       </div>
 
       {modal === 'org' && <Modal title="Add Org" onClose={() => setModal(null)}><FormOrg onSave={async (n) => { await addOrg(n); setModal(null); }} /></Modal>}
-      {modal === 'department' && <Modal title="Add Department" onClose={() => setModal(null)}><FormDepartment orgs={orgs} onSave={async (d) => { await addDepartment(d); setModal(null); }} /></Modal>}
+      {modal === 'department' && (
+        <Modal title={editingDepartment ? 'Edit Department' : 'Add Department'} onClose={closeDepartmentModal}>
+          <FormDepartment
+            orgs={orgs}
+            initial={editingDepartment}
+            onSave={async (d) => {
+              if (editingDepartment) await updateDepartment(editingDepartment.id, d);
+              else await addDepartment(d);
+              closeDepartmentModal();
+            }}
+          />
+        </Modal>
+      )}
       {modal === 'people' && (
         <Modal title={editingPerson ? 'Edit Person' : 'Add Person'} onClose={closePersonModal}>
           <FormPerson

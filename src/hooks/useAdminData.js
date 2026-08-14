@@ -60,6 +60,19 @@ export function useAdminData() {
     await load();
   };
 
+  const updateDepartment = async (id, { orgId, name, location }) => {
+    const { error } = await supabase
+      .from('departments')
+      .update({
+        org_id: orgId,
+        name,
+        location: location || null,
+      })
+      .eq('id', id);
+    if (error) throw error;
+    await load();
+  };
+
   const addPerson = async ({ departmentId, name, title, email }) => {
     const { error } = await supabase.from('people').insert({
       account_id: accountId,
@@ -115,6 +128,6 @@ export function useAdminData() {
 
   return {
     orgs, departments, people, teams, loading, reload: load,
-    addOrg, addDepartment, addPerson, updatePerson, setPersonActive, addTeam, addTeamMember,
+    addOrg, addDepartment, updateDepartment, addPerson, updatePerson, setPersonActive, addTeam, addTeamMember,
   };
 }
