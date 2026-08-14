@@ -1,8 +1,6 @@
-import Stripe from 'stripe';
 import { adminClient, setCors, requireAccountOwner, banAuthUser } from './_adminAuth.js';
 import { wipeAccountWorkspaces } from './_accountWipe.js';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+import { createStripeClient } from './_stripeClient.js';
 
 /**
  * Owner-only: cancel Stripe, ban all users, soft-delete account, wipe workspaces.
@@ -48,6 +46,7 @@ export default async function handler(req, res) {
   // 1) Cancel Stripe subscription (if any).
   if (sub?.stripe_subscription_id && process.env.STRIPE_SECRET_KEY) {
     try {
+      const stripe = createStripeClient(process.env.STRIPE_SECRET_KEY);
       await stripe.subscriptions.cancel(sub.stripe_subscription_id);
     } catch (err) {
       const msg = String(err?.message || '');

@@ -1,5 +1,5 @@
-import Stripe from 'stripe';
 import { adminClient } from './_adminAuth.js';
+import { createStripeClient } from './_stripeClient.js';
 import {
   resolvePriceId, priceEnvHint, MARKETING_TO_DB, DB_TO_MARKETING,
 } from './_stripePlans.js';
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
 
-  const stripe = new Stripe(secretKey);
+  const stripe = createStripeClient(secretKey);
 
   const { tier: rawTier, billingCycle = 'monthly' } = req.body || {};
   const tier = TIER_ALIASES[rawTier];

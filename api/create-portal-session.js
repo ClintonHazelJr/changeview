@@ -1,7 +1,5 @@
-import Stripe from 'stripe';
 import { adminClient, setCors, requireAccountOwner } from './_adminAuth.js';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+import { createStripeClient } from './_stripeClient.js';
 
 /**
  * Stripe Customer Portal — used when status is past_due so the owner can update their card.
@@ -14,6 +12,8 @@ export default async function handler(req, res) {
   if (!process.env.STRIPE_SECRET_KEY) {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
+
+  const stripe = createStripeClient(process.env.STRIPE_SECRET_KEY);
 
   const admin = adminClient();
   if (!admin) {

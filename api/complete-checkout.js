@@ -1,10 +1,8 @@
-import Stripe from 'stripe';
 import { adminClient, setCors, requireAccountOwner } from './_adminAuth.js';
+import { createStripeClient, subscriptionPeriodEndUnix } from './_stripeClient.js';
 import {
   planFromPriceId, MARKETING_TO_DB, unixToDateString, unixToIso, mapStripeSubscriptionStatus,
 } from './_stripePlans.js';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 /**
  * Optimistic sync after Checkout redirect.
@@ -23,6 +21,8 @@ export default async function handler(req, res) {
   if (!process.env.STRIPE_SECRET_KEY) {
     return res.status(500).json({ error: 'Stripe not configured' });
   }
+
+  const stripe = createStripeClient(process.env.STRIPE_SECRET_KEY);
 
   const { caller, error: authError } = await requireAccountOwner(admin, req);
   if (authError) return res.status(authError.status).json({ error: authError.message });
@@ -83,7 +83,7 @@ export default async function handler(req, res) {
         : (stripeSub.trial_end ? unixToIso(stripeSub.trial_end) : null),
       stripe_customer_id: stripeCustomerId,
       stripe_subscription_id: stripeSub.id,
-      current_period_end: unixToDateString(stripeSub.current_period_end),
+      current_period_end: unixToDateString(subscriptionPeriodEndUnix(stripeSub)),
       updated_at: new Date().toISOString(),
     })
     .eq('account_id', caller.account_id);

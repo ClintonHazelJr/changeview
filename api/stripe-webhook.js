@@ -1,5 +1,5 @@
-import Stripe from 'stripe';
 import { adminClient } from './_adminAuth.js';
+import { createStripeClient, subscriptionPeriodEndUnix } from './_stripeClient.js';
 import {
   planFromPriceId,
   mapStripeSubscriptionStatus,
@@ -7,8 +7,6 @@ import {
   unixToIso,
   MARKETING_TO_DB,
 } from './_stripePlans.js';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 /** Required so Stripe signature verification sees the exact raw body. */
 export const config = {
@@ -88,7 +86,7 @@ function patchFromStripeSubscription(subscription, extras = {}) {
   const patch = {
     stripe_subscription_id: subscription.id,
     stripe_customer_id: customerIdFrom(subscription) || extras.stripeCustomerId || null,
-    current_period_end: unixToDateString(subscription.current_period_end),
+    current_period_end: unixToDateString(subscriptionPeriodEndUnix(subscription)),
     trial_ends_at: subscription.trial_end ? unixToIso(subscription.trial_end) : null,
     ...extras.extraPatch,
   };
@@ -107,7 +105,7 @@ function patchFromStripeSubscription(subscription, extras = {}) {
   return patch;
 }
 
-async function handleCheckoutCompleted(admin, session) {
+async function handleCheckoutCompleted(stripe, admin, session) {
   const accountId = session.metadata?.account_id || session.client_reference_id;
   if (!accountId) {
     console.warn('checkout.session.completed missing account_id metadata');
@@ -169,7 +167,7 @@ async function handleSubscriptionDeleted(admin, subscription) {
     status: 'cancelled',
     stripe_subscription_id: subscription.id,
     stripe_customer_id: customerIdFrom(subscription) || row.stripe_customer_id,
-    current_period_end: unixToDateString(subscription.current_period_end) || row.current_period_end,
+    current_period_end: unixToDateString(subscriptionPeriodEndUnix(subscription)) || row.current_period_end,
     trial_ends_at: null,
   });
 }
@@ -205,6 +203,8 @@ export default async function handler(req, res) {
     return res.status(500).send('STRIPE_WEBHOOK_SECRET not configured');
   }
 
+  const stripe = createStripeClient(process.env.STRIPE_SECRET_KEY);
+
   const admin = adminClient();
   if (!admin) {
     return res.status(500).send('Supabase service role not configured');
@@ -230,7 +230,7 @@ export default async function handler(req, res) {
   try {
     switch (event.type) {
       case 'checkout.session.completed':
-        await handleCheckoutCompleted(admin, event.data.object);
+        await handleCheckoutCompleted(stripe, admin, event.data.object);
         break;
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
