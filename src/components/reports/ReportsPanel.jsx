@@ -4,7 +4,6 @@ import { C, HEAD, BODY, SEVERITY_COLOR, STATUS_COLOR, tint, isRatedSeverity, str
 import { supabase } from '../../lib/supabase';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { exportElementToPdf } from '../../lib/exportReportPdf';
-import ScheduleGantt, { ScheduleLegend } from '../schedule/ScheduleGantt';
 
 const SEV_SCORE = { none: 0, low: 1, medium: 2, high: 3 };
 const SEV_COLS = [
@@ -43,12 +42,25 @@ const REPORTS = [
   {
     key: 'schedule',
     title: 'Schedule Report',
-    desc: 'Same Gantt as Schedule — Program → Initiative → Task bars with Go Live and Comms markers.',
+    desc: 'Dated Program → Initiative → Task / Hypercare timeline with Comms and go-live milestones.',
     icon: CalendarRange,
     color: C.navy,
     file: 'schedule-report.pdf',
   },
 ];
+
+function formatReportDate(value) {
+  if (!value) return '—';
+  const d = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function dateRangeLabel(start, end) {
+  if (!start && !end) return 'No dates set';
+  if (start && end) return `${formatReportDate(start)} → ${formatReportDate(end)}`;
+  return formatReportDate(start || end);
+}
 
 /** Discrete traffic-light buckets from average severity (0–3 scale). */
 function heatMapCellStyle(avg) {
@@ -61,7 +73,7 @@ function heatMapCellStyle(avg) {
   return { background, color };
 }
 
-function ExportBar({ exportRef, filename, disabled, pdfOptions }) {
+function ExportBar({ exportRef, filename, disabled }) {
   const [busy, setBusy] = useState(false);
   return (
     <button
@@ -71,7 +83,7 @@ function ExportBar({ exportRef, filename, disabled, pdfOptions }) {
         if (!exportRef?.current) return;
         setBusy(true);
         try {
-          await exportElementToPdf(exportRef.current, filename, pdfOptions);
+          await exportElementToPdf(exportRef.current, filename);
         } catch (err) {
           alert(err.message || 'Export failed');
         } finally {
@@ -659,43 +671,79 @@ function ScheduleReport({ workspaceId, workspaceName, exportRef }) {
   const [comms, setComms] = useState([]);
   const [hypercareRows, setHypercareRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      setLoadError('');
-      try {
-        const [p, i, t, c, h] = await Promise.all([
-          supabase.from('programs').select('*').eq('workspace_id', workspaceId).order('name'),
-          supabase.from('initiatives').select('*').eq('workspace_id', workspaceId).order('name'),
-          supabase.from('tasks').select('*').eq('workspace_id', workspaceId).order('name'),
-          supabase.from('comms').select('id, initiative_id, delivery_date, key_message').eq('workspace_id', workspaceId).order('delivery_date'),
-          supabase.from('hypercare').select('id, initiative_id, start_date, end_date').eq('workspace_id', workspaceId),
-        ]);
-        if (cancelled) return;
-        if (p.error) throw new Error(p.error.message);
-        if (i.error) throw new Error(i.error.message);
-        if (t.error) throw new Error(t.error.message);
-        if (c.error) throw new Error(c.error.message);
-        if (h.error) throw new Error(h.error.message);
-        setPrograms(p.data || []);
-        setInitiatives(i.data || []);
-        setTasks(t.data || []);
-        setComms(c.data || []);
-        setHypercareRows(h.data || []);
-      } catch (err) {
-        if (!cancelled) setLoadError(err.message || 'Could not load schedule');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+      const [p, i, t, c, h] = await Promise.all([
+        supabase.from('programs').select('id, name, start_date, proposed_go_live_date').eq('workspace_id', workspaceId).order('name'),
+        supabase.from('initiatives').select('id, name, start_date, proposed_go_live_date, program_id').eq('workspace_id', workspaceId).order('name'),
+        supabase.from('tasks').select('id, name, start_date, finish_date, initiative_id').eq('workspace_id', workspaceId).order('name'),
+        supabase.from('comms').select('id, initiative_id, delivery_date, key_message').eq('workspace_id', workspaceId).order('delivery_date'),
+        supabase.from('hypercare').select('id, initiative_id, start_date, end_date, duration').eq('workspace_id', workspaceId),
+      ]);
+      if (cancelled) return;
+      setPrograms(p.data || []);
+      setInitiatives(i.data || []);
+      setTasks(t.data || []);
+      setComms(c.data || []);
+      setHypercareRows(h.data || []);
+      setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [workspaceId]);
 
+  const sections = useMemo(() => {
+    const initsByProgram = new Map();
+    const orphans = [];
+    initiatives.forEach((init) => {
+      if (!init.program_id) {
+        orphans.push(init);
+        return;
+      }
+      if (!initsByProgram.has(init.program_id)) initsByProgram.set(init.program_id, []);
+      initsByProgram.get(init.program_id).push(init);
+    });
+    const tasksByInit = new Map();
+    tasks.forEach((task) => {
+      if (!task.initiative_id) return;
+      if (!tasksByInit.has(task.initiative_id)) tasksByInit.set(task.initiative_id, []);
+      tasksByInit.get(task.initiative_id).push(task);
+    });
+    const hcByInit = new Map();
+    hypercareRows.forEach((h) => {
+      if (h.initiative_id) hcByInit.set(h.initiative_id, h);
+    });
+    const commsByInit = new Map();
+    comms.forEach((c) => {
+      if (!c.initiative_id) return;
+      if (!commsByInit.has(c.initiative_id)) commsByInit.set(c.initiative_id, []);
+      commsByInit.get(c.initiative_id).push(c);
+    });
+
+    const buildInitBlock = (init) => ({
+      init,
+      tasks: tasksByInit.get(init.id) || [],
+      hypercare: hcByInit.get(init.id) || null,
+      comms: (commsByInit.get(init.id) || []).slice().sort((a, b) => String(a.delivery_date || '').localeCompare(String(b.delivery_date || ''))),
+    });
+
+    const blocks = programs.map((program) => ({
+      program,
+      initiatives: (initsByProgram.get(program.id) || []).map(buildInitBlock),
+    }));
+    if (orphans.length) {
+      blocks.push({
+        program: { id: 'orphan', name: 'Unassigned initiatives' },
+        initiatives: orphans.map(buildInitBlock),
+      });
+    }
+    return blocks;
+  }, [programs, initiatives, tasks, hypercareRows, comms]);
+
   if (loading) return <p className="text-sm" style={{ color: C.sub }}>Loading…</p>;
-  if (loadError) return <p className="text-sm" style={{ color: C.coral }}>{loadError}</p>;
+
   if (!programs.length && !initiatives.length) {
     return <p className="text-sm" style={{ color: C.sub }}>No programs or initiatives in this workspace yet.</p>;
   }
@@ -703,31 +751,101 @@ function ScheduleReport({ workspaceId, workspaceName, exportRef }) {
   return (
     <article
       ref={exportRef}
-      className="bg-white rounded-3xl border shadow-sm p-6 w-full"
-      style={{ borderColor: C.border, overflow: 'visible' }}
+      className="bg-white rounded-3xl border shadow-sm p-10 max-w-3xl"
+      style={{ borderColor: C.border }}
     >
-      <header className="border-b pb-4 mb-4" style={{ borderColor: C.border }}>
+      <header className="border-b pb-5 mb-8" style={{ borderColor: C.border }}>
         <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: C.sub }}>
           ChangeView · Schedule Report
         </div>
-        <h3 className="text-2xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
+        <h3 className="text-2xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>
           {workspaceName || 'Workspace'} timeline
         </h3>
-        <p className="text-xs mb-3" style={{ color: C.sub }}>Prepared {new Date().toLocaleDateString()}</p>
-        <ScheduleLegend />
+        <p className="text-xs" style={{ color: C.sub }}>Prepared {new Date().toLocaleDateString()}</p>
       </header>
 
-      <ScheduleGantt
-        programs={programs}
-        initiatives={initiatives}
-        tasks={tasks}
-        comms={comms}
-        hypercareRows={hypercareRows}
-        expandAll
-        interactive={false}
-        overflowVisible
-        className="shadow-none"
-      />
+      <div className="space-y-8">
+        {sections.map(({ program, initiatives: initBlocks }) => (
+          <section key={program.id}>
+            <h4 className="text-lg font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
+              Program · {program.name}
+            </h4>
+            <p className="text-sm mb-4" style={{ color: C.sub }}>
+              {dateRangeLabel(program.start_date, program.proposed_go_live_date)}
+              {program.proposed_go_live_date ? ` · Go live ${formatReportDate(program.proposed_go_live_date)}` : ''}
+            </p>
+
+            {initBlocks.length === 0 ? (
+              <p className="text-sm pl-3" style={{ color: C.sub }}>No initiatives under this program.</p>
+            ) : (
+              <div className="space-y-5 pl-3 border-l-2" style={{ borderColor: C.border }}>
+                {initBlocks.map(({ init, tasks: initTasks, hypercare, comms: initComms }) => (
+                  <div key={init.id}>
+                    <h5 className="text-sm font-extrabold mb-1" style={{ color: C.ink }}>
+                      Initiative · {init.name}
+                    </h5>
+                    <p className="text-xs mb-2" style={{ color: C.sub }}>
+                      Timeline: {dateRangeLabel(init.start_date, init.proposed_go_live_date)}
+                    </p>
+                    {init.proposed_go_live_date && (
+                      <p className="text-xs font-semibold mb-2" style={{ color: C.navy }}>
+                        Go Live milestone: {formatReportDate(init.proposed_go_live_date)}
+                      </p>
+                    )}
+
+                    <div className="overflow-x-auto mb-3">
+                      <table className="w-full text-xs" style={{ color: C.ink }}>
+                        <thead>
+                          <tr className="text-left" style={{ color: C.sub }}>
+                            <th className="py-1.5 pr-3 font-semibold">Item</th>
+                            <th className="py-1.5 pr-3 font-semibold">Type</th>
+                            <th className="py-1.5 font-semibold">Dates</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {initTasks.map((task) => (
+                            <tr key={task.id} className="border-t" style={{ borderColor: C.border }}>
+                              <td className="py-1.5 pr-3">{task.name}</td>
+                              <td className="py-1.5 pr-3">Task</td>
+                              <td className="py-1.5">{dateRangeLabel(task.start_date, task.finish_date)}</td>
+                            </tr>
+                          ))}
+                          {hypercare && (
+                            <tr className="border-t" style={{ borderColor: C.border }}>
+                              <td className="py-1.5 pr-3">Hypercare</td>
+                              <td className="py-1.5 pr-3">Hypercare</td>
+                              <td className="py-1.5">
+                                {dateRangeLabel(hypercare.start_date, hypercare.end_date)}
+                                {hypercare.duration ? ` (${hypercare.duration})` : ''}
+                              </td>
+                            </tr>
+                          )}
+                          {initComms.map((c) => (
+                            <tr key={c.id} className="border-t" style={{ borderColor: C.border }}>
+                              <td className="py-1.5 pr-3">{c.key_message || 'Untitled comms'}</td>
+                              <td className="py-1.5 pr-3">Comms</td>
+                              <td className="py-1.5">
+                                {c.delivery_date ? `Delivery ${formatReportDate(c.delivery_date)}` : 'No delivery date'}
+                              </td>
+                            </tr>
+                          ))}
+                          {!initTasks.length && !hypercare && !initComms.length && (
+                            <tr className="border-t" style={{ borderColor: C.border }}>
+                              <td className="py-1.5" colSpan={3} style={{ color: C.sub }}>
+                                No tasks, hypercare, or comms yet.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        ))}
+      </div>
     </article>
   );
 }
@@ -787,11 +905,7 @@ export default function ReportsPanel() {
               <ArrowLeft size={14} /> All reports
             </button>
             <div className="flex-1" />
-            <ExportBar
-              exportRef={exportRef}
-              filename={meta?.file || 'report.pdf'}
-              pdfOptions={active === 'schedule' ? { orientation: 'landscape', format: 'a4' } : undefined}
-            />
+            <ExportBar exportRef={exportRef} filename={meta?.file || 'report.pdf'} />
           </div>
           <h2 className="text-xl font-extrabold mb-4" style={{ ...HEAD, color: C.ink }}>
             {meta?.title}
