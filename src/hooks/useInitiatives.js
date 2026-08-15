@@ -28,7 +28,7 @@ export function useInitiatives() {
         .order('updated_at', { ascending: false }),
       supabase
         .from('programs')
-        .select('id, name, organization_id, archived_at')
+        .select('*')
         .eq('workspace_id', ws)
         .order('name'),
     ]);

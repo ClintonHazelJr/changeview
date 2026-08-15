@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarRange, ChevronDown, ChevronRight } from 'lucide-react';
-import { C, HEAD, BODY, tint } from '../../lib/constants';
+import { C, HEAD, BODY, tint, isArchivedRecord } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { usePrograms } from '../../hooks/usePrograms';
+import { useInitiatives } from '../../hooks/useInitiatives';
+import { useTasks } from '../../hooks/useTasks';
 
 function parseDate(value) {
   if (!value) return null;
@@ -53,75 +56,66 @@ const COLOR_GO_LIVE = C.navy;
 const COLOR_COMMS = C.blue4;
 
 export default function SchedulePanel({ onOpenRecord }) {
-  const { activeWorkspace, activeWorkspaceId } = useWorkspace();
-  const [programs, setPrograms] = useState([]);
-  const [initiatives, setInitiatives] = useState([]);
-  const [tasks, setTasks] = useState([]);
+  const { activeWorkspace, activeWorkspaceId, loading: workspaceLoading } = useWorkspace();
+  const { programs, loading: programsLoading } = usePrograms();
+  const { initiatives, loading: initiativesLoading } = useInitiatives();
+  const { tasks, loading: tasksLoading } = useTasks();
   const [comms, setComms] = useState([]);
   const [hypercareRows, setHypercareRows] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [extrasLoading, setExtrasLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   /** Collapsed Program / Initiative ids. Empty = all expanded. */
   const [collapsed, setCollapsed] = useState(() => new Set());
 
+  // Comms + Hypercare aren't covered by the shared list hooks — load them once the workspace is ready.
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (workspaceLoading) return;
       if (!activeWorkspaceId) {
-        setPrograms([]);
-        setInitiatives([]);
-        setTasks([]);
         setComms([]);
         setHypercareRows([]);
-        setLoading(false);
+        setExtrasLoading(false);
+        setLoadError('');
         return;
       }
-      setLoading(true);
-      const [
-        { data: prog },
-        { data: inits },
-        { data: taskRows },
-        { data: commsRows },
-        { data: hcRows },
-      ] = await Promise.all([
-        supabase
-          .from('programs')
-          .select('id, name, start_date, proposed_go_live_date, archived_at')
-          .eq('workspace_id', activeWorkspaceId)
-          .order('name'),
-        supabase
-          .from('initiatives')
-          .select('id, name, start_date, proposed_go_live_date, program_id, archived_at')
-          .eq('workspace_id', activeWorkspaceId)
-          .order('name'),
-        supabase
-          .from('tasks')
-          .select('id, name, start_date, finish_date, initiative_id')
-          .eq('workspace_id', activeWorkspaceId)
-          .order('name'),
-        supabase
-          .from('comms')
-          .select('id, initiative_id, delivery_date, key_message')
-          .eq('workspace_id', activeWorkspaceId)
-          .order('delivery_date'),
-        supabase
-          .from('hypercare')
-          .select('id, initiative_id, start_date, end_date')
-          .eq('workspace_id', activeWorkspaceId),
-      ]);
-      if (cancelled) return;
-      setPrograms(prog || []);
-      setInitiatives(inits || []);
-      setTasks(taskRows || []);
-      setComms(commsRows || []);
-      setHypercareRows(hcRows || []);
-      setLoading(false);
+      setExtrasLoading(true);
+      setLoadError('');
+      try {
+        const [commsRes, hcRes] = await Promise.all([
+          supabase
+            .from('comms')
+            .select('id, initiative_id, delivery_date, key_message')
+            .eq('workspace_id', activeWorkspaceId)
+            .order('delivery_date'),
+          supabase
+            .from('hypercare')
+            .select('id, initiative_id, start_date, end_date')
+            .eq('workspace_id', activeWorkspaceId),
+        ]);
+        if (cancelled) return;
+        if (commsRes.error) throw new Error(commsRes.error.message);
+        if (hcRes.error) throw new Error(hcRes.error.message);
+        setComms(commsRes.data || []);
+        setHypercareRows(hcRes.data || []);
+      } catch (err) {
+        if (!cancelled) {
+          setComms([]);
+          setHypercareRows([]);
+          setLoadError(err.message || 'Could not load schedule milestones');
+        }
+      } finally {
+        if (!cancelled) setExtrasLoading(false);
+      }
     })();
     return () => { cancelled = true; };
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, workspaceLoading]);
+
+  const loading = workspaceLoading || programsLoading || initiativesLoading || tasksLoading || extrasLoading;
 
   const treeRows = useMemo(() => {
-    const activePrograms = programs.filter((p) => !p.archived_at);
-    const activeInits = initiatives.filter((i) => !i.archived_at);
+    const activePrograms = programs.filter((p) => !isArchivedRecord(p));
+    const activeInits = initiatives.filter((i) => !isArchivedRecord(i));
     const initsByProgram = new Map();
     const orphans = [];
     activeInits.forEach((i) => {
@@ -235,11 +229,11 @@ export default function SchedulePanel({ onOpenRecord }) {
       const d = parseDate(value);
       if (d) dates.push(d);
     };
-    programs.forEach((p) => {
+    programs.filter((p) => !isArchivedRecord(p)).forEach((p) => {
       consider(p.start_date);
       consider(p.proposed_go_live_date);
     });
-    initiatives.forEach((i) => {
+    initiatives.filter((i) => !isArchivedRecord(i)).forEach((i) => {
       consider(i.start_date);
       consider(i.proposed_go_live_date);
     });
@@ -312,8 +306,7 @@ export default function SchedulePanel({ onOpenRecord }) {
     }
   };
 
-  const hasAnyItems = programs.length > 0 || initiatives.length > 0 || tasks.length > 0
-    || hypercareRows.length > 0 || comms.length > 0;
+  const hasAnyItems = treeRows.length > 0;
 
   return (
     <div className="flex-1 p-6 max-w-[1400px] w-full mx-auto overflow-hidden flex flex-col" style={BODY}>
@@ -353,6 +346,10 @@ export default function SchedulePanel({ onOpenRecord }) {
 
       {loading ? (
         <p className="text-sm" style={{ color: C.sub }}>Loading…</p>
+      ) : loadError && !hasAnyItems ? (
+        <div className="text-center py-14 bg-white rounded-3xl border border-dashed" style={{ borderColor: C.border }}>
+          <div className="text-sm" style={{ color: C.coral }}>{loadError}</div>
+        </div>
       ) : !hasAnyItems ? (
         <div className="text-center py-14 bg-white rounded-3xl border border-dashed" style={{ borderColor: C.border }}>
           <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style={{ background: tint(COLOR_PROGRAM, '16') }}>
