@@ -101,8 +101,8 @@ export default function LandingPage() {
             <img
               src="/assets/hero_real_final.png"
               alt="ChangeView dashboard showing planning, delivery, and impact severity"
-              width={1024}
-              height={461}
+              width={1734}
+              height={903}
             />
           </div>
         </div>
