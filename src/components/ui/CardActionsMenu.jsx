@@ -4,15 +4,25 @@ import { MoreVertical } from 'lucide-react';
 import { C } from '../../lib/constants';
 
 /**
- * Compact ⋮ menu for list cards: Edit, Archive/Unarchive, Delete (destructive).
+ * Compact ⋮ menu for list cards.
+ * Soft action = Archive/Unarchive or Deactivate/Reactivate.
+ * Delete is optional (Programs/Initiatives only).
  */
 export default function CardActionsMenu({
-  archived = false,
   busy = false,
   onEdit,
+  softLabel,
+  onSoft,
+  // Backward-compatible Program/Initiative API
+  archived = false,
   onArchive,
   onDelete,
+  deleteLabel = 'Delete',
 }) {
+  const resolvedSoftLabel = softLabel
+    ?? (onArchive ? (archived ? 'Unarchive' : 'Archive') : null);
+  const resolvedOnSoft = onSoft ?? onArchive;
+
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
   const rootRef = useRef(null);
@@ -95,35 +105,43 @@ export default function CardActionsMenu({
             borderColor: C.border,
           }}
         >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={run(onEdit)}
-            className="w-full text-left text-sm px-3 py-2 hover:bg-black/[0.03]"
-            style={{ color: C.ink }}
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            disabled={busy}
-            onClick={run(onArchive)}
-            className="w-full text-left text-sm px-3 py-2 hover:bg-black/[0.03] disabled:opacity-50"
-            style={{ color: C.ink }}
-          >
-            {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
-          </button>
-          <div className="my-1 border-t" style={{ borderColor: C.border }} />
-          <button
-            type="button"
-            role="menuitem"
-            onClick={run(onDelete)}
-            className="w-full text-left text-sm font-semibold px-3 py-2 hover:bg-black/[0.03]"
-            style={{ color: C.coral }}
-          >
-            Delete
-          </button>
+          {onEdit && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={run(onEdit)}
+              className="w-full text-left text-sm px-3 py-2 hover:bg-black/[0.03]"
+              style={{ color: C.ink }}
+            >
+              Edit
+            </button>
+          )}
+          {resolvedOnSoft && resolvedSoftLabel && (
+            <button
+              type="button"
+              role="menuitem"
+              disabled={busy}
+              onClick={run(resolvedOnSoft)}
+              className="w-full text-left text-sm px-3 py-2 hover:bg-black/[0.03] disabled:opacity-50"
+              style={{ color: C.ink }}
+            >
+              {busy ? '…' : resolvedSoftLabel}
+            </button>
+          )}
+          {onDelete && (
+            <>
+              <div className="my-1 border-t" style={{ borderColor: C.border }} />
+              <button
+                type="button"
+                role="menuitem"
+                onClick={run(onDelete)}
+                className="w-full text-left text-sm font-semibold px-3 py-2 hover:bg-black/[0.03]"
+                style={{ color: C.coral }}
+              >
+                {deleteLabel}
+              </button>
+            </>
+          )}
         </div>,
         document.body,
       )}

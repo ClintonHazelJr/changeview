@@ -22,7 +22,7 @@ export function usePrograms() {
     const ws = activeWorkspaceId;
     const [p, o] = await Promise.all([
       supabase.from('programs').select('*').eq('workspace_id', ws).order('created_at', { ascending: false }),
-      supabase.from('organizations').select('id, name').eq('workspace_id', ws).order('name'),
+      supabase.from('organizations').select('id, name, is_active').eq('workspace_id', ws).order('name'),
     ]);
     setPrograms(p.data || []);
     setOrgs(o.data || []);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Building2, MapPin, Users, UserCircle2, Plus, ChevronRight, Mail, Tag, UserCheck, UserX,
+  Building2, MapPin, Users, UserCircle2, Plus, ChevronRight, Mail, Tag,
 } from 'lucide-react';
 import {
   C, HEAD, BODY, tint, initials, parseDbError, isActiveRecord,
@@ -9,10 +9,13 @@ import { supabase } from '../../lib/supabase';
 import { useAdminData } from '../../hooks/useAdminData';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { ListCard, TabSection } from '../ui/shared';
+import { TabSection } from '../ui/shared';
 import ListTable from '../ui/ListTable';
 import StatusPill from '../ui/StatusPill';
 import ShowInactiveToggle from '../ui/ShowInactiveToggle';
+import CardActionsMenu from '../ui/CardActionsMenu';
+import CascadingDeactivateModal from '../ui/CascadingDeactivateModal';
+import { countOrgDeactivateImpact } from '../../lib/deleteImpactCounts';
 import Modal from '../ui/Modal';
 import CsvImportModal from '../ui/CsvImportModal';
 import { findByName } from '../../lib/csvImport';
@@ -32,17 +35,26 @@ export default function SystemAdmin({
   const { profile } = useAuth();
   const {
     orgs, departments, people, teams,
-    addOrg, addDepartment, updateDepartment, setDepartmentActive,
+    addOrg, updateOrg, setOrgActive,
+    addDepartment, updateDepartment, setDepartmentActive,
     addPerson, updatePerson, setPersonActive, addTeam, addTeamMember, reload,
   } = useAdminData();
   const [adminTab, setAdminTab] = useState(initialTab || 'org');
   const [modal, setModal] = useState(null);
+  const [editingOrg, setEditingOrg] = useState(null);
   const [editingPerson, setEditingPerson] = useState(null);
   const [editingDepartment, setEditingDepartment] = useState(null);
+  const [busyOrgId, setBusyOrgId] = useState(null);
   const [busyPersonId, setBusyPersonId] = useState(null);
   const [busyDepartmentId, setBusyDepartmentId] = useState(null);
+  const [showInactiveOrgs, setShowInactiveOrgs] = useState(false);
   const [showInactivePeople, setShowInactivePeople] = useState(false);
   const [showInactiveDepartments, setShowInactiveDepartments] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState(null);
+  const [deactivateCounts, setDeactivateCounts] = useState([]);
+  const [deactivateCountsLoading, setDeactivateCountsLoading] = useState(false);
+  const [deactivateBusy, setDeactivateBusy] = useState(false);
+  const [deactivateError, setDeactivateError] = useState('');
   const [bulk, setBulk] = useState(null);
   const [expandedTeam, setExpandedTeam] = useState(null);
   const [viewMode, setViewMode] = useState('tiles');
@@ -57,6 +69,7 @@ export default function SystemAdmin({
   useEffect(() => {
     if (!initialOpenAddOrg) return;
     setAdminTab('org');
+    setEditingOrg(null);
     setModal('org');
     onInitialOpenAddOrgConsumed?.();
   }, [initialOpenAddOrg, onInitialOpenAddOrgConsumed]);
@@ -66,19 +79,38 @@ export default function SystemAdmin({
     if (!requireOrg) return;
     if (modal === 'org') return;
     setAdminTab('org');
+    setEditingOrg(null);
     setModal('org');
   }, [requireOrg, modal]);
 
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '—';
+  const orgIsActive = (o) => isActiveRecord(o);
   const personIsActive = (p) => isActiveRecord(p);
   const departmentIsActive = (d) => isActiveRecord(d);
+  const activeOrgs = orgs.filter(orgIsActive);
+  const inactiveOrgsCount = orgs.filter((o) => !orgIsActive(o)).length;
+  const visibleOrgs = showInactiveOrgs ? orgs : activeOrgs;
   const activePeople = people.filter(personIsActive);
   const inactivePeopleCount = people.filter((p) => !personIsActive(p)).length;
   const visiblePeople = showInactivePeople ? people : activePeople;
   const activeDepartments = departments.filter(departmentIsActive);
   const inactiveDepartmentsCount = departments.filter((d) => !departmentIsActive(d)).length;
   const visibleDepartments = showInactiveDepartments ? departments : activeDepartments;
+
+  const openAddOrg = () => {
+    setEditingOrg(null);
+    setModal('org');
+  };
+  const openEditOrg = (o) => {
+    setEditingOrg(o);
+    setModal('org');
+  };
+  const closeOrgModal = () => {
+    if (requireOrg && !editingOrg) return;
+    setModal(null);
+    setEditingOrg(null);
+  };
 
   const openAddPerson = () => {
     setEditingPerson(null);
@@ -104,6 +136,57 @@ export default function SystemAdmin({
   const closeDepartmentModal = () => {
     setModal(null);
     setEditingDepartment(null);
+  };
+
+  const openDeactivateOrg = async (o) => {
+    setDeactivateError('');
+    setDeactivateTarget(o);
+    setDeactivateCounts([]);
+    setDeactivateCountsLoading(true);
+    try {
+      setDeactivateCounts(await countOrgDeactivateImpact(o.id));
+    } catch (err) {
+      setDeactivateError(err.message || 'Could not load related records');
+    } finally {
+      setDeactivateCountsLoading(false);
+    }
+  };
+
+  const closeDeactivateOrg = () => {
+    if (deactivateBusy) return;
+    setDeactivateTarget(null);
+    setDeactivateCounts([]);
+    setDeactivateError('');
+  };
+
+  const confirmDeactivateOrg = async () => {
+    if (!deactivateTarget) return;
+    setDeactivateBusy(true);
+    setDeactivateError('');
+    try {
+      await setOrgActive(deactivateTarget.id, false);
+      setDeactivateTarget(null);
+      setDeactivateCounts([]);
+    } catch (err) {
+      setDeactivateError(err.message || 'Could not deactivate org');
+    } finally {
+      setDeactivateBusy(false);
+    }
+  };
+
+  const toggleOrgActive = async (o) => {
+    if (orgIsActive(o)) {
+      await openDeactivateOrg(o);
+      return;
+    }
+    setBusyOrgId(o.id);
+    try {
+      await setOrgActive(o.id, true);
+    } catch (err) {
+      alert(err.message || 'Could not reactivate org');
+    } finally {
+      setBusyOrgId(null);
+    }
   };
 
   const togglePersonActive = async (p) => {
@@ -194,7 +277,7 @@ export default function SystemAdmin({
           <TabSection
             title="Org"
             subtitle={`Add each client company you'll run change work for inside ${activeWorkspace?.name}.`}
-            onAdd={() => setModal('org')}
+            onAdd={openAddOrg}
             addLabel="Add Org"
             color={C.purple}
             empty={orgs.length === 0}
@@ -203,17 +286,101 @@ export default function SystemAdmin({
             viewMode={viewMode}
             onViewChange={setViewMode}
           >
-            {viewMode === 'list' ? (
+            <div className="flex justify-end mb-3">
+              <ShowInactiveToggle
+                show={showInactiveOrgs}
+                onChange={setShowInactiveOrgs}
+                inactiveCount={inactiveOrgsCount}
+              />
+            </div>
+            {visibleOrgs.length === 0 ? (
+              <p className="text-sm py-6 text-center" style={{ color: C.sub }}>
+                {inactiveOrgsCount > 0
+                  ? 'No active orgs. Turn on Show inactive to find and reactivate one.'
+                  : 'No orgs yet.'}
+              </p>
+            ) : viewMode === 'list' ? (
               <ListTable
                 columns={[
                   { key: 'name', label: 'Name', sortable: true, render: (c) => <span className="font-semibold">{c.name}</span> },
                   { key: 'type', label: 'Type', render: () => 'Company' },
+                  {
+                    key: 'is_active',
+                    label: 'Status',
+                    sortable: true,
+                    sortValue: (c) => (orgIsActive(c) ? 1 : 0),
+                    render: (c) => (
+                      <StatusPill
+                        label={orgIsActive(c) ? 'Active' : 'Inactive'}
+                        color={orgIsActive(c) ? C.green : C.sub}
+                      />
+                    ),
+                  },
+                  {
+                    key: 'actions',
+                    label: '',
+                    render: (c) => (
+                      <div className="relative h-8 w-8 ml-auto">
+                        <CardActionsMenu
+                          busy={busyOrgId === c.id}
+                          onEdit={() => openEditOrg(c)}
+                          softLabel={orgIsActive(c) ? 'Deactivate' : 'Reactivate'}
+                          onSoft={() => toggleOrgActive(c)}
+                        />
+                      </div>
+                    ),
+                  },
                 ]}
-                rows={orgs}
+                rows={visibleOrgs}
+                onRowClick={openEditOrg}
                 initialSortKey="name"
               />
             ) : (
-              <div className="grid grid-cols-2 gap-3">{orgs.map((c) => <ListCard key={c.id} icon={Building2} color={C.purple} title={c.name} subtitle="Company" />)}</div>
+              <div className="grid grid-cols-2 gap-3">
+                {visibleOrgs.map((c) => {
+                  const inactive = !orgIsActive(c);
+                  return (
+                    <div
+                      key={c.id}
+                      className="relative bg-white rounded-2xl p-4 shadow-sm border"
+                      style={{
+                        borderColor: C.border,
+                        opacity: inactive ? 0.72 : 1,
+                        background: inactive ? tint(C.sub, '08') : '#fff',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => openEditOrg(c)}
+                        className="flex items-center gap-3 w-full text-left pr-8"
+                      >
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                          style={{ background: tint(inactive ? C.sub : C.purple, '18') }}
+                        >
+                          <Building2 size={16} style={{ color: inactive ? C.sub : C.purple }} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            <div className="text-sm font-bold truncate" style={{ color: inactive ? C.sub : C.ink }}>{c.name}</div>
+                            <StatusPill
+                              label={inactive ? 'Inactive' : 'Active'}
+                              color={inactive ? C.sub : C.green}
+                            />
+                          </div>
+                          <div className="text-xs truncate" style={{ color: C.sub }}>Company</div>
+                        </div>
+                      </button>
+                      <CardActionsMenu
+                        busy={busyOrgId === c.id}
+                        onEdit={() => openEditOrg(c)}
+                        softLabel={inactive ? 'Reactivate' : 'Deactivate'}
+                        onSoft={() => toggleOrgActive(c)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </TabSection>
         )}
@@ -225,7 +392,7 @@ export default function SystemAdmin({
             addLabel="Add Department"
             onBulkUpload={() => setBulk('departments')}
             color={C.teal}
-            disabled={orgs.length === 0}
+            disabled={activeOrgs.length === 0}
             disabledText="Add an Org first."
             empty={departments.length === 0}
             emptyText="No departments yet."
@@ -274,22 +441,14 @@ export default function SystemAdmin({
                     key: 'actions',
                     label: '',
                     render: (d) => (
-                      <button
-                        type="button"
-                        disabled={busyDepartmentId === d.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleDepartmentActive(d);
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full disabled:opacity-50"
-                        style={{
-                          background: departmentIsActive(d) ? tint(C.coral, '18') : tint(C.green, '18'),
-                          color: departmentIsActive(d) ? C.coral : C.green,
-                        }}
-                      >
-                        {departmentIsActive(d) ? <UserX size={12} /> : <UserCheck size={12} />}
-                        {busyDepartmentId === d.id ? '…' : departmentIsActive(d) ? 'Deactivate' : 'Reactivate'}
-                      </button>
+                      <div className="relative h-8 w-8 ml-auto">
+                        <CardActionsMenu
+                          busy={busyDepartmentId === d.id}
+                          onEdit={() => openEditDepartment(d)}
+                          softLabel={departmentIsActive(d) ? 'Deactivate' : 'Reactivate'}
+                          onSoft={() => toggleDepartmentActive(d)}
+                        />
+                      </div>
                     ),
                   },
                 ]}
@@ -301,11 +460,10 @@ export default function SystemAdmin({
               <div className="grid grid-cols-2 gap-3">
                 {visibleDepartments.map((d) => {
                   const inactive = !departmentIsActive(d);
-                  const busy = busyDepartmentId === d.id;
                   return (
                     <div
                       key={d.id}
-                      className="bg-white rounded-2xl p-4 shadow-sm border flex items-start gap-3"
+                      className="relative bg-white rounded-2xl p-4 shadow-sm border"
                       style={{
                         borderColor: C.border,
                         opacity: inactive ? 0.72 : 1,
@@ -315,7 +473,7 @@ export default function SystemAdmin({
                       <button
                         type="button"
                         onClick={() => openEditDepartment(d)}
-                        className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                        className="flex items-center gap-3 w-full text-left pr-8"
                       >
                         <div
                           className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
@@ -337,19 +495,12 @@ export default function SystemAdmin({
                           </div>
                         </div>
                       </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => toggleDepartmentActive(d)}
-                        className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-full shrink-0 disabled:opacity-50"
-                        style={{
-                          background: inactive ? tint(C.green, '18') : tint(C.coral, '18'),
-                          color: inactive ? C.green : C.coral,
-                        }}
-                      >
-                        {inactive ? <UserCheck size={12} /> : <UserX size={12} />}
-                        {busy ? '…' : inactive ? 'Reactivate' : 'Deactivate'}
-                      </button>
+                      <CardActionsMenu
+                        busy={busyDepartmentId === d.id}
+                        onEdit={() => openEditDepartment(d)}
+                        softLabel={inactive ? 'Reactivate' : 'Deactivate'}
+                        onSoft={() => toggleDepartmentActive(d)}
+                      />
                     </div>
                   );
                 })}
@@ -415,22 +566,14 @@ export default function SystemAdmin({
                     key: 'actions',
                     label: '',
                     render: (p) => (
-                      <button
-                        type="button"
-                        disabled={busyPersonId === p.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          togglePersonActive(p);
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full disabled:opacity-50"
-                        style={{
-                          background: personIsActive(p) ? tint(C.coral, '18') : tint(C.green, '18'),
-                          color: personIsActive(p) ? C.coral : C.green,
-                        }}
-                      >
-                        {personIsActive(p) ? <UserX size={12} /> : <UserCheck size={12} />}
-                        {busyPersonId === p.id ? '…' : personIsActive(p) ? 'Deactivate' : 'Reactivate'}
-                      </button>
+                      <div className="relative h-8 w-8 ml-auto">
+                        <CardActionsMenu
+                          busy={busyPersonId === p.id}
+                          onEdit={() => openEditPerson(p)}
+                          softLabel={personIsActive(p) ? 'Deactivate' : 'Reactivate'}
+                          onSoft={() => togglePersonActive(p)}
+                        />
+                      </div>
                     ),
                   },
                 ]}
@@ -442,11 +585,10 @@ export default function SystemAdmin({
               <div className="grid grid-cols-2 gap-3">
                 {visiblePeople.map((p) => {
                   const inactive = !personIsActive(p);
-                  const busy = busyPersonId === p.id;
                   return (
                     <div
                       key={p.id}
-                      className="bg-white rounded-2xl p-4 shadow-sm border flex items-start gap-3"
+                      className="relative bg-white rounded-2xl p-4 shadow-sm border"
                       style={{
                         borderColor: C.border,
                         opacity: inactive ? 0.72 : 1,
@@ -456,7 +598,7 @@ export default function SystemAdmin({
                       <button
                         type="button"
                         onClick={() => openEditPerson(p)}
-                        className="flex items-start gap-3 min-w-0 flex-1 text-left"
+                        className="flex items-start gap-3 w-full text-left pr-8"
                       >
                         <div
                           className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
@@ -476,19 +618,12 @@ export default function SystemAdmin({
                           {p.email && <div className="flex items-center gap-1 text-xs mt-1 truncate" style={{ color: C.sub }}><Mail size={11} />{p.email}</div>}
                         </div>
                       </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => togglePersonActive(p)}
-                        className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-full shrink-0 disabled:opacity-50"
-                        style={{
-                          background: inactive ? tint(C.green, '18') : tint(C.coral, '18'),
-                          color: inactive ? C.green : C.coral,
-                        }}
-                      >
-                        {inactive ? <UserCheck size={12} /> : <UserX size={12} />}
-                        {busy ? '…' : inactive ? 'Reactivate' : 'Deactivate'}
-                      </button>
+                      <CardActionsMenu
+                        busy={busyPersonId === p.id}
+                        onEdit={() => openEditPerson(p)}
+                        softLabel={inactive ? 'Reactivate' : 'Deactivate'}
+                        onSoft={() => togglePersonActive(p)}
+                      />
                     </div>
                   );
                 })}
@@ -580,18 +715,23 @@ export default function SystemAdmin({
 
       {modal === 'org' && (
         <Modal
-          title="Add Org"
-          hideClose={requireOrg}
-          onClose={requireOrg ? undefined : () => setModal(null)}
+          title={editingOrg ? 'Edit Org' : 'Add Org'}
+          hideClose={requireOrg && !editingOrg}
+          onClose={requireOrg && !editingOrg ? undefined : closeOrgModal}
         >
           <FormOrg
+            initial={editingOrg}
             onSave={async (n) => {
-              await addOrg(n);
+              if (editingOrg) await updateOrg(editingOrg.id, n);
+              else {
+                await addOrg(n);
+                onOrgCreated?.();
+              }
               setModal(null);
-              onOrgCreated?.();
+              setEditingOrg(null);
             }}
           />
-          {requireOrg && (
+          {requireOrg && !editingOrg && (
             <p className="text-xs mt-3" style={{ color: C.sub }}>
               Add your first organization to continue. This is a one-time setup step.
             </p>
@@ -633,6 +773,19 @@ export default function SystemAdmin({
             onSave={async (personId, role) => { await addTeamMember(modal.teamId, personId, role); setModal(null); }}
           />
         </Modal>
+      )}
+
+      {deactivateTarget && (
+        <CascadingDeactivateModal
+          entityLabel="Org"
+          recordName={deactivateTarget.name}
+          counts={deactivateCounts}
+          countsLoading={deactivateCountsLoading}
+          busy={deactivateBusy}
+          error={deactivateError}
+          onClose={closeDeactivateOrg}
+          onConfirm={confirmDeactivateOrg}
+        />
       )}
 
       {bulk === 'departments' && (

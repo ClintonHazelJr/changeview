@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Archive, ArchiveRestore, CircleDot, Rocket, CheckCircle2, Trash2 } from 'lucide-react';
-import { C, tint, isArchivedRecord } from '../../lib/constants';
+import { C, tint, isArchivedRecord, isActiveRecord } from '../../lib/constants';
 import { countProgramDeleteImpact } from '../../lib/deleteImpactCounts';
 import { usePrograms } from '../../hooks/usePrograms';
 import Modal from '../ui/Modal';
@@ -42,6 +42,8 @@ export default function ProgramsPanel({ initialProgramId = null, onProgramFocusC
 
   const orgName = (id) => orgs.find((o) => o.id === id)?.name || 'Unassigned org';
   const getStatus = (p) => p.status || 'planning';
+  const activeOrgs = useMemo(() => orgs.filter(isActiveRecord), [orgs]);
+  const canAddProgram = activeOrgs.length > 0;
 
   const archivedCount = programs.filter(isArchivedRecord).length;
   const visiblePrograms = useMemo(
@@ -214,7 +216,7 @@ export default function ProgramsPanel({ initialProgramId = null, onProgramFocusC
         title="Program"
         addLabel="Add Program"
         onAdd={openAdd}
-        addDisabled={orgs.length === 0}
+        addDisabled={!canAddProgram}
         viewMode={viewMode}
         onViewChange={setViewMode}
       />
@@ -231,12 +233,12 @@ export default function ProgramsPanel({ initialProgramId = null, onProgramFocusC
         counts={counts}
         active={statusFilter}
         onSelect={setStatusFilter}
-        onAddStatus={orgs.length ? openAdd : undefined}
+        onAddStatus={canAddProgram ? openAdd : undefined}
       />
       <ListBody
         empty={filtered.length === 0}
         emptyText={
-          orgs.length === 0
+          !canAddProgram
             ? 'Add an Org in Settings first.'
             : archivedCount > 0 && !showArchived
               ? 'No active programs. Turn on Show archived to find one.'
@@ -259,7 +261,7 @@ export default function ProgramsPanel({ initialProgramId = null, onProgramFocusC
               items={g.items}
               getStatus={getStatus}
               addLabel="Add Program"
-              onAdd={orgs.length ? openAdd : undefined}
+              onAdd={canAddProgram ? openAdd : undefined}
             >
               {g.items.map((p) => {
                 const archived = isArchivedRecord(p);

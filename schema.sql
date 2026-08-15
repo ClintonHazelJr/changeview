@@ -149,6 +149,7 @@ create table organizations (
   account_id uuid not null references accounts(id) on delete cascade,
   workspace_id uuid not null references workspaces(id) on delete cascade,
   name text not null,
+  is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
 

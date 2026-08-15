@@ -113,3 +113,30 @@ export async function countProgramDeleteImpact(programId) {
     { label: 'Hypercare plans', count: hypercare },
   ];
 }
+
+/** Counts for Org deactivation cascade (departments → people; programs → initiatives). */
+export async function countOrgDeactivateImpact(orgId) {
+  const [{ count: departments, error: deptErr }, { data: deptRows, error: deptListErr }, { count: programs, error: progErr }, { data: programRows, error: progListErr }] = await Promise.all([
+    supabase.from('departments').select('*', { count: 'exact', head: true }).eq('org_id', orgId),
+    supabase.from('departments').select('id').eq('org_id', orgId),
+    supabase.from('programs').select('*', { count: 'exact', head: true }).eq('organization_id', orgId),
+    supabase.from('programs').select('id').eq('organization_id', orgId),
+  ]);
+  if (deptErr) throw deptErr;
+  if (deptListErr) throw deptListErr;
+  if (progErr) throw progErr;
+  if (progListErr) throw progListErr;
+
+  const departmentIds = (deptRows || []).map((r) => r.id);
+  const programIds = (programRows || []).map((r) => r.id);
+
+  const people = await countIn('people', 'department_id', departmentIds);
+  const initiatives = await countIn('initiatives', 'program_id', programIds);
+
+  return [
+    { label: 'Departments', count: departments || 0 },
+    { label: 'People', count: people },
+    { label: 'Programs (will archive)', count: programs || 0 },
+    { label: 'Initiatives (via Programs)', count: initiatives },
+  ];
+}

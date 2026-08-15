@@ -20,9 +20,10 @@ import { Field, Pill, SaveRow } from '../ui/shared';
 import PersonSelect from '../ui/PersonSelect';
 import { AttachmentList, FieldWithAttach } from '../ui/AttachmentField';
 
-export function FormOrg({ onSave }) {
-  const [name, setName] = useState('');
+export function FormOrg({ initial, onSave }) {
+  const [name, setName] = useState(initial?.name || '');
   const [error, setError] = useState('');
+  const editing = Boolean(initial?.id);
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
@@ -32,13 +33,14 @@ export function FormOrg({ onSave }) {
         <input className={inputClass} style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Software Co" autoFocus />
       </Field>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow />
+      <SaveRow label={editing ? 'Save changes' : 'Save'} />
     </form>
   );
 }
 
 export function FormDepartment({ orgs, initial, onSave }) {
-  const [orgId, setOrgId] = useState(initial?.org_id || orgs[0]?.id || '');
+  const assignableOrgs = assignableOptions(orgs, initial?.org_id);
+  const [orgId, setOrgId] = useState(initial?.org_id || assignableOrgs[0]?.id || '');
   const [name, setName] = useState(initial?.name || '');
   const [location, setLocation] = useState(initial?.location || '');
   const [error, setError] = useState('');
@@ -50,7 +52,7 @@ export function FormDepartment({ orgs, initial, onSave }) {
     }}>
       <Field label="Org">
         <select className={inputClass} style={inputStyle} value={orgId} onChange={(e) => setOrgId(e.target.value)}>
-          {orgs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {assignableOrgs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </Field>
       <Field label="Department"><input className={inputClass} style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Operations" autoFocus /></Field>
@@ -289,9 +291,10 @@ export function FormProgram({ orgs, initial, onSave }) {
   const [people, setPeople] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [loadingPeople, setLoadingPeople] = useState(true);
+  const assignableOrgs = assignableOptions(orgs, initial?.organization_id);
   const [vals, setVals] = useState({
     name: initial?.name || '',
-    organizationId: initial?.organization_id || orgs[0]?.id || '',
+    organizationId: initial?.organization_id || assignableOrgs[0]?.id || '',
     description: initial?.description || '',
     status: initial?.status || 'planning',
     startDate: initial?.start_date || '',
@@ -340,11 +343,11 @@ export function FormProgram({ orgs, initial, onSave }) {
       } catch (err) { setError(err.message); }
     }}>
       <Field label="Org">
-        {orgs.length === 0 ? (
+        {assignableOptions(orgs, vals.organizationId).length === 0 ? (
           <p className="text-xs" style={{ color: C.sub }}>Add an Org in Settings first.</p>
         ) : (
           <select className={inputClass} style={inputStyle} value={vals.organizationId} onChange={set('organizationId')}>
-            {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            {assignableOptions(orgs, vals.organizationId).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
           </select>
         )}
       </Field>
@@ -383,7 +386,7 @@ export function FormProgram({ orgs, initial, onSave }) {
         />
       </div>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow label={editing ? 'Save changes' : 'Save'} disabled={orgs.length === 0} />
+      <SaveRow label={editing ? 'Save changes' : 'Save'} disabled={assignableOptions(orgs, vals.organizationId).length === 0} />
     </form>
   );
 }

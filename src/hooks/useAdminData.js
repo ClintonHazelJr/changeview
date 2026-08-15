@@ -44,12 +44,30 @@ export function useAdminData() {
   const addOrg = async (name) => {
     const { data, error } = await supabase
       .from('organizations')
-      .insert({ account_id: accountId, workspace_id: workspaceId, name })
+      .insert({ account_id: accountId, workspace_id: workspaceId, name, is_active: true })
       .select()
       .single();
     if (error) throw error;
     await load();
     return data;
+  };
+
+  const updateOrg = async (id, name) => {
+    const { error } = await supabase
+      .from('organizations')
+      .update({ name })
+      .eq('id', id);
+    if (error) throw error;
+    await load();
+  };
+
+  const setOrgActive = async (id, isActive) => {
+    const { error } = await supabase
+      .from('organizations')
+      .update({ is_active: isActive })
+      .eq('id', id);
+    if (error) throw error;
+    await load();
   };
 
   const addDepartment = async ({ orgId, name, location }) => {
@@ -142,7 +160,8 @@ export function useAdminData() {
 
   return {
     orgs, departments, people, teams, loading, reload: load,
-    addOrg, addDepartment, updateDepartment, setDepartmentActive,
+    addOrg, updateOrg, setOrgActive,
+    addDepartment, updateDepartment, setDepartmentActive,
     addPerson, updatePerson, setPersonActive, addTeam, addTeamMember,
   };
 }
