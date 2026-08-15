@@ -146,9 +146,19 @@ export function isActiveRecord(row) {
   return row?.is_active !== false;
 }
 
+/** Soft-archive flag. */
+export function isArchivedRecord(row) {
+  return Boolean(row?.archived_at);
+}
+
 /** Active rows for new assignments; keep currentId even if deactivated. */
 export function assignableOptions(rows, currentId) {
   return (rows || []).filter((r) => isActiveRecord(r) || (currentId && r.id === currentId));
+}
+
+/** Non-archived rows for pickers/lists; keep currentId even if archived. */
+export function unarchivedOptions(rows, currentId) {
+  return (rows || []).filter((r) => !isArchivedRecord(r) || (currentId && r.id === currentId));
 }
 
 /** Strip legacy [cv-meta:{...}] tags once stuffed into initiative descriptions. */

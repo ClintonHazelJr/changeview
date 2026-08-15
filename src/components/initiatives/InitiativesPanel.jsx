@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, FileText, AlertTriangle, Users, GraduationCap, MessageSquare,
-  CircleDot, Rocket, HeartPulse, CheckCircle2,
+  CircleDot, Rocket, HeartPulse, CheckCircle2, Archive, ArchiveRestore,
 } from 'lucide-react';
-import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, STATUS_COLOR, isRatedSeverity, stripInitiativeMeta, parseDbError } from '../../lib/constants';
+import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, STATUS_COLOR, isRatedSeverity, stripInitiativeMeta, parseDbError, isArchivedRecord } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useInitiatives, useInitiativeDetail } from '../../hooks/useInitiatives';
 import { useAdminData } from '../../hooks/useAdminData';
@@ -12,6 +12,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { TabSection } from '../ui/shared';
 import Modal from '../ui/Modal';
 import CsvImportModal from '../ui/CsvImportModal';
+import ShowInactiveToggle from '../ui/ShowInactiveToggle';
 import { findPerson, parseYesNo } from '../../lib/csvImport';
 import {
   FormInitiative, FormImpact, FormStakeholder, FormLearningNeed, FormComms, FormHypercare,
@@ -40,7 +41,7 @@ export default function InitiativesPanel({
   initialTab = null,
   onSelectedConsumed,
 }) {
-  const { initiatives, programs, addInitiative, updateInitiative, reload: reloadInitiatives } = useInitiatives();
+  const { initiatives, programs, addInitiative, updateInitiative, setInitiativeArchived, reload: reloadInitiatives } = useInitiatives();
   const { departments, people } = useAdminData();
   const { profile } = useAuth();
   const { activeWorkspaceId } = useWorkspace();
@@ -51,6 +52,8 @@ export default function InitiativesPanel({
   const [statusFilter, setStatusFilter] = useState(null);
   const [viewMode, setViewMode] = useState('tiles');
   const [bulkStakeholders, setBulkStakeholders] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [busyArchiveId, setBusyArchiveId] = useState(null);
 
   const openCreate = (type) => {
     setEditingRecord(null);
@@ -69,13 +72,16 @@ export default function InitiativesPanel({
     if (initialSelectedId) {
       setSelectedInitId(initialSelectedId);
       setInitTab(initialTab || 'details');
+      const match = initiatives.find((i) => i.id === initialSelectedId);
+      if (match && isArchivedRecord(match)) setShowArchived(true);
       onSelectedConsumed?.();
     }
-  }, [initialSelectedId, initialTab, onSelectedConsumed]);
+  }, [initialSelectedId, initialTab, onSelectedConsumed, initiatives]);
 
   const detail = useInitiativeDetail(selectedInitId);
   const selectedInit = detail.initiative;
   const programName = (id) => programs.find((p) => p.id === id)?.name || 'No Program';
+  const activePrograms = programs.filter((p) => !isArchivedRecord(p));
 
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '—';
@@ -83,6 +89,20 @@ export default function InitiativesPanel({
   const impactLabel = (id) => {
     const i = detail.impacts.find((x) => x.id === id);
     return i ? `${deptName(i.department_id)} impact` : '—';
+  };
+
+  const toggleArchive = async (i) => {
+    const archived = isArchivedRecord(i);
+    if (!archived && !window.confirm(`Archive ${i.name}?`)) return;
+    setBusyArchiveId(i.id);
+    try {
+      await setInitiativeArchived(i.id, !archived);
+      await detail.reload();
+    } catch (err) {
+      alert(err.message || 'Could not update initiative');
+    } finally {
+      setBusyArchiveId(null);
+    }
   };
 
   const initData = {
@@ -109,10 +129,15 @@ export default function InitiativesPanel({
   ];
 
   const getStatus = (i) => i.status || 'planning';
-  const counts = countByStatus(initiatives, getStatus, INIT_STATUSES.map((s) => s.key));
+  const archivedCount = initiatives.filter(isArchivedRecord).length;
+  const visibleInitiatives = useMemo(
+    () => (showArchived ? initiatives : initiatives.filter((i) => !isArchivedRecord(i))),
+    [initiatives, showArchived],
+  );
+  const counts = countByStatus(visibleInitiatives, getStatus, INIT_STATUSES.map((s) => s.key));
   const filtered = useMemo(
-    () => (statusFilter ? initiatives.filter((i) => getStatus(i) === statusFilter) : initiatives),
-    [initiatives, statusFilter],
+    () => (statusFilter ? visibleInitiatives.filter((i) => getStatus(i) === statusFilter) : visibleInitiatives),
+    [visibleInitiatives, statusFilter],
   );
   const groups = useMemo(() => {
     const map = new Map();
@@ -141,7 +166,12 @@ export default function InitiativesPanel({
         label: 'Status',
         sortable: true,
         sortValue: (i) => getStatus(i),
-        render: (i) => <StatusPill label={getStatus(i)} color={statusColor(getStatus(i))} />,
+        render: (i) => (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <StatusPill label={getStatus(i)} color={statusColor(getStatus(i))} />
+            {isArchivedRecord(i) && <StatusPill label="Archived" color={C.sub} />}
+          </div>
+        ),
       },
       {
         key: 'program',
@@ -156,6 +186,32 @@ export default function InitiativesPanel({
         sortable: true,
         render: (i) => formatDate(i.proposed_go_live_date) || '—',
       },
+      {
+        key: 'actions',
+        label: '',
+        render: (i) => {
+          const archived = isArchivedRecord(i);
+          const busy = busyArchiveId === i.id;
+          return (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleArchive(i);
+              }}
+              className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full disabled:opacity-50"
+              style={{
+                background: archived ? tint(C.green, '18') : tint(C.coral, '18'),
+                color: archived ? C.green : C.coral,
+              }}
+            >
+              {archived ? <ArchiveRestore size={12} /> : <Archive size={12} />}
+              {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
+            </button>
+          );
+        },
+      },
     ];
 
     return (
@@ -164,20 +220,34 @@ export default function InitiativesPanel({
           title="Initiatives"
           addLabel="Add Initiative"
           onAdd={() => setModal('initiative')}
-          addDisabled={programs.length === 0}
+          addDisabled={activePrograms.length === 0}
           viewMode={viewMode}
           onViewChange={setViewMode}
         />
+        <div className="flex justify-end px-1 mb-2">
+          <ShowInactiveToggle
+            show={showArchived}
+            onChange={setShowArchived}
+            inactiveCount={archivedCount}
+            entityLabel="archived"
+          />
+        </div>
         <StatusFilterRow
           statuses={INIT_STATUSES}
           counts={counts}
           active={statusFilter}
           onSelect={setStatusFilter}
-          onAddStatus={programs.length ? () => setModal('initiative') : undefined}
+          onAddStatus={activePrograms.length ? () => setModal('initiative') : undefined}
         />
         <ListBody
           empty={filtered.length === 0}
-          emptyText={programs.length === 0 ? 'Create a Program first, then add Initiatives.' : 'No initiatives yet.'}
+          emptyText={
+            activePrograms.length === 0 && programs.length === 0
+              ? 'Create a Program first, then add Initiatives.'
+              : archivedCount > 0 && !showArchived
+                ? 'No active initiatives. Turn on Show archived to find one.'
+                : 'No initiatives yet.'
+          }
         >
           {viewMode === 'list' ? (
             <ListTable
@@ -194,23 +264,44 @@ export default function InitiativesPanel({
                 items={g.items}
                 getStatus={getStatus}
                 addLabel="Add Initiative"
-                onAdd={programs.length ? () => setModal('initiative') : undefined}
+                onAdd={activePrograms.length ? () => setModal('initiative') : undefined}
               >
-                {g.items.map((i) => (
-                    <CompactListCard
-                      key={i.id}
-                      title={i.name}
-                      subtitle={formatDate(i.proposed_go_live_date) ? `Go live ${formatDate(i.proposed_go_live_date)}` : 'No go-live date'}
-                      tags={[{ label: getStatus(i), color: statusColor(getStatus(i)) }]}
-                      avatars={[
-                        personLabel(i.change_owner_id),
-                        personLabel(i.product_owner_id),
-                        personLabel(i.business_owner_id),
-                        personLabel(i.project_manager_id),
-                      ].filter(Boolean)}
-                      onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
-                    />
-                  ))}
+                {g.items.map((i) => {
+                  const archived = isArchivedRecord(i);
+                  const busy = busyArchiveId === i.id;
+                  return (
+                    <div key={i.id} className="relative" style={{ opacity: archived ? 0.72 : 1 }}>
+                      <CompactListCard
+                        title={i.name}
+                        subtitle={formatDate(i.proposed_go_live_date) ? `Go live ${formatDate(i.proposed_go_live_date)}` : 'No go-live date'}
+                        tags={[
+                          { label: getStatus(i), color: statusColor(getStatus(i)) },
+                          ...(archived ? [{ label: 'Archived', color: C.sub }] : []),
+                        ]}
+                        avatars={[
+                          personLabel(i.change_owner_id),
+                          personLabel(i.product_owner_id),
+                          personLabel(i.business_owner_id),
+                          personLabel(i.project_manager_id),
+                        ].filter(Boolean)}
+                        onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
+                      />
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => toggleArchive(i)}
+                        className="absolute top-3 right-3 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full disabled:opacity-50 z-10"
+                        style={{
+                          background: archived ? tint(C.green, '18') : tint(C.coral, '18'),
+                          color: archived ? C.green : C.coral,
+                        }}
+                      >
+                        {archived ? <ArchiveRestore size={11} /> : <Archive size={11} />}
+                        {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
+                      </button>
+                    </div>
+                  );
+                })}
               </GroupSection>
             ))
           )}
@@ -273,15 +364,34 @@ export default function InitiativesPanel({
         {initTab === 'details' && selectedInit && (
           <div>
             <div className="flex items-start justify-between gap-3 mb-1">
-              <h2 className="text-xl font-extrabold" style={{ ...HEAD, color: C.ink }}>{selectedInit.name}</h2>
-              <button
-                type="button"
-                onClick={() => openEdit('initiative', selectedInit)}
-                className="text-xs font-bold px-3 py-1.5 rounded-full shrink-0"
-                style={{ background: tint(C.coral, '18'), color: C.coral }}
-              >
-                Edit
-              </button>
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <h2 className="text-xl font-extrabold" style={{ ...HEAD, color: C.ink }}>{selectedInit.name}</h2>
+                {isArchivedRecord(selectedInit) && <StatusPill label="Archived" color={C.sub} />}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={busyArchiveId === selectedInit.id}
+                  onClick={() => toggleArchive(selectedInit)}
+                  className="text-xs font-bold px-3 py-1.5 rounded-full"
+                  style={{
+                    background: isArchivedRecord(selectedInit) ? tint(C.green, '18') : tint(C.coral, '18'),
+                    color: isArchivedRecord(selectedInit) ? C.green : C.coral,
+                  }}
+                >
+                  {busyArchiveId === selectedInit.id
+                    ? '…'
+                    : isArchivedRecord(selectedInit) ? 'Unarchive' : 'Archive'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openEdit('initiative', selectedInit)}
+                  className="text-xs font-bold px-3 py-1.5 rounded-full"
+                  style={{ background: tint(C.coral, '18'), color: C.coral }}
+                >
+                  Edit
+                </button>
+              </div>
             </div>
             <p className="text-sm mb-6" style={{ color: C.sub }}>
               {stripInitiativeMeta(selectedInit.description) || '—'}

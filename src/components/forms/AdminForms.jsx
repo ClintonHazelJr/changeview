@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Sparkles, Copy } from 'lucide-react';
 import {
-  C, inputClass, inputStyle, TAG_OPTIONS, SEVERITY_COLOR, SEVERITY_LEVELS, stripInitiativeMeta, assignableOptions,
+  C, inputClass, inputStyle, TAG_OPTIONS, SEVERITY_COLOR, SEVERITY_LEVELS, stripInitiativeMeta, assignableOptions, unarchivedOptions,
 } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -188,7 +188,7 @@ export function FormInitiative({ initial, onSave }) {
       const [peopleRes, deptRes, programsRes] = await Promise.all([
         supabase.from('people').select('id, name, title, email, department_id, is_active').eq('workspace_id', activeWorkspaceId).order('name'),
         supabase.from('departments').select('id, name, is_active').eq('workspace_id', activeWorkspaceId),
-        supabase.from('programs').select('id, name').eq('workspace_id', activeWorkspaceId).order('name'),
+        supabase.from('programs').select('id, name, archived_at').eq('workspace_id', activeWorkspaceId).order('name'),
       ]);
       if (cancelled) return;
       if (peopleRes.error) setError(peopleRes.error.message);
@@ -197,8 +197,9 @@ export function FormInitiative({ initial, onSave }) {
       setPrograms(programsRes.data || []);
       setLoadingPeople(false);
       setLoadingPrograms(false);
-      if ((programsRes.data || []).length === 1) {
-        setVals((prev) => ({ ...prev, programId: prev.programId || programsRes.data[0].id }));
+      const openPrograms = unarchivedOptions(programsRes.data || [], '');
+      if (openPrograms.length === 1) {
+        setVals((prev) => ({ ...prev, programId: prev.programId || openPrograms[0].id }));
       }
     })();
     return () => { cancelled = true; };
@@ -215,12 +216,12 @@ export function FormInitiative({ initial, onSave }) {
       <Field label="Program">
         {loadingPrograms ? (
           <p className="text-xs" style={{ color: C.sub }}>Loading programs…</p>
-        ) : programs.length === 0 ? (
+        ) : unarchivedOptions(programs, vals.programId).length === 0 ? (
           <p className="text-xs" style={{ color: C.sub }}>Create a Program first (sidebar → Program).</p>
         ) : (
           <select className={inputClass} style={inputStyle} value={vals.programId} onChange={set('programId')} required>
             <option value="">Select program</option>
-            {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {unarchivedOptions(programs, vals.programId).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
       </Field>
@@ -278,12 +279,16 @@ export function FormInitiative({ initial, onSave }) {
         />
       </div>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow disabled={programs.length === 0} />
+      <SaveRow disabled={unarchivedOptions(programs, vals.programId).length === 0} />
     </form>
   );
 }
 
 export function FormProgram({ orgs, initial, onSave }) {
+  const { activeWorkspaceId } = useWorkspace();
+  const [people, setPeople] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [loadingPeople, setLoadingPeople] = useState(true);
   const [vals, setVals] = useState({
     name: initial?.name || '',
     organizationId: initial?.organization_id || orgs[0]?.id || '',
@@ -294,9 +299,38 @@ export function FormProgram({ orgs, initial, onSave }) {
     budget: initial?.budget ?? '',
     goal: initial?.goal || '',
     benefits: initial?.benefits || '',
+    programManagerId: initial?.program_manager_id || '',
+    sponsorId: initial?.sponsor_id || '',
   });
   const [error, setError] = useState('');
   const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
+  const editing = Boolean(initial?.id);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!activeWorkspaceId) {
+        if (!cancelled) {
+          setPeople([]);
+          setDepartments([]);
+          setLoadingPeople(false);
+        }
+        return;
+      }
+      setLoadingPeople(true);
+      const [peopleRes, deptRes] = await Promise.all([
+        supabase.from('people').select('id, name, title, email, department_id, is_active').eq('workspace_id', activeWorkspaceId).order('name'),
+        supabase.from('departments').select('id, name, is_active').eq('workspace_id', activeWorkspaceId),
+      ]);
+      if (cancelled) return;
+      if (peopleRes.error) setError(peopleRes.error.message);
+      setPeople(peopleRes.data || []);
+      setDepartments(deptRes.data || []);
+      setLoadingPeople(false);
+    })();
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId]);
+
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
@@ -330,8 +364,26 @@ export function FormProgram({ orgs, initial, onSave }) {
       <Field label="Budget"><input type="number" className={inputClass} style={inputStyle} value={vals.budget} onChange={set('budget')} /></Field>
       <Field label="Goal"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.goal} onChange={set('goal')} /></Field>
       <Field label="Benefits"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.benefits} onChange={set('benefits')} /></Field>
+      <div className="grid grid-cols-2 gap-4">
+        <PersonSelect
+          label="Program Manager"
+          people={people}
+          departments={departments}
+          loading={loadingPeople}
+          value={vals.programManagerId}
+          onChange={set('programManagerId')}
+        />
+        <PersonSelect
+          label="Sponsor"
+          people={people}
+          departments={departments}
+          loading={loadingPeople}
+          value={vals.sponsorId}
+          onChange={set('sponsorId')}
+        />
+      </div>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow disabled={orgs.length === 0} />
+      <SaveRow label={editing ? 'Save changes' : 'Save'} disabled={orgs.length === 0} />
     </form>
   );
 }

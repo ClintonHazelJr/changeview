@@ -28,7 +28,7 @@ export function useInitiatives() {
         .order('updated_at', { ascending: false }),
       supabase
         .from('programs')
-        .select('id, name, organization_id')
+        .select('id, name, organization_id, archived_at')
         .eq('workspace_id', ws)
         .order('name'),
     ]);
@@ -99,7 +99,16 @@ export function useInitiatives() {
     return data;
   };
 
-  return { initiatives, programs, loading, reload: load, addInitiative, updateInitiative };
+  const setInitiativeArchived = async (id, archived) => {
+    const { error } = await supabase
+      .from('initiatives')
+      .update({ archived_at: archived ? new Date().toISOString() : null })
+      .eq('id', id);
+    if (error) throw new Error(parseDbError(error));
+    await load();
+  };
+
+  return { initiatives, programs, loading, reload: load, addInitiative, updateInitiative, setInitiativeArchived };
 }
 
 export function useInitiativeDetail(initiativeId) {

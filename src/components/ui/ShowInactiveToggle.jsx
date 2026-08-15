@@ -1,7 +1,15 @@
 import { C, tint } from '../../lib/constants';
 
-/** Toggle to reveal soft-deactivated rows. Hidden when there are none (unless already on). */
-export default function ShowInactiveToggle({ show, onChange, inactiveCount = 0 }) {
+/**
+ * Toggle to reveal soft-hidden rows (inactive or archived).
+ * Hidden when there are none (unless already on).
+ */
+export default function ShowInactiveToggle({
+  show,
+  onChange,
+  inactiveCount = 0,
+  entityLabel = 'inactive',
+}) {
   if (inactiveCount === 0 && !show) return null;
   return (
     <button
@@ -13,7 +21,7 @@ export default function ShowInactiveToggle({ show, onChange, inactiveCount = 0 }
         color: show ? C.ink : C.navy,
       }}
     >
-      {show ? 'Hide inactive' : `Show inactive (${inactiveCount})`}
+      {show ? `Hide ${entityLabel}` : `Show ${entityLabel} (${inactiveCount})`}
     </button>
   );
 }

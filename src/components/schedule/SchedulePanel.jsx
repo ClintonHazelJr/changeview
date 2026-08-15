@@ -85,12 +85,12 @@ export default function SchedulePanel({ onOpenRecord }) {
       ] = await Promise.all([
         supabase
           .from('programs')
-          .select('id, name, start_date, proposed_go_live_date')
+          .select('id, name, start_date, proposed_go_live_date, archived_at')
           .eq('workspace_id', activeWorkspaceId)
           .order('name'),
         supabase
           .from('initiatives')
-          .select('id, name, start_date, proposed_go_live_date, program_id')
+          .select('id, name, start_date, proposed_go_live_date, program_id, archived_at')
           .eq('workspace_id', activeWorkspaceId)
           .order('name'),
         supabase
@@ -120,9 +120,11 @@ export default function SchedulePanel({ onOpenRecord }) {
   }, [activeWorkspaceId]);
 
   const treeRows = useMemo(() => {
+    const activePrograms = programs.filter((p) => !p.archived_at);
+    const activeInits = initiatives.filter((i) => !i.archived_at);
     const initsByProgram = new Map();
     const orphans = [];
-    initiatives.forEach((i) => {
+    activeInits.forEach((i) => {
       if (!i.program_id) {
         orphans.push(i);
         return;
@@ -203,7 +205,7 @@ export default function SchedulePanel({ onOpenRecord }) {
       }
     };
 
-    programs.forEach((p) => {
+    activePrograms.forEach((p) => {
       const childInits = initsByProgram.get(p.id) || [];
       out.push({
         id: `program-${p.id}`,
