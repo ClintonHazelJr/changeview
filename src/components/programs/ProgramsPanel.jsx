@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Archive, ArchiveRestore, CircleDot, Rocket, CheckCircle2 } from 'lucide-react';
+import { Archive, ArchiveRestore, CircleDot, Rocket, CheckCircle2, Trash2 } from 'lucide-react';
 import { C, tint, isArchivedRecord } from '../../lib/constants';
+import { countProgramDeleteImpact } from '../../lib/deleteImpactCounts';
 import { usePrograms } from '../../hooks/usePrograms';
 import Modal from '../ui/Modal';
+import CascadingDeleteModal from '../ui/CascadingDeleteModal';
 import { FormProgram } from '../forms/AdminForms';
 import ListTable from '../ui/ListTable';
 import StatusPill from '../ui/StatusPill';
@@ -24,13 +26,18 @@ function formatDate(value) {
 }
 
 export default function ProgramsPanel({ initialProgramId = null, onProgramFocusConsumed }) {
-  const { programs, orgs, addProgram, updateProgram, setProgramArchived } = usePrograms();
+  const { programs, orgs, addProgram, updateProgram, setProgramArchived, deleteProgram } = usePrograms();
   const [modal, setModal] = useState(null);
   const [editing, setEditing] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [viewMode, setViewMode] = useState('tiles');
   const [showArchived, setShowArchived] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteCounts, setDeleteCounts] = useState([]);
+  const [deleteCountsLoading, setDeleteCountsLoading] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const orgName = (id) => orgs.find((o) => o.id === id)?.name || 'Unassigned org';
   const getStatus = (p) => p.status || 'planning';
@@ -75,6 +82,38 @@ export default function ProgramsPanel({ initialProgramId = null, onProgramFocusC
       alert(err.message || 'Could not update program');
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const openDelete = async (p) => {
+    setDeleteError('');
+    setDeleteTarget(p);
+    setDeleteCounts([]);
+    setDeleteCountsLoading(true);
+    try {
+      setDeleteCounts(await countProgramDeleteImpact(p.id));
+    } catch (err) {
+      setDeleteError(err.message || 'Could not load related records');
+    } finally {
+      setDeleteCountsLoading(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    setDeleteError('');
+    try {
+      await deleteProgram(deleteTarget.id);
+      setDeleteTarget(null);
+      if (editing?.id === deleteTarget.id) {
+        setModal(null);
+        setEditing(null);
+      }
+    } catch (err) {
+      setDeleteError(err.message || 'Could not delete program');
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -134,22 +173,35 @@ export default function ProgramsPanel({ initialProgramId = null, onProgramFocusC
         const archived = isArchivedRecord(p);
         const busy = busyId === p.id;
         return (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleArchive(p);
-            }}
-            className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full disabled:opacity-50"
-            style={{
-              background: archived ? tint(C.green, '18') : tint(C.coral, '18'),
-              color: archived ? C.green : C.coral,
-            }}
-          >
-            {archived ? <ArchiveRestore size={12} /> : <Archive size={12} />}
-            {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
-          </button>
+          <div className="flex items-center gap-1.5 justify-end">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleArchive(p);
+              }}
+              className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full disabled:opacity-50"
+              style={{
+                background: archived ? tint(C.green, '18') : tint(C.coral, '18'),
+                color: archived ? C.green : C.coral,
+              }}
+            >
+              {archived ? <ArchiveRestore size={12} /> : <Archive size={12} />}
+              {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                openDelete(p);
+              }}
+              className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
+              style={{ background: tint(C.coral, '18'), color: C.coral }}
+            >
+              <Trash2 size={12} /> Delete
+            </button>
+          </div>
         );
       },
     },
@@ -226,19 +278,29 @@ export default function ProgramsPanel({ initialProgramId = null, onProgramFocusC
                       ]}
                       onClick={() => openEdit(p)}
                     />
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => toggleArchive(p)}
-                      className="absolute top-3 right-3 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full disabled:opacity-50"
-                      style={{
-                        background: archived ? tint(C.green, '18') : tint(C.coral, '18'),
-                        color: archived ? C.green : C.coral,
-                      }}
-                    >
-                      {archived ? <ArchiveRestore size={11} /> : <Archive size={11} />}
-                      {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
-                    </button>
+                    <div className="absolute top-3 right-3 flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => toggleArchive(p)}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full disabled:opacity-50"
+                        style={{
+                          background: archived ? tint(C.green, '18') : tint(C.coral, '18'),
+                          color: archived ? C.green : C.coral,
+                        }}
+                      >
+                        {archived ? <ArchiveRestore size={11} /> : <Archive size={11} />}
+                        {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openDelete(p)}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full"
+                        style={{ background: tint(C.coral, '22'), color: C.coral }}
+                      >
+                        <Trash2 size={11} /> Delete
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -259,7 +321,32 @@ export default function ProgramsPanel({ initialProgramId = null, onProgramFocusC
               setEditing(null);
             }}
           />
+          {editing && (
+            <div className="mt-4 pt-4 border-t flex justify-end" style={{ borderColor: C.border }}>
+              <button
+                type="button"
+                onClick={() => openDelete(editing)}
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-full"
+                style={{ background: tint(C.coral, '18'), color: C.coral }}
+              >
+                <Trash2 size={13} /> Delete program
+              </button>
+            </div>
+          )}
         </Modal>
+      )}
+
+      {deleteTarget && (
+        <CascadingDeleteModal
+          entityLabel="Program"
+          recordName={deleteTarget.name}
+          counts={deleteCounts}
+          countsLoading={deleteCountsLoading}
+          busy={deleteBusy}
+          error={deleteError}
+          onClose={() => { if (!deleteBusy) setDeleteTarget(null); }}
+          onConfirm={confirmDelete}
+        />
       )}
     </ListPageShell>
   );

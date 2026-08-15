@@ -108,7 +108,16 @@ export function useInitiatives() {
     await load();
   };
 
-  return { initiatives, programs, loading, reload: load, addInitiative, updateInitiative, setInitiativeArchived };
+  const deleteInitiative = async (id) => {
+    const { error } = await supabase.from('initiatives').delete().eq('id', id);
+    if (error) throw new Error(parseDbError(error));
+    await load();
+  };
+
+  return {
+    initiatives, programs, loading, reload: load,
+    addInitiative, updateInitiative, setInitiativeArchived, deleteInitiative,
+  };
 }
 
 export function useInitiativeDetail(initiativeId) {

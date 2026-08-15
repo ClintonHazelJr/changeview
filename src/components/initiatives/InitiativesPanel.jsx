@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, FileText, AlertTriangle, Users, GraduationCap, MessageSquare,
-  CircleDot, Rocket, HeartPulse, CheckCircle2, Archive, ArchiveRestore,
+  CircleDot, Rocket, HeartPulse, CheckCircle2, Archive, ArchiveRestore, Trash2,
 } from 'lucide-react';
 import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, STATUS_COLOR, isRatedSeverity, stripInitiativeMeta, parseDbError, isArchivedRecord } from '../../lib/constants';
+import { countInitiativeDeleteImpact } from '../../lib/deleteImpactCounts';
 import { supabase } from '../../lib/supabase';
 import { useInitiatives, useInitiativeDetail } from '../../hooks/useInitiatives';
 import { useAdminData } from '../../hooks/useAdminData';
@@ -11,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { TabSection } from '../ui/shared';
 import Modal from '../ui/Modal';
+import CascadingDeleteModal from '../ui/CascadingDeleteModal';
 import CsvImportModal from '../ui/CsvImportModal';
 import ShowInactiveToggle from '../ui/ShowInactiveToggle';
 import { findPerson, parseYesNo } from '../../lib/csvImport';
@@ -41,7 +43,7 @@ export default function InitiativesPanel({
   initialTab = null,
   onSelectedConsumed,
 }) {
-  const { initiatives, programs, addInitiative, updateInitiative, setInitiativeArchived, reload: reloadInitiatives } = useInitiatives();
+  const { initiatives, programs, addInitiative, updateInitiative, setInitiativeArchived, deleteInitiative, reload: reloadInitiatives } = useInitiatives();
   const { departments, people } = useAdminData();
   const { profile } = useAuth();
   const { activeWorkspaceId } = useWorkspace();
@@ -54,6 +56,11 @@ export default function InitiativesPanel({
   const [bulkStakeholders, setBulkStakeholders] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [busyArchiveId, setBusyArchiveId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteCounts, setDeleteCounts] = useState([]);
+  const [deleteCountsLoading, setDeleteCountsLoading] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const openCreate = (type) => {
     setEditingRecord(null);
@@ -102,6 +109,37 @@ export default function InitiativesPanel({
       alert(err.message || 'Could not update initiative');
     } finally {
       setBusyArchiveId(null);
+    }
+  };
+
+  const openDelete = async (i) => {
+    setDeleteError('');
+    setDeleteTarget(i);
+    setDeleteCounts([]);
+    setDeleteCountsLoading(true);
+    try {
+      setDeleteCounts(await countInitiativeDeleteImpact(i.id));
+    } catch (err) {
+      setDeleteError(err.message || 'Could not load related records');
+    } finally {
+      setDeleteCountsLoading(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    setDeleteError('');
+    try {
+      const id = deleteTarget.id;
+      await deleteInitiative(id);
+      setDeleteTarget(null);
+      closeModal();
+      if (selectedInitId === id) setSelectedInitId(null);
+    } catch (err) {
+      setDeleteError(err.message || 'Could not delete initiative');
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -193,22 +231,35 @@ export default function InitiativesPanel({
           const archived = isArchivedRecord(i);
           const busy = busyArchiveId === i.id;
           return (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleArchive(i);
-              }}
-              className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full disabled:opacity-50"
-              style={{
-                background: archived ? tint(C.green, '18') : tint(C.coral, '18'),
-                color: archived ? C.green : C.coral,
-              }}
-            >
-              {archived ? <ArchiveRestore size={12} /> : <Archive size={12} />}
-              {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
-            </button>
+            <div className="flex items-center gap-1.5 justify-end">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleArchive(i);
+                }}
+                className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full disabled:opacity-50"
+                style={{
+                  background: archived ? tint(C.green, '18') : tint(C.coral, '18'),
+                  color: archived ? C.green : C.coral,
+                }}
+              >
+                {archived ? <ArchiveRestore size={12} /> : <Archive size={12} />}
+                {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openDelete(i);
+                }}
+                className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
+                style={{ background: tint(C.coral, '18'), color: C.coral }}
+              >
+                <Trash2 size={12} /> Delete
+              </button>
+            </div>
           );
         },
       },
@@ -286,19 +337,29 @@ export default function InitiativesPanel({
                         ].filter(Boolean)}
                         onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
                       />
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => toggleArchive(i)}
-                        className="absolute top-3 right-3 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full disabled:opacity-50 z-10"
-                        style={{
-                          background: archived ? tint(C.green, '18') : tint(C.coral, '18'),
-                          color: archived ? C.green : C.coral,
-                        }}
-                      >
-                        {archived ? <ArchiveRestore size={11} /> : <Archive size={11} />}
-                        {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
-                      </button>
+                      <div className="absolute top-3 right-3 flex items-center gap-1 z-10">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => toggleArchive(i)}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full disabled:opacity-50"
+                          style={{
+                            background: archived ? tint(C.green, '18') : tint(C.coral, '18'),
+                            color: archived ? C.green : C.coral,
+                          }}
+                        >
+                          {archived ? <ArchiveRestore size={11} /> : <Archive size={11} />}
+                          {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openDelete(i)}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full"
+                          style={{ background: tint(C.coral, '22'), color: C.coral }}
+                        >
+                          <Trash2 size={11} /> Delete
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -317,6 +378,18 @@ export default function InitiativesPanel({
               }}
             />
           </Modal>
+        )}
+        {deleteTarget && (
+          <CascadingDeleteModal
+            entityLabel="Initiative"
+            recordName={deleteTarget.name}
+            counts={deleteCounts}
+            countsLoading={deleteCountsLoading}
+            busy={deleteBusy}
+            error={deleteError}
+            onClose={() => { if (!deleteBusy) setDeleteTarget(null); }}
+            onConfirm={confirmDelete}
+          />
         )}
       </ListPageShell>
     );
@@ -382,6 +455,14 @@ export default function InitiativesPanel({
                   {busyArchiveId === selectedInit.id
                     ? '…'
                     : isArchivedRecord(selectedInit) ? 'Unarchive' : 'Archive'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openDelete(selectedInit)}
+                  className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full"
+                  style={{ background: tint(C.coral, '18'), color: C.coral }}
+                >
+                  <Trash2 size={12} /> Delete
                 </button>
                 <button
                   type="button"
@@ -695,6 +776,18 @@ export default function InitiativesPanel({
               closeModal();
             }}
           />
+          {editingRecord && (
+            <div className="mt-4 pt-4 border-t flex justify-end" style={{ borderColor: C.border }}>
+              <button
+                type="button"
+                onClick={() => openDelete(editingRecord)}
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-full"
+                style={{ background: tint(C.coral, '18'), color: C.coral }}
+              >
+                <Trash2 size={13} /> Delete initiative
+              </button>
+            </div>
+          )}
         </Modal>
       )}
       {modal === 'comms' && selectedInit && (
@@ -712,6 +805,18 @@ export default function InitiativesPanel({
             onDelete={editingRecord ? async () => { await detail.deleteComms(editingRecord.id); closeModal(); } : undefined}
           />
         </Modal>
+      )}
+      {deleteTarget && (
+        <CascadingDeleteModal
+          entityLabel="Initiative"
+          recordName={deleteTarget.name}
+          counts={deleteCounts}
+          countsLoading={deleteCountsLoading}
+          busy={deleteBusy}
+          error={deleteError}
+          onClose={() => { if (!deleteBusy) setDeleteTarget(null); }}
+          onConfirm={confirmDelete}
+        />
       )}
     </div>
   );

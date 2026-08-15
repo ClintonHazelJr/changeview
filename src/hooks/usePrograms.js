@@ -89,8 +89,14 @@ export function usePrograms() {
     await load();
   };
 
+  const deleteProgram = async (id) => {
+    const { error } = await supabase.from('programs').delete().eq('id', id);
+    if (error) throw new Error(parseDbError(error));
+    await load();
+  };
+
   return {
     programs, orgs, loading, reload: load,
-    addProgram, updateProgram, setProgramArchived,
+    addProgram, updateProgram, setProgramArchived, deleteProgram,
   };
 }
