@@ -3,8 +3,11 @@ import { wipeAccountWorkspaces } from './_accountWipe.js';
 import { createStripeClient } from './_stripeClient.js';
 
 /**
- * Owner-only: cancel Stripe, ban all users, soft-delete account, wipe workspaces.
+ * Owner-only: cancel Stripe, ban all Auth users, soft-delete account, wipe workspaces.
  * Body: { confirm: 'DELETE' }
+ *
+ * Dedicated deletion path — does not flip users.is_active (that path's last-owner
+ * safeguard is for /api/deactivate-user only). Login lockout is Auth ban + accounts.deleted_at.
  *
  * Auth bans must succeed before soft-delete. The Admin API returns { error }
  * rather than throwing — always check that field.
@@ -71,7 +74,9 @@ export default async function handler(req, res) {
     }
   }
 
-  // 2) Ban every Auth user on the account — must succeed before soft-delete.
+  // 2) Ban every Auth user on the account via Admin API — must succeed before soft-delete.
+  // Do NOT flip users.is_active here: the last-owner safeguard on that column is for
+  // per-user deactivation (/api/deactivate-user), not whole-account deletion.
   const { data: users, error: usersErr } = await admin
     .from('users')
     .select('id, email')
@@ -113,22 +118,19 @@ export default async function handler(req, res) {
     });
   }
 
-  // 3) Mark app users inactive (after Auth bans succeed).
-  const { error: inactiveErr } = await admin
+  // 3) Clear default workspace pointers only (no is_active — avoids only-owner trigger).
+  const { error: clearWsErr } = await admin
     .from('users')
-    .update({ is_active: false, default_workspace_id: null })
+    .update({ default_workspace_id: null })
     .eq('account_id', caller.account_id);
-  if (inactiveErr) {
-    console.error('[delete-account] is_active update failed after bans', {
+  if (clearWsErr) {
+    console.warn('[delete-account] could not clear default_workspace_id (continuing)', {
       accountId: caller.account_id,
-      message: inactiveErr.message,
-    });
-    return res.status(500).json({
-      error: inactiveErr.message || 'Users were banned in Auth but could not be marked inactive',
+      message: clearWsErr.message,
     });
   }
 
-  // 4) Soft-delete the account.
+  // 4) Soft-delete the account (AuthContext treats deleted_at as signed-out).
   const { error: delErr } = await admin
     .from('accounts')
     .update({ deleted_at: new Date().toISOString() })
