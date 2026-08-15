@@ -8,6 +8,8 @@ import {
   startCheckout,
   startBillingPortal,
 } from '../../lib/checkout';
+import { usePlanPrices } from '../../hooks/usePlanPrices';
+import { formatPlanPrice } from '../../../shared/planPrices.js';
 
 /**
  * Billing gates:
@@ -17,6 +19,7 @@ import {
 export default function BillingGate({ mode = 'past_due' }) {
   const { session } = useAuth();
   const { planTier, subscription, reload, loading } = useWorkspace();
+  const { plans } = usePlanPrices();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -65,6 +68,9 @@ export default function BillingGate({ mode = 'past_due' }) {
 
   const isIncomplete = mode === 'incomplete';
   const planLabel = PLAN_LABELS[marketingTier] || PLAN_LABELS[planTier] || 'your plan';
+  const priceLabel = marketingTier
+    ? formatPlanPrice(plans, marketingTier, billingCycle)
+    : '';
 
   return (
     <div className="fixed inset-0 z-[100] overflow-y-auto" style={{ ...BODY, background: `linear-gradient(180deg, ${C.bg}, ${tint(C.purple, '12')})` }}>
@@ -81,6 +87,7 @@ export default function BillingGate({ mode = 'past_due' }) {
           <p className="text-xs font-semibold mb-6" style={{ color: C.purple }}>
             Plan: {loading && !marketingTier ? 'Loading…' : planLabel}
             {marketingTier ? (billingCycle === 'annual' ? ' · annual' : ' · monthly') : ''}
+            {priceLabel ? ` · ${priceLabel}` : ''}
           </p>
           {error && <p className="text-sm mb-4" style={{ color: C.coral }}>{error}</p>}
           <button

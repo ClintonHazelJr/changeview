@@ -3,6 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { C, HEAD, BODY, PLAN_LABELS, inputClass, inputStyle } from '../lib/constants';
 import { useAuth } from '../contexts/AuthContext';
 import { rememberCheckoutIntent, startCheckout } from '../lib/checkout';
+import { usePlanPrices } from '../hooks/usePlanPrices';
+import { formatPlanPrice } from '../../shared/planPrices.js';
 
 const VALID_PLANS = new Set(['solo', 'small', 'enterprise']);
 
@@ -14,6 +16,8 @@ export default function SignupPage() {
   const planTier = VALID_PLANS.has(planParam) ? planParam : 'solo';
   const billingCycle = planTier === 'solo' ? 'monthly' : (billingParam === 'annual' ? 'annual' : 'monthly');
   const checkoutCancelled = params.get('checkout') === 'cancelled';
+  const { plans } = usePlanPrices();
+  const priceLabel = formatPlanPrice(plans, planTier, billingCycle);
 
   const [fullName, setFullName] = useState('');
   const [accountName, setAccountName] = useState('');
@@ -105,6 +109,7 @@ export default function SignupPage() {
           <p className="text-sm" style={{ color: C.sub }}>
             Plan: {PLAN_LABELS[planTier] || planTier}
             {billingCycle === 'annual' ? ' · annual' : ' · monthly'}
+            {priceLabel ? ` · ${priceLabel}` : ''}
           </p>
           {error && (
             <p className="text-sm mt-3" style={{ color: C.coral }}>{error}</p>
@@ -125,6 +130,7 @@ export default function SignupPage() {
         <p className="text-xs font-semibold mb-6" style={{ color: C.purple }}>
           Plan: {PLAN_LABELS[planTier] || planTier}
           {billingCycle === 'annual' ? ' · billed annually after trial' : ' · billed monthly after trial'}
+          {priceLabel ? ` (${priceLabel})` : ''}
         </p>
         {checkoutCancelled && (
           <p className="text-xs mb-4" style={{ color: C.coral }}>

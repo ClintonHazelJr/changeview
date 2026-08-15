@@ -4,15 +4,10 @@ import { hasAuthRedirectParams } from '../lib/authUrls';
 import { rememberCheckoutIntent } from '../lib/checkout';
 import Mark from '../components/landing/Mark';
 import SiteShell from '../components/landing/SiteShell';
+import { usePlanPrices } from '../hooks/usePlanPrices';
+import { formatUsdAmount, priceAmount, pricePeriodLabel } from '../../shared/planPrices.js';
 
 const PAGE_TITLE = 'ChangeView — Change that people actually adopt';
-
-/** Display prices; Stripe Price IDs come from env via checkout. Annual = 2 months free. */
-const PLAN_PRICES = {
-  solo: { monthly: 59 },
-  small: { monthly: 149, annual: 1490 },
-  enterprise: { monthly: 299, annual: 2990 },
-};
 
 function trialSignupPath(tier, billingCycle = 'monthly') {
   const cycle = tier === 'solo' ? 'monthly' : (billingCycle === 'annual' ? 'annual' : 'monthly');
@@ -65,6 +60,7 @@ function BillingCycleToggle({ value, onChange }) {
 export default function LandingPage() {
   const navigate = useNavigate();
   const [billingCycle, setBillingCycle] = useState('monthly');
+  const { plans, annualSaveLabel } = usePlanPrices();
   const accountDeleted = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('account') === 'deleted';
 
@@ -73,11 +69,10 @@ export default function LandingPage() {
     navigate(`/auth/callback${window.location.search}${window.location.hash}`, { replace: true });
   }, [navigate]);
 
-  const smallPrice = billingCycle === 'annual' ? PLAN_PRICES.small.annual : PLAN_PRICES.small.monthly;
-  const enterprisePrice = billingCycle === 'annual'
-    ? PLAN_PRICES.enterprise.annual
-    : PLAN_PRICES.enterprise.monthly;
-  const pricePer = billingCycle === 'annual' ? '/ yr' : '/ mo';
+  const soloPrice = priceAmount(plans, 'solo', 'monthly');
+  const smallPrice = priceAmount(plans, 'small', billingCycle);
+  const enterprisePrice = priceAmount(plans, 'enterprise', billingCycle);
+  const pricePer = pricePeriodLabel(billingCycle);
 
   return (
     <SiteShell
@@ -195,7 +190,7 @@ export default function LandingPage() {
             <div className="tier">
               <h3>Sole Proprietor</h3>
               <div className="price">
-                <span className="amt">${PLAN_PRICES.solo.monthly}</span>
+                <span className="amt">${formatUsdAmount(soloPrice)}</span>
                 <span className="per">/ mo</span>
               </div>
               <p>1 user, 1 workspace. For a solo consultant running a single client rollout. Monthly billing only.</p>
@@ -206,11 +201,11 @@ export default function LandingPage() {
               <h3>Business</h3>
               <BillingCycleToggle value={billingCycle} onChange={setBillingCycle} />
               <div className="price">
-                <span className="amt">${smallPrice.toLocaleString('en-US')}</span>
+                <span className="amt">${formatUsdAmount(smallPrice)}</span>
                 <span className="per">{pricePer}</span>
               </div>
               {billingCycle === 'annual' ? (
-                <p className="billing-save">2 months free</p>
+                <p className="billing-save">{annualSaveLabel}</p>
               ) : null}
               <p>5 users, unlimited workspaces. For teams running change across multiple clients or departments.</p>
               <PlanCta tier="small" billingCycle={billingCycle} className="btn btn-red pay">
@@ -221,11 +216,11 @@ export default function LandingPage() {
               <h3>Enterprise</h3>
               <BillingCycleToggle value={billingCycle} onChange={setBillingCycle} />
               <div className="price">
-                <span className="amt">${enterprisePrice.toLocaleString('en-US')}</span>
+                <span className="amt">${formatUsdAmount(enterprisePrice)}</span>
                 <span className="per">{pricePer}</span>
               </div>
               {billingCycle === 'annual' ? (
-                <p className="billing-save">2 months free</p>
+                <p className="billing-save">{annualSaveLabel}</p>
               ) : null}
               <p>Unlimited users, unlimited workspaces. Monthly or annual billing.</p>
               <PlanCta tier="enterprise" billingCycle={billingCycle} className="btn btn-ghost-navy">

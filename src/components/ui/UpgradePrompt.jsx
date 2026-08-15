@@ -1,11 +1,17 @@
 import { Sparkles } from 'lucide-react';
 import { C, HEAD, BODY, tint, PLAN_LABELS } from '../../lib/constants';
+import { usePlanPrices } from '../../hooks/usePlanPrices';
+import { formatPlanPrice } from '../../../shared/planPrices.js';
 
 export default function UpgradePrompt({
   feature = 'This feature',
   title,
   body,
 }) {
+  const { plans } = usePlanPrices();
+  const smallPrice = formatPlanPrice(plans, 'small', 'monthly');
+  const enterprisePrice = formatPlanPrice(plans, 'enterprise', 'monthly');
+
   return (
     <div className="flex-1 p-8 max-w-xl w-full mx-auto flex items-center justify-center" style={BODY}>
       <div className="bg-white rounded-3xl border shadow-sm p-8 text-center w-full" style={{ borderColor: C.border }}>
@@ -22,7 +28,10 @@ export default function UpgradePrompt({
           {body || (
             <>
               Your plan is <strong style={{ color: C.ink }}>{PLAN_LABELS.solo}</strong>.
-              Upgrade to {PLAN_LABELS.small} or <strong style={{ color: C.ink }}>{PLAN_LABELS.enterprise}</strong> for
+              Upgrade to {PLAN_LABELS.small}
+              {smallPrice ? ` (${smallPrice})` : ''} or{' '}
+              <strong style={{ color: C.ink }}>{PLAN_LABELS.enterprise}</strong>
+              {enterprisePrice ? ` (${enterprisePrice})` : ''} for
               Tasks, Schedule, unlimited workspaces, and multi-user access.
             </>
           )}

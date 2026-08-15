@@ -9,6 +9,8 @@ import { Field, SaveRow } from '../ui/shared';
 import Modal from '../ui/Modal';
 import { FormWorkspace } from '../forms/AdminForms';
 import { Link } from 'react-router-dom';
+import { usePlanPrices } from '../../hooks/usePlanPrices';
+import { formatPlanPrice } from '../../../shared/planPrices.js';
 
 function ConfirmDeleteModal({
   title, description, confirmWord = 'DELETE', accountName = '', confirmLabel, busy, error, onClose, onConfirm,
@@ -63,6 +65,7 @@ function ConfirmDeleteModal({
 export default function ProfilePanel() {
   const { profile, session, refreshProfile, signOut } = useAuth();
   const { workspaces, reload, createWorkspace, subscription, planTier, trialActive, trialDaysLeft } = useWorkspace();
+  const { plans } = usePlanPrices();
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [memberWorkspaces, setMemberWorkspaces] = useState([]);
   const [activeUserCount, setActiveUserCount] = useState(null);
@@ -327,6 +330,11 @@ export default function ProfilePanel() {
     : subscription?.billing_cycle === 'monthly'
       ? 'Monthly'
       : '—';
+  const planPriceLabel = formatPlanPrice(
+    plans,
+    planTier,
+    subscription?.billing_cycle === 'annual' ? 'annual' : 'monthly',
+  );
   const nextBilling = subscription?.current_period_end
     ? new Date(subscription.current_period_end).toLocaleDateString(undefined, {
       year: 'numeric', month: 'short', day: 'numeric',
@@ -474,6 +482,7 @@ export default function ProfilePanel() {
               <dd className="font-semibold text-right" style={{ color: C.ink }}>
                 {PLAN_LABELS[planTier] || planTier || '—'}
                 {billingCycleLabel !== '—' ? ` · ${billingCycleLabel}` : ''}
+                {planPriceLabel ? ` · ${planPriceLabel}` : ''}
               </dd>
             </div>
             <div className="flex justify-between gap-3">

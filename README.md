@@ -44,14 +44,16 @@ STRIPE_PUBLISHABLE_KEY=
 STRIPE_WEBHOOK_SECRET=              # signing secret for /api/stripe-webhook
 ```
 
-Stripe Price IDs (for checkout — create one Product per tier in Stripe):
+Stripe Price IDs (for checkout — create one Product per tier in Stripe).
+Display prices are fetched live from these Price objects (`/api/plan-prices`);
+fallback amounts live in `shared/planPrices.js`.
 
 ```
-STRIPE_PRICE_SOLO_MONTHLY=          # $59 / month
-STRIPE_PRICE_SMALL_MONTHLY=         # $149 / month
-STRIPE_PRICE_SMALL_ANNUAL=          # $1,490 / year
-STRIPE_PRICE_ENTERPRISE_MONTHLY=    # $299 / month
-STRIPE_PRICE_ENTERPRISE_ANNUAL=     # $2,990 / year
+STRIPE_PRICE_SOLO_MONTHLY=          # $39 / month
+STRIPE_PRICE_SMALL_MONTHLY=         # $99 / month
+STRIPE_PRICE_SMALL_ANNUAL=          # $990 / year (2 months free)
+STRIPE_PRICE_ENTERPRISE_MONTHLY=    # $199 / month
+STRIPE_PRICE_ENTERPRISE_ANNUAL=     # $1,990 / year (2 months free)
 ```
 
 Webhook endpoint (Stripe Dashboard → Developers → Webhooks): `https://<your-domain>/api/stripe-webhook`  
@@ -94,4 +96,4 @@ Push to GitHub and connect to Vercel. Set all env vars in Vercel project setting
 
 ## Pricing
 
-Landing page plans: **Sole Proprietor** $59/mo (monthly only), **Business** $149/mo or $1,490/yr, **Enterprise** $299/mo or $2,990/yr. Checkout uses the Stripe Price IDs above based on tier + billing cycle.
+**Sole Proprietor** $39/mo (monthly only), **Business** $99/mo or $990/yr, **Enterprise** $199/mo or $1,990/yr (annual = 10× monthly / “2 months free”). UI amounts come from Stripe Price `unit_amount` via `/api/plan-prices`, with `shared/planPrices.js` as fallback. Checkout still uses the Stripe Price IDs above based on tier + billing cycle.
