@@ -156,6 +156,7 @@ export function FormInitiative({ initial, onSave }) {
     name: initial?.name || '',
     description: stripInitiativeMeta(initial?.description),
     programId: initial?.program_id || '',
+    status: initial?.status || 'planning',
     startDate: initial?.start_date || '',
     goLiveDate: initial?.proposed_go_live_date || '',
     budget: initial?.budget ?? '',
@@ -224,6 +225,14 @@ export function FormInitiative({ initial, onSave }) {
         )}
       </Field>
       <Field label="Initiative Name"><input className={inputClass} style={inputStyle} value={vals.name} onChange={set('name')} placeholder="e.g. Salesforce Rollout" autoFocus /></Field>
+      <Field label="Status">
+        <select className={inputClass} style={inputStyle} value={vals.status} onChange={set('status')}>
+          <option value="planning">Planning</option>
+          <option value="delivery">Delivery</option>
+          <option value="hypercare">Hypercare</option>
+          <option value="closed">Closed</option>
+        </select>
+      </Field>
       <Field label="Description"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.description} onChange={set('description')} /></Field>
       <div className="grid grid-cols-2 gap-4">
         <Field label="Start Date"><input type="date" className={inputClass} style={inputStyle} value={vals.startDate} onChange={set('startDate')} /></Field>
