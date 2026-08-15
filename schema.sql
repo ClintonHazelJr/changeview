@@ -30,6 +30,8 @@ create table users (
   -- Soft deactivate: frees a seat; login blocked via Auth ban in /api/deactivate-user.
   -- Do not hard-delete users — their id is referenced as owners/assignees/authors.
   is_active boolean not null default true,
+  terms_accepted_at timestamptz,
+  onboarding_completed_at timestamptz,
   created_at timestamptz not null default now()
 );
 

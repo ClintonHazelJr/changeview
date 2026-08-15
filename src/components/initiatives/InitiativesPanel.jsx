@@ -271,6 +271,7 @@ export default function InitiativesPanel({
         <ListTopBar
           title="Initiatives"
           addLabel="Add Initiative"
+          addTourId="add-initiative"
           onAdd={() => setModal('initiative')}
           addDisabled={activePrograms.length === 0}
           viewMode={viewMode}

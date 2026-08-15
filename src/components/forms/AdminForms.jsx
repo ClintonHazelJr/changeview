@@ -1187,7 +1187,7 @@ export function FormComms({ initiative, impacts, deptName, initial, onSave, onDe
       <Field label="Tone"><div>{['professional', 'playful', 'caring'].map((t) => <Pill key={t} active={tone === t} color={C.purple} onClick={() => setTone(t)}>{t}</Pill>)}</div></Field>
       <Field label="Additional instructions (optional)"><input className={inputClass} style={inputStyle} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g. Keep it under 100 words" /></Field>
       <div className="rounded-2xl p-4 mb-4" style={{ background: C.purple + '0A', border: `1px solid ${C.purple}30` }}>
-        <button type="button" onClick={generate} disabled={loading} className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-full text-white shadow-sm disabled:opacity-60" style={{ background: C.purple }}>
+        <button type="button" data-tour="ai-comms-generator" onClick={generate} disabled={loading} className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-full text-white shadow-sm disabled:opacity-60" style={{ background: C.purple }}>
           {loading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
           {loading ? 'Generating...' : 'AI Comms Generator'}
         </button>

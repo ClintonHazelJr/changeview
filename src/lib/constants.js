@@ -74,6 +74,19 @@ export const PLAN_LABELS = {
   enterprise: 'Enterprise',
 };
 
+/** Seat / workspace caps. null = unlimited. Aligns with marketing + DB workspace trigger. */
+export const PLAN_LIMITS = {
+  solo: { workspaces: 1, users: 1 },
+  small: { workspaces: null, users: 5 },
+  enterprise: { workspaces: null, users: null },
+};
+
+export function formatPlanLimit(used, limit) {
+  const usedN = Number(used) || 0;
+  if (limit == null) return `${usedN} of unlimited`;
+  return `${usedN} of ${limit}`;
+}
+
 /** UI gate only — API still enforces PLATFORM_ADMIN_EMAIL / default. */
 export const PLATFORM_ADMIN_EMAIL = String(
   import.meta.env.VITE_PLATFORM_ADMIN_EMAIL || 'clintonhazeljr@gmail.com',
@@ -96,6 +109,12 @@ export function isTrialExpired(subscription) {
 
 export function isTrialingActive(subscription) {
   return subscription?.status === 'trialing' && !isTrialExpired(subscription);
+}
+
+/** Trial unlocks Enterprise-level capacity for the duration of the trial. */
+export function effectivePlanLimits(tier, subscription = null) {
+  if (isTrialingActive(subscription)) return PLAN_LIMITS.enterprise;
+  return PLAN_LIMITS[tier] || PLAN_LIMITS.solo;
 }
 
 export function isPastDue(subscription) {

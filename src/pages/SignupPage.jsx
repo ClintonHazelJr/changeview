@@ -21,6 +21,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Capture whether the user was already signed in when this page loaded (pricing card while logged in).
   const arrivedLoggedIn = useRef(null);
@@ -68,12 +69,16 @@ export default function SignupPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!termsAccepted) {
+      setError('Please agree to the Terms of Service and Privacy Policy to continue.');
+      return;
+    }
     setError('');
     setBusy(true);
     rememberCheckoutIntent(planTier, billingCycle);
     try {
       const data = await signUp({
-        email, password, fullName, accountName, planTier, billingCycle,
+        email, password, fullName, accountName, planTier, billingCycle, termsAccepted: true,
       });
       // Account/workspace provision via trigger; checkout must not wait on email confirm.
       await startCheckout(planTier, billingCycle, {
@@ -135,8 +140,27 @@ export default function SignupPage() {
           <input type="email" required className={`${inputClass} mb-4`} style={inputStyle} value={email} onChange={(e) => setEmail(e.target.value)} />
           <label className="block text-xs font-semibold mb-1.5" style={{ color: C.sub }}>Password</label>
           <input type="password" required minLength={6} className={`${inputClass} mb-4`} style={inputStyle} value={password} onChange={(e) => setPassword(e.target.value)} />
+          <label className="flex items-start gap-2.5 mb-4 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="mt-0.5 shrink-0"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              required
+            />
+            <span className="text-xs leading-relaxed" style={{ color: C.sub }}>
+              I agree to the{' '}
+              <Link to="/terms" target="_blank" rel="noopener noreferrer" style={{ color: C.purple }} onClick={(e) => e.stopPropagation()}>
+                Terms of Service
+              </Link>
+              {' '}and{' '}
+              <Link to="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: C.purple }} onClick={(e) => e.stopPropagation()}>
+                Privacy Policy
+              </Link>
+            </span>
+          </label>
           {error && <p className="text-xs mb-3" style={{ color: C.coral }}>{error}</p>}
-          <button type="submit" disabled={busy} className="w-full text-sm font-bold text-white py-3 rounded-full disabled:opacity-50" style={{ background: C.purple }}>
+          <button type="submit" disabled={busy || !termsAccepted} className="w-full text-sm font-bold text-white py-3 rounded-full disabled:opacity-50" style={{ background: C.purple }}>
             Continue to checkout
           </button>
         </form>

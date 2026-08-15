@@ -79,6 +79,7 @@ export default function SiteShell({ title, children, notice }) {
             </div>
             <div className="col">
               <span className="h">Resources</span>
+              <Link to="/guide">Guide</Link>
               <Link to="/blog">Blog</Link>
             </div>
           </div>

@@ -18,6 +18,7 @@ import UsersPanel from '../components/users/UsersPanel';
 import TasksPanel from '../components/tasks/TasksPanel';
 import UpgradePrompt from '../components/ui/UpgradePrompt';
 import BillingGate from '../components/ui/BillingGate';
+import OnboardingTour from '../components/onboarding/OnboardingTour';
 
 function AppShell() {
   const { profile, session } = useAuth();
@@ -237,6 +238,9 @@ function AppShell() {
       {showIncompleteGate && <BillingGate mode="incomplete" />}
       {showPastDueGate && <BillingGate mode="past_due" />}
       <TopNav onNavigate={handleNavigate} />
+      {!workspaceLoading && profile && !profile.onboarding_completed_at && (
+        <OnboardingTour onNavigate={handleNavigate} />
+      )}
       {checkoutMsg && (
         <div
           className="px-6 py-2 text-xs font-semibold text-center"

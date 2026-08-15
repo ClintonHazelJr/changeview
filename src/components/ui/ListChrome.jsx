@@ -13,7 +13,7 @@ export function statusColor(status) {
  * modes: which ViewToggle options to show (default tiles + list)
  */
 export function ListTopBar({
-  title, addLabel, onAdd, addDisabled,
+  title, addLabel, onAdd, addDisabled, addTourId,
   viewMode = 'tiles', onViewChange, viewModes = ['tiles', 'list'],
   onBulkUpload, bulkLabel = 'Bulk Upload', bulkDisabled,
 }) {
@@ -41,6 +41,7 @@ export function ListTopBar({
       )}
       <button
         type="button"
+        data-tour={addTourId || undefined}
         onClick={onAdd}
         disabled={addDisabled}
         className="flex items-center gap-1.5 text-sm font-bold text-white px-4 py-2 rounded-full disabled:opacity-40 shadow-sm"

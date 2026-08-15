@@ -38,6 +38,7 @@ export default function AppSidebar({ section, setSection }) {
             <button
               key={item.key}
               type="button"
+              data-tour={item.key === 'initiatives' ? 'nav-initiatives' : undefined}
               onClick={() => setSection(item.key)}
               className="w-full flex items-center gap-2.5 pl-3 pr-2.5 py-2.5 rounded-xl text-sm text-left"
               style={{
@@ -78,6 +79,7 @@ export default function AppSidebar({ section, setSection }) {
         </button>
         <button
           type="button"
+          data-tour="nav-settings"
           onClick={() => setSection('settings')}
           className="w-full flex items-center gap-2.5 pl-3 pr-2.5 py-2.5 rounded-xl text-sm text-left"
           style={{
@@ -87,7 +89,7 @@ export default function AppSidebar({ section, setSection }) {
           }}
         >
           <Settings size={16} style={{ color: section === 'settings' ? C.purple : C.sub }} />
-          <span style={HEAD}>Settings</span>
+          <span style={HEAD}>System Admin</span>
         </button>
       </div>
     </aside>
