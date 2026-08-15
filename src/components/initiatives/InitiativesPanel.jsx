@@ -13,6 +13,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { TabSection } from '../ui/shared';
 import Modal from '../ui/Modal';
 import CascadingDeleteModal from '../ui/CascadingDeleteModal';
+import CardActionsMenu from '../ui/CardActionsMenu';
 import CsvImportModal from '../ui/CsvImportModal';
 import ShowInactiveToggle from '../ui/ShowInactiveToggle';
 import { findPerson, parseYesNo } from '../../lib/csvImport';
@@ -337,29 +338,17 @@ export default function InitiativesPanel({
                         ].filter(Boolean)}
                         onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
                       />
-                      <div className="absolute top-3 right-3 flex items-center gap-1 z-10">
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => toggleArchive(i)}
-                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full disabled:opacity-50"
-                          style={{
-                            background: archived ? tint(C.green, '18') : tint(C.coral, '18'),
-                            color: archived ? C.green : C.coral,
-                          }}
-                        >
-                          {archived ? <ArchiveRestore size={11} /> : <Archive size={11} />}
-                          {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openDelete(i)}
-                          className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full"
-                          style={{ background: tint(C.coral, '22'), color: C.coral }}
-                        >
-                          <Trash2 size={11} /> Delete
-                        </button>
-                      </div>
+                      <CardActionsMenu
+                        archived={archived}
+                        busy={busy}
+                        onEdit={() => {
+                          openEdit('initiative', i);
+                          setSelectedInitId(i.id);
+                          setInitTab('details');
+                        }}
+                        onArchive={() => toggleArchive(i)}
+                        onDelete={() => openDelete(i)}
+                      />
                     </div>
                   );
                 })}

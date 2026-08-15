@@ -5,6 +5,7 @@ import { countProgramDeleteImpact } from '../../lib/deleteImpactCounts';
 import { usePrograms } from '../../hooks/usePrograms';
 import Modal from '../ui/Modal';
 import CascadingDeleteModal from '../ui/CascadingDeleteModal';
+import CardActionsMenu from '../ui/CardActionsMenu';
 import { FormProgram } from '../forms/AdminForms';
 import ListTable from '../ui/ListTable';
 import StatusPill from '../ui/StatusPill';
@@ -278,29 +279,13 @@ export default function ProgramsPanel({ initialProgramId = null, onProgramFocusC
                       ]}
                       onClick={() => openEdit(p)}
                     />
-                    <div className="absolute top-3 right-3 flex items-center gap-1">
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => toggleArchive(p)}
-                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full disabled:opacity-50"
-                        style={{
-                          background: archived ? tint(C.green, '18') : tint(C.coral, '18'),
-                          color: archived ? C.green : C.coral,
-                        }}
-                      >
-                        {archived ? <ArchiveRestore size={11} /> : <Archive size={11} />}
-                        {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openDelete(p)}
-                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full"
-                        style={{ background: tint(C.coral, '22'), color: C.coral }}
-                      >
-                        <Trash2 size={11} /> Delete
-                      </button>
-                    </div>
+                    <CardActionsMenu
+                      archived={archived}
+                      busy={busy}
+                      onEdit={() => openEdit(p)}
+                      onArchive={() => toggleArchive(p)}
+                      onDelete={() => openDelete(p)}
+                    />
                   </div>
                 );
               })}

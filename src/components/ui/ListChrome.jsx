@@ -198,7 +198,7 @@ export function CompactListCard({
       className="bg-white rounded-xl border p-3 text-left hover:shadow-sm transition-shadow w-full min-h-[88px] flex flex-col"
       style={{ borderColor: C.border }}
     >
-      <div className="text-sm font-bold leading-snug line-clamp-2 mb-0.5" style={{ color: C.ink }}>{title}</div>
+      <div className="text-sm font-bold leading-snug line-clamp-2 mb-0.5 pr-8" style={{ color: C.ink }}>{title}</div>
       {subtitle && (
         <div className="text-[11px] mb-2 line-clamp-1" style={{ color: C.sub }}>{subtitle}</div>
       )}
