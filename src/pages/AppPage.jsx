@@ -44,14 +44,18 @@ function AppShell() {
   const [taskFocusId, setTaskFocusId] = useState(null);
   const [adminTabFocus, setAdminTabFocus] = useState(null);
   const [openAddOrg, setOpenAddOrg] = useState(false);
+  // null = still checking, false = must add Org first, true = ok to show tour
+  const [orgSetupComplete, setOrgSetupComplete] = useState(null);
   const orgSetupCheckedForWs = useRef(null);
 
   // Empty workspace → System Admin Org tab with Add Org ready (login + workspace switch).
+  // Hold the onboarding tour until at least one Org exists.
   useEffect(() => {
     if (workspaceLoading || !activeWorkspaceId) return undefined;
     if (orgSetupCheckedForWs.current === activeWorkspaceId) return undefined;
 
     let cancelled = false;
+    setOrgSetupComplete(null);
     (async () => {
       const { count, error } = await supabase
         .from('organizations')
@@ -59,7 +63,16 @@ function AppShell() {
         .eq('workspace_id', activeWorkspaceId);
       if (cancelled) return;
       orgSetupCheckedForWs.current = activeWorkspaceId;
-      if (error || (count ?? 0) > 0) return;
+      if (error) {
+        // Don't block forever on a read error — allow normal app + tour.
+        setOrgSetupComplete(true);
+        return;
+      }
+      if ((count ?? 0) > 0) {
+        setOrgSetupComplete(true);
+        return;
+      }
+      setOrgSetupComplete(false);
       setSection('settings');
       setAdminTabFocus('org');
       setOpenAddOrg(true);
@@ -67,6 +80,21 @@ function AppShell() {
 
     return () => { cancelled = true; };
   }, [activeWorkspaceId, workspaceLoading]);
+
+  const markOrgSetupComplete = useCallback(() => {
+    setOrgSetupComplete(true);
+    setOpenAddOrg(false);
+  }, []);
+
+  // Keep the user on System Admin + Add Org until the first Org exists.
+  useEffect(() => {
+    if (orgSetupComplete !== false) return;
+    if (section !== 'settings') {
+      setSection('settings');
+      setAdminTabFocus('org');
+      setOpenAddOrg(true);
+    }
+  }, [orgSetupComplete, section]);
 
   useEffect(() => {
     const checkout = params.get('checkout');
@@ -224,6 +252,8 @@ function AppShell() {
         onInitialTabConsumed={() => setAdminTabFocus(null)}
         initialOpenAddOrg={openAddOrg}
         onInitialOpenAddOrgConsumed={() => setOpenAddOrg(false)}
+        requireOrg={orgSetupComplete === false}
+        onOrgCreated={markOrgSetupComplete}
       />
     );
   }
@@ -232,13 +262,17 @@ function AppShell() {
   // loading and when checkout is genuinely required; only trust it after load.
   const showIncompleteGate = !workspaceLoading && isOwner && checkoutNeeded && !pastDue;
   const showPastDueGate = !workspaceLoading && isOwner && pastDue;
+  const showOnboardingTour = !workspaceLoading
+    && profile
+    && !profile.onboarding_completed_at
+    && orgSetupComplete === true;
 
   return (
     <div className="min-h-screen w-full flex flex-col" style={{ ...BODY, background: C.bg }}>
       {showIncompleteGate && <BillingGate mode="incomplete" />}
       {showPastDueGate && <BillingGate mode="past_due" />}
       <TopNav onNavigate={handleNavigate} />
-      {!workspaceLoading && profile && !profile.onboarding_completed_at && (
+      {showOnboardingTour && (
         <OnboardingTour onNavigate={handleNavigate} />
       )}
       {checkoutMsg && (

@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
 import { C, HEAD, BODY } from '../../lib/constants';
 
-export default function Modal({ title, onClose, children, wide }) {
+export default function Modal({ title, onClose, children, wide, hideClose = false }) {
   return (
     <div className="fixed inset-0 bg-black/25 flex items-center justify-center z-50 p-4">
       <div
@@ -13,9 +13,11 @@ export default function Modal({ title, onClose, children, wide }) {
           style={{ borderColor: C.border }}
         >
           <h3 className="font-bold" style={{ ...HEAD, color: C.ink }}>{title}</h3>
-          <button type="button" onClick={onClose} className="text-gray-300 hover:text-gray-500">
-            <X size={18} />
-          </button>
+          {!hideClose && (
+            <button type="button" onClick={onClose} className="text-gray-300 hover:text-gray-500" aria-label="Close">
+              <X size={18} />
+            </button>
+          )}
         </div>
         <div className="p-6">{children}</div>
       </div>

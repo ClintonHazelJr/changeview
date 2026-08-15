@@ -25,6 +25,8 @@ export default function SystemAdmin({
   onInitialTabConsumed,
   initialOpenAddOrg = false,
   onInitialOpenAddOrgConsumed,
+  requireOrg = false,
+  onOrgCreated,
 }) {
   const { activeWorkspace, activeWorkspaceId } = useWorkspace();
   const { profile } = useAuth();
@@ -58,6 +60,14 @@ export default function SystemAdmin({
     setModal('org');
     onInitialOpenAddOrgConsumed?.();
   }, [initialOpenAddOrg, onInitialOpenAddOrgConsumed]);
+
+  // If mandatory Org setup is still required and the modal was closed somehow, reopen it.
+  useEffect(() => {
+    if (!requireOrg) return;
+    if (modal === 'org') return;
+    setAdminTab('org');
+    setModal('org');
+  }, [requireOrg, modal]);
 
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '—';
@@ -568,7 +578,26 @@ export default function SystemAdmin({
         )}
       </div>
 
-      {modal === 'org' && <Modal title="Add Org" onClose={() => setModal(null)}><FormOrg onSave={async (n) => { await addOrg(n); setModal(null); }} /></Modal>}
+      {modal === 'org' && (
+        <Modal
+          title="Add Org"
+          hideClose={requireOrg}
+          onClose={requireOrg ? undefined : () => setModal(null)}
+        >
+          <FormOrg
+            onSave={async (n) => {
+              await addOrg(n);
+              setModal(null);
+              onOrgCreated?.();
+            }}
+          />
+          {requireOrg && (
+            <p className="text-xs mt-3" style={{ color: C.sub }}>
+              Add your first organization to continue. This is a one-time setup step.
+            </p>
+          )}
+        </Modal>
+      )}
       {modal === 'department' && (
         <Modal title={editingDepartment ? 'Edit Department' : 'Add Department'} onClose={closeDepartmentModal}>
           <FormDepartment
