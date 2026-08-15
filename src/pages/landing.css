@@ -203,6 +203,21 @@
   font-size: 16px;
 }
 
+.cv-landing .shot {
+  margin-top: 48px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.cv-landing .shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
+
 /* trust */
 .cv-landing .trust {
   background: #eef0f7;

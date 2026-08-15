@@ -97,6 +97,14 @@ export default function LandingPage() {
               <Link className="btn btn-red" to="/signup?plan=solo&billing=monthly">Start free</Link>
             </div>
           </div>
+          <div className="shot">
+            <img
+              src="/assets/hero_real_final.png"
+              alt="ChangeView dashboard showing planning, delivery, and impact severity"
+              width={1024}
+              height={461}
+            />
+          </div>
         </div>
       </header>
 
