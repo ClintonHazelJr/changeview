@@ -3,19 +3,28 @@ import { jsPDF } from 'jspdf';
 
 /**
  * Capture a DOM node to a multi-page PDF (preserves colors for heat maps).
+ * @param {HTMLElement} element
+ * @param {string} filename
+ * @param {{ orientation?: 'portrait'|'landscape', format?: string }} [options]
  */
-export async function exportElementToPdf(element, filename = 'report.pdf') {
+export async function exportElementToPdf(element, filename = 'report.pdf', options = {}) {
   if (!element) throw new Error('Nothing to export yet.');
+
+  const orientation = options.orientation === 'landscape' ? 'landscape' : 'portrait';
+  const format = options.format || 'a4';
 
   const canvas = await html2canvas(element, {
     scale: 2,
     useCORS: true,
     backgroundColor: '#ffffff',
     logging: false,
+    // Capture full scroll width for wide Gantt charts
+    windowWidth: Math.max(element.scrollWidth, element.offsetWidth),
+    windowHeight: Math.max(element.scrollHeight, element.offsetHeight),
   });
 
   const imgData = canvas.toDataURL('image/png');
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const pdf = new jsPDF({ orientation, unit: 'pt', format });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 28;
