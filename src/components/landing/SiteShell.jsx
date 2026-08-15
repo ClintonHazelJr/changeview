@@ -62,6 +62,7 @@ export default function SiteShell({ title, children, notice }) {
               <Mark variant="footer" style={{ width: 32, height: 26, display: 'block' }} />
               <span>changeview</span>
             </span>
+            <span className="attrib">a Blackhand Technologies product</span>
             <span className="tag">Change management that people actually adopt.</span>
           </div>
           <div className="cols">

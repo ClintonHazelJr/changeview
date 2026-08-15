@@ -5,7 +5,7 @@ const TERMS_MD = `# Terms of Service
 
 **Last updated: August 14, 2026**
 
-These Terms of Service ("Terms") govern your access to and use of ChangeView (the "Service"), operated by [LEGAL ENTITY NAME]. By creating an account, you agree to these Terms.
+These Terms of Service ("Terms") govern your access to and use of ChangeView (the "Service"), operated by Blackhand Technologies (ABN:54 693 473 004). By creating an account, you agree to these Terms.
 
 ## 1. The Service
 
@@ -66,7 +66,7 @@ We may update these Terms from time to time. We'll notify you of material change
 
 ## 12. Governing law
 
-These Terms are governed by the laws of [JURISDICTION], without regard to conflict of law principles.
+These Terms are governed by the laws of Victoria, Australia, without regard to conflict of law principles.
 
 ## 13. Contact
 
