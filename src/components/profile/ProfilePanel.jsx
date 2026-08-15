@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CreditCard, LogOut, Trash2, AlertTriangle } from 'lucide-react';
-import { C, HEAD, BODY, inputClass, inputStyle, initials, tint, PLAN_LABELS } from '../../lib/constants';
+import { C, HEAD, BODY, inputClass, inputStyle, initials, tint, PLAN_LABELS, isPlatformAdminEmail, PLATFORM_RESET_CONFIRM } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -71,6 +71,7 @@ export default function ProfilePanel() {
   const [dangerError, setDangerError] = useState('');
   const [showCreateWs, setShowCreateWs] = useState(false);
   const [wipeNotice, setWipeNotice] = useState('');
+  const [resetNotice, setResetNotice] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -80,6 +81,7 @@ export default function ProfilePanel() {
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState('');
   const isOwner = profile?.role === 'owner';
+  const isPlatformAdmin = isPlatformAdminEmail(profile?.email || session?.user?.email);
   const accountName = profile?.accounts?.name || '';
   const hasStripeCustomer = Boolean(subscription?.stripe_customer_id);
 
@@ -242,6 +244,37 @@ export default function ProfilePanel() {
     }
   };
 
+  const runPlatformReset = async (confirm) => {
+    setDangerBusy(true);
+    setDangerError('');
+    setResetNotice('');
+    try {
+      const res = await fetch('/api/admin-reset-except', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ confirm }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Platform reset failed');
+      setDangerModal(null);
+      const parts = [
+        `${data.deletedAccounts ?? 0} accounts`,
+        `${data.deletedAuthUsers ?? 0} auth users`,
+        `${data.deletedStripeCustomers ?? 0} Stripe customers`,
+      ];
+      setResetNotice(`Platform reset complete: removed ${parts.join(', ')}. Your login and account were kept.`);
+      if (Array.isArray(data.errors) && data.errors.length) {
+        setResetNotice((prev) => `${prev} Some errors: ${data.errors.slice(0, 3).join('; ')}`);
+      }
+      await reload();
+      await refreshProfile();
+    } catch (err) {
+      setDangerError(err.message);
+    } finally {
+      setDangerBusy(false);
+    }
+  };
+
   const workspaceList = isOwner
     ? null
     : (memberWorkspaces.length ? memberWorkspaces : workspaces);
@@ -257,6 +290,15 @@ export default function ProfilePanel() {
           style={{ borderColor: tint(C.amber, '50'), background: tint(C.amber, '16'), color: C.ink }}
         >
           {wipeNotice}
+        </div>
+      )}
+
+      {resetNotice && (
+        <div
+          className="mb-4 text-sm rounded-2xl border px-4 py-3"
+          style={{ borderColor: tint(C.navy, '45'), background: tint(C.navy, '10'), color: C.ink }}
+        >
+          {resetNotice}
         </div>
       )}
 
@@ -490,6 +532,36 @@ export default function ProfilePanel() {
         </section>
       )}
 
+      {isPlatformAdmin && (
+        <section
+          className="rounded-3xl border p-5 mt-4"
+          style={{ borderColor: tint(C.ink, '35'), background: tint(C.ink, '06') }}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle size={16} style={{ color: C.ink }} />
+            <h3 className="text-sm font-extrabold" style={{ ...HEAD, color: C.ink }}>Platform admin</h3>
+          </div>
+          <p className="text-xs mb-5" style={{ color: C.sub }}>
+            Visible only to you. Purges every other tenancy so test resets stay consistent.
+          </p>
+          <div className="bg-white rounded-2xl border p-4" style={{ borderColor: tint(C.coral, '40') }}>
+            <div className="text-sm font-bold mb-1" style={{ color: C.coral }}>Reset platform (keep my login)</div>
+            <p className="text-xs mb-3" style={{ color: C.sub }}>
+              Permanently deletes every other account, workspace, app user, Auth login, and Stripe customer.
+              Keeps your email, account, subscription, and workspaces.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setDangerError(''); setDangerModal('platform-reset'); }}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-white px-3 py-2 rounded-full"
+              style={{ background: C.ink }}
+            >
+              <Trash2 size={13} /> Reset all except me
+            </button>
+          </div>
+        </section>
+      )}
+
       {dangerModal === 'data' && (
         <ConfirmDeleteModal
           title="Delete all data"
@@ -513,6 +585,19 @@ export default function ProfilePanel() {
           error={dangerError}
           onClose={() => setDangerModal(null)}
           onConfirm={runDeleteAccount}
+        />
+      )}
+
+      {dangerModal === 'platform-reset' && (
+        <ConfirmDeleteModal
+          title="Reset platform"
+          description="This permanently deletes every other account, workspace, user, Auth login, and Stripe customer. Your login, account, subscription, and workspaces are kept. This cannot be undone."
+          confirmWord={PLATFORM_RESET_CONFIRM}
+          confirmLabel="Reset platform"
+          busy={dangerBusy}
+          error={dangerError}
+          onClose={() => setDangerModal(null)}
+          onConfirm={runPlatformReset}
         />
       )}
 

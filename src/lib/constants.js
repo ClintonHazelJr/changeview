@@ -73,6 +73,17 @@ export const PLAN_LABELS = {
   small: 'Business',
   enterprise: 'Enterprise',
 };
+
+/** UI gate only — API still enforces PLATFORM_ADMIN_EMAIL / default. */
+export const PLATFORM_ADMIN_EMAIL = String(
+  import.meta.env.VITE_PLATFORM_ADMIN_EMAIL || 'clintonhazeljr@gmail.com',
+).trim().toLowerCase();
+
+export const PLATFORM_RESET_CONFIRM = 'RESET ALL EXCEPT ME';
+
+export const isPlatformAdminEmail = (email) =>
+  String(email || '').trim().toLowerCase() === PLATFORM_ADMIN_EMAIL;
+
 export const isSoloPlan = (tier) => tier === 'solo';
 export const isEnterprisePlan = (tier) => tier === 'enterprise';
 export const isSmallPlan = (tier) => tier === 'small';
