@@ -36,10 +36,10 @@ export const initials = (name = '') =>
 const GRAY = '#8a8986';
 
 export const SEVERITY_COLOR = {
-  none: GRAY,
-  low: C.blue4,
-  medium: C.royal,
-  high: C.red,
+  none: C.ink, // No Impact — ink, not pure black
+  low: '#22C55E',
+  medium: '#FBBF24',
+  high: C.red, // #ff1717
 };
 export const SEVERITY_LEVELS = ['none', 'low', 'medium', 'high'];
 export const isRatedSeverity = (value) => Boolean(value) && value !== 'none';
@@ -53,10 +53,10 @@ export const STATUS_COLOR = {
   draft: GRAY,
   approved: C.navy,
   rejected: C.red,
-  // Severity (shared keys)
-  none: GRAY,
-  low: C.blue4,
-  medium: C.royal,
+  // Severity (shared keys — traffic light)
+  none: C.ink,
+  low: '#22C55E',
+  medium: '#FBBF24',
   high: C.red,
   // Task Kanban
   backlog: GRAY,

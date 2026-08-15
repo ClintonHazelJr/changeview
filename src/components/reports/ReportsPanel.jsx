@@ -62,12 +62,15 @@ function dateRangeLabel(start, end) {
   return formatReportDate(start || end);
 }
 
-/** Single-hue blue ramp: light trust tint → navy (darker = higher score). */
-function cellColor(score, max) {
-  if (!score || !max) return C.trust;
-  const t = Math.min(1, score / max);
-  const a = Math.round(28 + t * 200).toString(16).padStart(2, '0');
-  return `${C.navy}${a}`;
+/** Discrete traffic-light buckets from average severity (0–3 scale). */
+function heatMapCellStyle(avg) {
+  const score = Number(avg) || 0;
+  let background = SEVERITY_COLOR.none;
+  if (score >= 2.5) background = SEVERITY_COLOR.high;
+  else if (score >= 1.5) background = SEVERITY_COLOR.medium;
+  else if (score >= 0.5) background = SEVERITY_COLOR.low;
+  const color = background === SEVERITY_COLOR.medium ? C.ink : '#fff';
+  return { background, color };
 }
 
 function ExportBar({ exportRef, filename, disabled }) {
@@ -569,6 +572,7 @@ function HeatMapReport({ workspaceId, exportRef }) {
           sums[deptId] = {
             id: deptId,
             name: deptMap[deptId] || 'Unassigned',
+            count: 0,
             severity_org: 0,
             severity_people: 0,
             severity_process: 0,
@@ -576,23 +580,24 @@ function HeatMapReport({ workspaceId, exportRef }) {
             severity_environment: 0,
           };
         }
+        sums[deptId].count += 1;
         SEV_COLS.forEach(({ key }) => {
           sums[deptId][key] += SEV_SCORE[imp[key]] ?? 0;
         });
       });
-      setCells(Object.values(sums).sort((a, b) => a.name.localeCompare(b.name)));
+      const rows = Object.values(sums).map((row) => {
+        const n = row.count || 1;
+        const next = { id: row.id, name: row.name, count: row.count };
+        SEV_COLS.forEach(({ key }) => {
+          next[key] = row[key] / n;
+        });
+        return next;
+      }).sort((a, b) => a.name.localeCompare(b.name));
+      setCells(rows);
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [workspaceId]);
-
-  const max = useMemo(() => {
-    let m = 0;
-    cells.forEach((row) => {
-      SEV_COLS.forEach(({ key }) => { m = Math.max(m, row[key] || 0); });
-    });
-    return m || 1;
-  }, [cells]);
 
   if (loading) return <p className="text-sm" style={{ color: C.sub }}>Loading…</p>;
   if (cells.length === 0) return <p className="text-sm" style={{ color: C.sub }}>No impacts to map yet.</p>;
@@ -602,6 +607,19 @@ function HeatMapReport({ workspaceId, exportRef }) {
       <div className="mb-3 px-1">
         <div className="text-[11px] font-bold uppercase tracking-wide" style={{ color: C.sub }}>ChangeView</div>
         <h3 className="text-lg font-extrabold" style={{ ...HEAD, color: C.ink }}>Impact heat map</h3>
+      </div>
+      <div className="flex flex-wrap gap-2 mb-3 px-1 text-[11px] font-semibold">
+        {[
+          { label: 'No Impact', color: SEVERITY_COLOR.none },
+          { label: 'Low', color: SEVERITY_COLOR.low },
+          { label: 'Medium', color: SEVERITY_COLOR.medium },
+          { label: 'High', color: SEVERITY_COLOR.high },
+        ].map((item) => (
+          <span key={item.label} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ background: C.bg, color: C.ink }}>
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: item.color }} />
+            {item.label}
+          </span>
+        ))}
       </div>
       <table className="w-full text-sm min-w-[700px]">
         <thead>
@@ -616,27 +634,31 @@ function HeatMapReport({ workspaceId, exportRef }) {
           {cells.map((row) => (
             <tr key={row.id} className="border-b" style={{ borderColor: C.border }}>
               <td className="px-3 py-2 font-semibold" style={{ color: C.ink }}>{row.name}</td>
-              {SEV_COLS.map(({ key }) => (
-                <td key={key} className="px-2 py-2 text-center">
-                  <div
-                    className="mx-auto rounded-lg py-2 font-bold text-xs"
-                    style={{
-                      background: cellColor(row[key], max),
-                      color: row[key] > max * 0.45 ? '#fff' : C.ink,
-                      minWidth: 48,
-                    }}
-                    title={`Sum severity score: ${row[key]}`}
-                  >
-                    {row[key]}
-                  </div>
-                </td>
-              ))}
+              {SEV_COLS.map(({ key }) => {
+                const avg = row[key] || 0;
+                const style = heatMapCellStyle(avg);
+                return (
+                  <td key={key} className="px-2 py-2 text-center">
+                    <div
+                      className="mx-auto rounded-lg py-2 font-bold text-xs"
+                      style={{
+                        ...style,
+                        minWidth: 48,
+                      }}
+                      title={`Average severity: ${avg.toFixed(2)} (none=0 … high=3)`}
+                    >
+                      {avg.toFixed(1)}
+                    </div>
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
       </table>
       <p className="px-4 py-3 text-[11px]" style={{ color: C.sub }}>
-        Cell values are summed severity scores across impacts (none=0, low=1, medium=2, high=3). Darker cells = higher cumulative impact.
+        Cell values are average severity per department (none=0, low=1, medium=2, high=3).
+        Colors are discrete buckets: 0–0.5 No Impact, 0.5–1.5 Low, 1.5–2.5 Medium, 2.5–3 High.
       </p>
     </div>
   );
