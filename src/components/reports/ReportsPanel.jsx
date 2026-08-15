@@ -145,7 +145,7 @@ function RequirementsReport({ workspaceId, exportRef }) {
         </select>
         <select className="text-sm rounded-xl border px-3 py-2" style={{ borderColor: C.border, color: C.ink }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">All statuses</option>
-          {['draft', 'approved', 'rejected'].map((s) => <option key={s} value={s}>{s}</option>)}
+          {['draft', 'approved', 'completed', 'rejected'].map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
       <div ref={exportRef} className="bg-white rounded-2xl border overflow-x-auto p-4" style={{ borderColor: C.border }}>

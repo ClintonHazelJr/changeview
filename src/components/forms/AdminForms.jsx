@@ -446,6 +446,7 @@ export function FormRequirement({ initiatives, people, departments = [], impacts
           <select className={inputClass} style={inputStyle} value={vals.status} onChange={set('status')}>
             <option value="draft">Draft</option>
             <option value="approved">Approved</option>
+            <option value="completed">Completed</option>
             <option value="rejected">Rejected</option>
           </select>
         </Field>

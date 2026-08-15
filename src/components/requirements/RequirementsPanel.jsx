@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FilePenLine, BadgeCheck, Ban } from 'lucide-react';
+import { FilePenLine, BadgeCheck, Ban, CircleCheck } from 'lucide-react';
 import { SEVERITY_COLOR, parseDbError, C, inputClass, inputStyle } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useRequirements } from '../../hooks/useRequirements';
@@ -20,6 +20,7 @@ import { findPerson, requireEnum } from '../../lib/csvImport';
 const STATUSES = [
   { key: 'draft', label: 'Draft', icon: FilePenLine },
   { key: 'approved', label: 'Approved', icon: BadgeCheck },
+  { key: 'completed', label: 'Completed', icon: CircleCheck },
   { key: 'rejected', label: 'Rejected', icon: Ban },
 ];
 
@@ -223,7 +224,7 @@ export default function RequirementsPanel() {
           mapRow={(row) => {
             const description = row.Description;
             if (!description) throw new Error('Description is required');
-            const status = requireEnum(row.Status, ['draft', 'approved', 'rejected'], {
+            const status = requireEnum(row.Status, ['draft', 'approved', 'rejected', 'completed'], {
               field: 'Status',
               defaultValue: 'draft',
             });

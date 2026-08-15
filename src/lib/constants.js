@@ -53,6 +53,7 @@ export const STATUS_COLOR = {
   draft: GRAY,
   approved: C.navy,
   rejected: C.red,
+  completed: '#16A34A', // green — distinct from approved (navy)
   // Severity (shared keys — traffic light)
   none: C.ink,
   low: '#22C55E',

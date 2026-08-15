@@ -294,7 +294,7 @@ create table requirements (
   initiative_id uuid not null references initiatives(id) on delete cascade,
   reference_number text,
   description text not null,
-  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected')),
+  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected', 'completed')),
   priority text check (priority in ('low', 'medium', 'high')),
   author_id uuid references people(id),
   business_approver_id uuid references people(id),
