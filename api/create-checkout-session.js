@@ -204,14 +204,16 @@ export default async function handler(req, res) {
       }
     }
 
-    if (afterSignup && !accountId) {
+    if (!accountId) {
       return res.status(400).json({
-        error: 'Could not attach checkout to your new account. Try again in a moment.',
+        error: afterSignup
+          ? 'Could not attach checkout to your new account. Try again in a moment.'
+          : 'Sign in to continue to checkout so we can link billing to your account.',
       });
     }
 
     console.log('[checkout-debug] auth/lookup phase done', {
-      accountId: accountId || null,
+      accountId,
       hasCustomerEmail: Boolean(customerEmail),
       hasStripeCustomerId: Boolean(stripeCustomerId),
       addTrial,
@@ -221,7 +223,7 @@ export default async function handler(req, res) {
     });
 
     const meta = {
-      account_id: accountId || '',
+      account_id: accountId,
       tier,
       plan_tier: tier,
       billing_cycle: billingCycle,
