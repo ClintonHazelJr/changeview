@@ -1,59 +1,73 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { C, HEAD, BODY } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
-const STEPS = [
-  {
-    id: 'workspace',
-    target: '[data-tour="workspace-picker"]',
-    section: null,
-    title: 'Your workspace',
-    body: 'Switch Workspaces here. Each Workspace holds its own Orgs, Programs, and Initiatives — useful if you run more than one engagement.',
-  },
-  {
-    id: 'admin',
-    target: '[data-tour="nav-settings"]',
-    section: 'settings',
-    title: 'Start in System Admin',
-    body: 'Setup begins here: add Orgs, Departments, People, and Project Teams. Do this once so Impacts, Stakeholders, and assignees are ready to reuse.',
-  },
-  {
-    id: 'initiative',
-    target: '[data-tour="add-initiative"]',
-    section: 'initiatives',
-    title: 'Add an Initiative',
-    body: 'Initiatives are the units of change you run (under a Program). Create one to scope Impacts, Stakeholders, Learning Needs, and Comms.',
-  },
-  {
-    id: 'comms',
-    target: '[data-tour="nav-initiatives"]',
-    section: 'initiatives',
-    title: 'AI Comms Generator',
-    body: 'Open any Initiative → Comms tab → AI Comms Generator. It drafts from your real Impact context (current state, future state, severity) — not generic filler. You edit and send; ChangeView never auto-sends.',
-  },
-  {
-    id: 'done',
-    target: null,
-    section: null,
-    title: "You're set",
-    body: 'That’s the loop: set up once in System Admin, scope Impacts, draft Comms with AI, then track and report. Reopen this tour anytime from Profile.',
-  },
-];
+function buildSteps(needsOrgSetup) {
+  return [
+    {
+      id: 'workspace',
+      target: '[data-tour="workspace-picker"]',
+      section: null,
+      title: 'Your workspace',
+      body: 'Switch Workspaces here. Each Workspace holds its own Orgs, Programs, and Initiatives — useful if you run more than one engagement.',
+    },
+    {
+      id: 'admin',
+      target: '[data-tour="nav-settings"]',
+      section: 'settings',
+      title: 'Start in System Admin',
+      body: 'Setup begins here: add Orgs, Departments, People, and Project Teams. Do this once so Impacts, Stakeholders, and assignees are ready to reuse.',
+    },
+    {
+      id: 'initiative',
+      target: '[data-tour="add-initiative"]',
+      section: 'initiatives',
+      title: 'Add an Initiative',
+      body: 'Initiatives are the units of change you run (under a Program). Create one to scope Impacts, Stakeholders, Learning Needs, and Comms.',
+    },
+    {
+      id: 'comms',
+      target: '[data-tour="nav-initiatives"]',
+      section: 'initiatives',
+      title: 'AI Comms Generator',
+      body: 'Open any Initiative → Comms tab → AI Comms Generator. It drafts from your real Impact context (current state, future state, severity) — not generic filler. You edit and send; ChangeView never auto-sends.',
+    },
+    needsOrgSetup
+      ? {
+        id: 'add-org',
+        target: '[data-tour="nav-settings"]',
+        section: 'settings',
+        title: 'Next: add your first Org',
+        body: 'That is the loop conceptually. Your real next step is concrete: add an Organization (a client company or your own). Departments and People come right after.',
+        finishLabel: 'Add your first Org',
+      }
+      : {
+        id: 'done',
+        target: null,
+        section: null,
+        title: "You're set",
+        body: "That's the loop: set up once in System Admin, scope Impacts, draft Comms with AI, then track and report. Reopen this tour anytime from Profile.",
+        finishLabel: 'Done',
+      },
+  ];
+}
 
 /**
  * Short first-run tour. Shown when profile.onboarding_completed_at is null.
- * Finish or Skip sets onboarding_completed_at = now().
+ * Finish or Skip sets onboarding_completed_at = now(), then onFinished()
+ * (used to open Add Org when the workspace still has none).
  */
-export default function OnboardingTour({ onNavigate }) {
+export default function OnboardingTour({ onNavigate, onFinished, needsOrgSetup = false }) {
   const { profile, refreshProfile } = useAuth();
+  const steps = useMemo(() => buildSteps(needsOrgSetup), [needsOrgSetup]);
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const step = STEPS[stepIndex];
-  const isLast = stepIndex >= STEPS.length - 1;
+  const step = steps[Math.min(stepIndex, steps.length - 1)];
+  const isLast = stepIndex >= steps.length - 1;
 
   const complete = useCallback(async () => {
     if (!profile?.id || busy) return;
@@ -65,13 +79,15 @@ export default function OnboardingTour({ onNavigate }) {
         .eq('id', profile.id);
       if (error) throw error;
       await refreshProfile();
+      onFinished?.({ needsOrgSetup });
     } catch (err) {
       console.error('Could not save onboarding completion', err);
       await refreshProfile();
+      onFinished?.({ needsOrgSetup });
     } finally {
       setBusy(false);
     }
-  }, [profile?.id, busy, refreshProfile]);
+  }, [profile?.id, busy, refreshProfile, onFinished, needsOrgSetup]);
 
   useEffect(() => {
     if (!step?.section || typeof onNavigate !== 'function') return undefined;
@@ -153,6 +169,8 @@ export default function OnboardingTour({ onNavigate }) {
     };
   })();
 
+  const finishLabel = step.finishLabel || 'Done';
+
   return (
     <div className="fixed inset-0 z-[80]" style={{ ...BODY }} role="dialog" aria-modal="true" aria-label="Onboarding">
       {hole ? (
@@ -181,7 +199,7 @@ export default function OnboardingTour({ onNavigate }) {
         <div className="flex items-start justify-between gap-3 mb-2">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: C.sub }}>
-              Step {stepIndex + 1} of {STEPS.length}
+              Step {stepIndex + 1} of {steps.length}
             </div>
             <h2 className="text-base font-extrabold" style={{ ...HEAD, color: C.ink }}>{step.title}</h2>
           </div>
@@ -228,7 +246,7 @@ export default function OnboardingTour({ onNavigate }) {
               className="text-sm font-bold text-white px-4 py-2 rounded-full disabled:opacity-50"
               style={{ background: C.purple }}
             >
-              {isLast ? (busy ? 'Saving…' : 'Done') : 'Next'}
+              {isLast ? (busy ? 'Saving…' : finishLabel) : 'Next'}
             </button>
           </div>
         </div>
