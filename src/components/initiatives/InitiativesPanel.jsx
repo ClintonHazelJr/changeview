@@ -148,6 +148,7 @@ export default function InitiativesPanel({
     impacts: detail.impacts,
     stakeholders: detail.stakeholders,
     learningNeeds: detail.learningNeeds,
+    tasks: detail.tasks,
     comms: detail.comms,
     hypercare: detail.hypercare,
   };
@@ -740,6 +741,7 @@ export default function InitiativesPanel({
           <FormLearningNeed
             impacts={initData.impacts}
             deptName={deptName}
+            tasks={initData.tasks || []}
             initial={editingRecord}
             onSave={async (v) => (
               editingRecord

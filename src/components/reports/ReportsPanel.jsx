@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ClipboardList, FileText, Grid3X3, CalendarRange, Download, Loader2 } from 'lucide-react';
+import {
+  ArrowLeft, ClipboardList, FileText, Grid3X3, CalendarRange, Download, Loader2,
+  GraduationCap, CheckSquare, ListChecks,
+} from 'lucide-react';
 import { C, HEAD, BODY, SEVERITY_COLOR, STATUS_COLOR, tint, isRatedSeverity, stripInitiativeMeta } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { exportElementToPdf } from '../../lib/exportReportPdf';
+import {
+  ChangeReadinessReport,
+  RequirementsCompletionReport,
+  TaskCompletionReport,
+} from './CompletionReports';
 
 const SEV_SCORE = { none: 0, low: 1, medium: 2, high: 3 };
 const SEV_COLS = [
@@ -32,11 +40,35 @@ const REPORTS = [
     file: 'change-impact-assessment.pdf',
   },
   {
+    key: 'readiness',
+    title: 'Change Readiness',
+    desc: 'Learning Need completion for an initiative — overall %, by department, and task linkage.',
+    icon: GraduationCap,
+    color: '#16A34A',
+    file: 'change-readiness.pdf',
+  },
+  {
+    key: 'req-completion',
+    title: 'Requirements Completion',
+    desc: 'Requirements completed vs remaining, status distribution, and linked-task flags.',
+    icon: ListChecks,
+    color: C.navy,
+    file: 'requirements-completion.pdf',
+  },
+  {
+    key: 'task-completion',
+    title: 'Task Completion',
+    desc: 'Task done rate, status breakdown (including Blocked), and completion by assignee.',
+    icon: CheckSquare,
+    color: C.teal,
+    file: 'task-completion.pdf',
+  },
+  {
     key: 'heatmap',
     title: 'Impact heat map',
     desc: 'Departments × severity categories — where change pressure concentrates.',
     icon: Grid3X3,
-    color: C.teal,
+    color: C.blue3,
     file: 'impact-heat-map.pdf',
   },
   {
@@ -44,7 +76,7 @@ const REPORTS = [
     title: 'Schedule Report',
     desc: 'Dated Program → Initiative → Task / Hypercare timeline with Comms and go-live milestones.',
     icon: CalendarRange,
-    color: C.navy,
+    color: C.royal,
     file: 'schedule-report.pdf',
   },
 ];
@@ -875,7 +907,7 @@ export default function ReportsPanel() {
             <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Reports — {activeWorkspace?.name}</h2>
             <p className="text-sm" style={{ color: C.sub }}>Choose a report to run for this workspace.</p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {REPORTS.map((r) => (
               <button
                 key={r.key}
@@ -912,6 +944,9 @@ export default function ReportsPanel() {
           </h2>
           {active === 'requirements' && <RequirementsReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
           {active === 'cia' && <CiaReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
+          {active === 'readiness' && <ChangeReadinessReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
+          {active === 'req-completion' && <RequirementsCompletionReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
+          {active === 'task-completion' && <TaskCompletionReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
           {active === 'heatmap' && <HeatMapReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
           {active === 'schedule' && (
             <ScheduleReport

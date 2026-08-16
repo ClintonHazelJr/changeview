@@ -505,7 +505,7 @@ export function FormRequirement({ initiatives, people, departments = [], impacts
 }
 
 export function FormTask({
-  initiatives, people, departments = [], teams, requirements, initial, onSave, onDelete,
+  initiatives, people, departments = [], teams, requirements, learningNeeds = [], initial, onSave, onDelete,
 }) {
   const [vals, setVals] = useState({
     initiativeId: initial?.initiative_id || initiatives[0]?.id || '',
@@ -521,17 +521,27 @@ export function FormTask({
     sprint: initial?.sprint || '',
     pi: initial?.pi || '',
     requirementIds: initial?.requirementIds || [],
+    learningNeedIds: initial?.learningNeedIds || [],
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
   const initiativeReqs = requirements.filter((r) => r.initiative_id === vals.initiativeId);
+  const initiativeLNs = learningNeeds.filter((ln) => ln.initiative_id === vals.initiativeId);
   const toggleReq = (id) => {
     setVals((prev) => ({
       ...prev,
       requirementIds: prev.requirementIds.includes(id)
         ? prev.requirementIds.filter((x) => x !== id)
         : [...prev.requirementIds, id],
+    }));
+  };
+  const toggleLN = (id) => {
+    setVals((prev) => ({
+      ...prev,
+      learningNeedIds: prev.learningNeedIds.includes(id)
+        ? prev.learningNeedIds.filter((x) => x !== id)
+        : [...prev.learningNeedIds, id],
     }));
   };
 
@@ -623,6 +633,25 @@ export function FormTask({
                   className="mt-1"
                 />
                 <span>{r.reference_number || 'Req'} — {r.description}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </Field>
+      <Field label="Linked Learning Needs">
+        {initiativeLNs.length === 0 ? (
+          <p className="text-xs" style={{ color: C.sub }}>No learning needs on this Initiative yet.</p>
+        ) : (
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {initiativeLNs.map((ln) => (
+              <label key={ln.id} className="flex items-start gap-2 text-sm" style={{ color: C.ink }}>
+                <input
+                  type="checkbox"
+                  checked={vals.learningNeedIds.includes(ln.id)}
+                  onChange={() => toggleLN(ln.id)}
+                  className="mt-1"
+                />
+                <span>{ln.team || 'Team'} — {ln.goal || 'Learning need'}</span>
               </label>
             ))}
           </div>
@@ -869,7 +898,7 @@ export function FormStakeholder({ people, departments = [], initial, onSave, onD
   );
 }
 
-export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete, onComplete }) {
+export function FormLearningNeed({ impacts, deptName, tasks = [], initial, onSave, onDelete, onComplete }) {
   const editing = Boolean(initial?.id);
   const { profile } = useAuth();
   const { activeWorkspaceId } = useWorkspace();
@@ -884,9 +913,16 @@ export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete,
   const [sessions, setSessions] = useState(initial?.session_count ?? 1);
   const [hours, setHours] = useState(initial?.time_hours ?? 0.5);
   const [status, setStatus] = useState(initial?.status || 'draft');
+  const [taskIds, setTaskIds] = useState(initial?.taskIds || []);
   const [materials, setMaterials] = useState([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const selectedImpact = impacts.find((i) => i.id === impactId);
+  const initiativeTasks = tasks.filter((t) => t.initiative_id === selectedImpact?.initiative_id);
+  const toggleTask = (id) => {
+    setTaskIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
 
   useEffect(() => {
     if (!initial?.id) return;
@@ -918,7 +954,7 @@ export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete,
       setError('');
       try {
         const saved = await onSave({
-          impactId, team, goal, headcount: Number(headcount) || 0, type, sessions: Number(sessions), hours: Number(hours), status,
+          impactId, team, goal, headcount: Number(headcount) || 0, type, sessions: Number(sessions), hours: Number(hours), status, taskIds,
         });
         const learningNeedId = saved?.id || initial?.id;
         if (!learningNeedId) throw new Error('Learning Need was saved but no id was returned.');
@@ -961,8 +997,28 @@ export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete,
         <select className={inputClass} style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="draft">Draft</option>
           <option value="approved">Approved</option>
+          <option value="completed">Completed</option>
           <option value="rejected">Rejected</option>
         </select>
+      </Field>
+      <Field label="Linked Tasks">
+        {initiativeTasks.length === 0 ? (
+          <p className="text-xs" style={{ color: C.sub }}>No tasks on this Initiative yet.</p>
+        ) : (
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {initiativeTasks.map((t) => (
+              <label key={t.id} className="flex items-start gap-2 text-sm" style={{ color: C.ink }}>
+                <input
+                  type="checkbox"
+                  checked={taskIds.includes(t.id)}
+                  onChange={() => toggleTask(t.id)}
+                  className="mt-1"
+                />
+                <span>{t.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
       </Field>
       <FieldWithAttach
         label="Training Material"

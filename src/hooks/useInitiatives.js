@@ -127,21 +127,30 @@ export function useInitiativeDetail(initiativeId) {
   const [impacts, setImpacts] = useState([]);
   const [stakeholders, setStakeholders] = useState([]);
   const [learningNeeds, setLearningNeeds] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [comms, setComms] = useState([]);
   const [hypercare, setHypercare] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!initiativeId || !activeWorkspaceId) {
+      setInitiative(null);
+      setImpacts([]);
+      setStakeholders([]);
+      setLearningNeeds([]);
+      setTasks([]);
+      setComms([]);
+      setHypercare(null);
       setLoading(false);
       return;
     }
     setLoading(true);
-    const [init, imp, stk, ln, cm, hc] = await Promise.all([
+    const [init, imp, stk, ln, tk, cm, hc] = await Promise.all([
       supabase.from('initiatives').select('*').eq('id', initiativeId).single(),
       supabase.from('impacts').select('*').eq('initiative_id', initiativeId).order('created_at'),
       supabase.from('stakeholders').select('*').eq('initiative_id', initiativeId).order('created_at'),
-      supabase.from('learning_needs').select('*').eq('workspace_id', activeWorkspaceId).order('created_at'),
+      supabase.from('learning_needs').select('*, task_learning_needs(task_id)').eq('workspace_id', activeWorkspaceId).order('created_at'),
+      supabase.from('tasks').select('id, name, initiative_id, status').eq('initiative_id', initiativeId).order('name'),
       supabase.from('comms').select('*').eq('initiative_id', initiativeId).order('created_at'),
       supabase.from('hypercare').select('*').eq('initiative_id', initiativeId).maybeSingle(),
     ]);
@@ -149,7 +158,11 @@ export function useInitiativeDetail(initiativeId) {
     setImpacts(imp.data || []);
     setStakeholders(stk.data || []);
     const impactIds = new Set((imp.data || []).map((x) => x.id));
-    setLearningNeeds((ln.data || []).filter((x) => impactIds.has(x.impact_id)));
+    setLearningNeeds((ln.data || []).filter((x) => impactIds.has(x.impact_id)).map((row) => ({
+      ...row,
+      taskIds: (row.task_learning_needs || []).map((x) => x.task_id),
+    })));
+    setTasks(tk.data || []);
     setComms(cm.data || []);
     setHypercare(hc.data || null);
     setLoading(false);
@@ -252,6 +265,18 @@ export function useInitiativeDetail(initiativeId) {
       ...learningPayload(vals),
     }).select().single();
     if (error) throw new Error(parseDbError(error));
+    const taskIds = vals.taskIds || [];
+    if (taskIds.length) {
+      const { error: linkError } = await supabase.from('task_learning_needs').insert(
+        taskIds.map((taskId) => ({
+          account_id: accountId,
+          workspace_id: workspaceId,
+          task_id: taskId,
+          learning_need_id: data.id,
+        })),
+      );
+      if (linkError) throw new Error(parseDbError(linkError));
+    }
     await load();
     return data;
   };
@@ -259,6 +284,19 @@ export function useInitiativeDetail(initiativeId) {
   const updateLearningNeed = async (id, vals) => {
     const { data, error } = await supabase.from('learning_needs').update(learningPayload(vals)).eq('id', id).select().single();
     if (error) throw new Error(parseDbError(error));
+    await supabase.from('task_learning_needs').delete().eq('learning_need_id', id);
+    const taskIds = vals.taskIds || [];
+    if (taskIds.length) {
+      const { error: linkError } = await supabase.from('task_learning_needs').insert(
+        taskIds.map((taskId) => ({
+          account_id: accountId,
+          workspace_id: workspaceId,
+          task_id: taskId,
+          learning_need_id: id,
+        })),
+      );
+      if (linkError) throw new Error(parseDbError(linkError));
+    }
     await load();
     return data;
   };
@@ -335,7 +373,7 @@ export function useInitiativeDetail(initiativeId) {
   };
 
   return {
-    initiative, impacts, stakeholders, learningNeeds, comms, hypercare, loading, reload: load,
+    initiative, impacts, stakeholders, learningNeeds, tasks, comms, hypercare, loading, reload: load,
     addImpact, updateImpact, deleteImpact,
     addStakeholder, updateStakeholder, deleteStakeholder,
     addLearningNeed, updateLearningNeed, deleteLearningNeed,

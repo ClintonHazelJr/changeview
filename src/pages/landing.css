@@ -218,37 +218,6 @@
   max-width: 100%;
 }
 
-/* trust */
-.cv-landing .trust {
-  background: #eef0f7;
-}
-
-.cv-landing .trust .row {
-  display: flex;
-  align-items: center;
-  gap: 38px;
-  padding: 26px 0;
-  flex-wrap: wrap;
-}
-
-.cv-landing .trust .label {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #7d7c79;
-}
-
-.cv-landing .trust .logos {
-  display: flex;
-  gap: 40px;
-  flex-wrap: wrap;
-  font-size: 17px;
-  font-weight: 700;
-  color: #a9a8a5;
-  letter-spacing: -0.02em;
-}
-
 /* sections */
 .cv-landing .section {
   padding: 80px 0;

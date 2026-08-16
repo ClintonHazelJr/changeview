@@ -32,7 +32,7 @@ const TASK_HEADERS = [
 
 export default function TasksPanel({ initialTaskId = null, onTaskFocusConsumed }) {
   const {
-    tasks, initiatives, people, teams, requirements,
+    tasks, initiatives, people, teams, requirements, learningNeeds,
     saveTask, updateTaskStatus, deleteTask, reload,
   } = useTasks();
   const { departments } = useAdminData();
@@ -275,6 +275,7 @@ export default function TasksPanel({ initialTaskId = null, onTaskFocusConsumed }
             departments={departments}
             teams={teams}
             requirements={requirements}
+            learningNeeds={learningNeeds}
             initial={editing}
             onDelete={editing ? async () => { await deleteTask(editing.id); setModal(null); setEditing(null); } : undefined}
             onSave={async (vals) => {

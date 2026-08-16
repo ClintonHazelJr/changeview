@@ -378,7 +378,7 @@ create table learning_needs (
   type text, -- training, huddle
   session_count int default 1,
   time_hours numeric(5,2) default 0,
-  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected')),
+  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected', 'completed')),
   created_at timestamptz not null default now()
 );
 
@@ -465,6 +465,14 @@ create table task_requirements (
   primary key (task_id, requirement_id)
 );
 
+create table task_learning_needs (
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  task_id uuid not null references tasks(id) on delete cascade,
+  learning_need_id uuid not null references learning_needs(id) on delete cascade,
+  primary key (task_id, learning_need_id)
+);
+
 -- ============================================================
 -- Indexes (query patterns: always filtered by account_id first,
 -- then usually by initiative_id or impact_id)
@@ -508,6 +516,8 @@ create index idx_tasks_initiative on tasks(initiative_id);
 create index idx_tasks_status on tasks(status);
 create index idx_task_requirements_task on task_requirements(task_id);
 create index idx_task_requirements_requirement on task_requirements(requirement_id);
+create index idx_task_learning_needs_task on task_learning_needs(task_id);
+create index idx_task_learning_needs_learning_need on task_learning_needs(learning_need_id);
 
 -- ============================================================
 -- Row Level Security (Supabase)
@@ -529,6 +539,7 @@ alter table requirements enable row level security;
 alter table requirement_impacts enable row level security;
 alter table tasks enable row level security;
 alter table task_requirements enable row level security;
+alter table task_learning_needs enable row level security;
 alter table cost_entries enable row level security;
 alter table programs enable row level security;
 alter table organizations enable row level security;

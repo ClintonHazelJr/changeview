@@ -108,19 +108,6 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section className="trust">
-        <div className="wrap row">
-          <span className="label">Trusted by change teams at</span>
-          <div className="logos">
-            <span>NORTHWIND</span>
-            <span>Meridian</span>
-            <span>ATLAS CO</span>
-            <span>Kestrel</span>
-            <span>Vantage</span>
-          </div>
-        </div>
-      </section>
-
       <section className="section" id="features">
         <div className="wrap">
           <div className="head">
