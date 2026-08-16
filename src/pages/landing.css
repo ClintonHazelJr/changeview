@@ -468,30 +468,6 @@
   padding: 13px;
 }
 
-/* faq */
-.cv-landing .faq .qa {
-  padding: 24px 0;
-  border-top: 1px solid var(--line);
-  display: flex;
-  gap: 40px;
-}
-
-.cv-landing .faq .qa:last-child {
-  border-bottom: 1px solid var(--line);
-}
-
-.cv-landing .faq .qa h3 {
-  flex: 0 0 300px;
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.cv-landing .faq .qa p {
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--muted);
-}
-
 /* cta band */
 .cv-landing .band {
   background: var(--navy);
@@ -836,15 +812,6 @@
 
   .cv-landing .navlinks {
     display: none;
-  }
-
-  .cv-landing .faq .qa {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .cv-landing .faq .qa h3 {
-    flex: none;
   }
 
   .cv-landing .band .row {

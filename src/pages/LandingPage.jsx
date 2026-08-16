@@ -99,10 +99,10 @@ export default function LandingPage() {
           </div>
           <div className="shot">
             <img
-              src="/assets/hero_real_final.png"
-              alt="ChangeView dashboard showing planning, delivery, and impact severity"
-              width={1734}
-              height={903}
+              src="/assets/hero_abstract.png"
+              alt="Abstract ChangeView dashboard preview"
+              width={1620}
+              height={1057}
             />
           </div>
         </div>
@@ -235,30 +235,6 @@ export default function LandingPage() {
                 Start free trial
               </PlanCta>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section faq" style={{ paddingTop: 0 }}>
-        <div className="wrap">
-          <h2 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em', marginBottom: 36 }}>
-            Questions, answered.
-          </h2>
-          <div className="qa">
-            <h3>Is this only for big transformations?</h3>
-            <p>No. changeview works for a single team&apos;s process change up to a company-wide reorg — the plan just scales with you.</p>
-          </div>
-          <div className="qa">
-            <h3>How fast can we get started?</h3>
-            <p>Most teams import their org and launch a first plan within a week, using a built-in playbook.</p>
-          </div>
-          <div className="qa">
-            <h3>Does it integrate with our tools?</h3>
-            <p>Yes — Slack, Teams, email, HRIS, and SSO. Comms and readiness data flow both ways.</p>
-          </div>
-          <div className="qa">
-            <h3>How is adoption measured?</h3>
-            <p>A blend of real product usage, readiness pulses, and stakeholder sentiment, rolled into one adoption score per group.</p>
           </div>
         </div>
       </section>
