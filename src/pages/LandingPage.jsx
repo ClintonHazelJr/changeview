@@ -137,8 +137,13 @@ export default function LandingPage() {
             </div>
             <div className="feature">
               <Mark className="ic" variant="mono" color="#3a54c4" />
-              <h3>Readiness surveys</h3>
-              <p>Pulse-check confidence before and after each phase, and act on it instantly.</p>
+              <h3>Change readiness</h3>
+              <p>See exactly how ready each department is, based on real training completion, not guesswork.</p>
+            </div>
+            <div className="feature">
+              <Mark className="ic" variant="mono" color="#5f79df" />
+              <h3>Task tracking</h3>
+              <p>Track execution on a Kanban board, and watch requirements and training automatically mark complete as the real work gets done.</p>
             </div>
           </div>
         </div>

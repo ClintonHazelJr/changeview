@@ -244,10 +244,10 @@
   margin-bottom: 48px;
 }
 
-/* features — 5 cards: 3 on top, 2 centered below */
+/* features — 2×3 grid */
 .cv-landing .features {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 2px;
   background: var(--line);
 }
@@ -258,15 +258,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  grid-column: span 2;
-}
-
-.cv-landing .feature:nth-child(4) {
-  grid-column: 2 / span 2;
-}
-
-.cv-landing .feature:nth-child(5) {
-  grid-column: 4 / span 2;
 }
 
 .cv-landing .feature .ic {
@@ -771,12 +762,6 @@
   .cv-landing .steps,
   .cv-landing .tiers {
     grid-template-columns: 1fr;
-  }
-
-  .cv-landing .feature,
-  .cv-landing .feature:nth-child(4),
-  .cv-landing .feature:nth-child(5) {
-    grid-column: auto;
   }
 
   .cv-landing .navlinks {
