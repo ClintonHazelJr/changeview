@@ -99,10 +99,10 @@ export default function LandingPage() {
           </div>
           <div className="shot">
             <img
-              src="/assets/hero_abstract.png"
-              alt="Abstract ChangeView dashboard preview"
-              width={1620}
-              height={1057}
+              src="/assets/hero_real_final.png"
+              alt="ChangeView dashboard showing planning, delivery, and impact severity"
+              width={1734}
+              height={903}
             />
           </div>
         </div>
