@@ -119,3 +119,33 @@ export async function startBillingPortal({ accessToken } = {}) {
   }
   window.location.href = data.url;
 }
+
+/** Update an existing Stripe subscription's plan (in place — no new Checkout). */
+export async function updateSubscriptionPlan(
+  tier,
+  billingCycle = 'monthly',
+  { accessToken } = {},
+) {
+  const normalizedTier = normalizePlanTier(tier);
+  const normalizedCycle = billingCycle === 'annual' && normalizedTier !== 'solo' ? 'annual' : 'monthly';
+  if (!normalizedTier) {
+    throw new Error(`Unknown plan tier: ${tier}`);
+  }
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  const res = await fetch('/api/update-subscription-plan', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      tier: normalizedTier,
+      billingCycle: normalizedCycle,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Could not update plan');
+  }
+  return data;
+}

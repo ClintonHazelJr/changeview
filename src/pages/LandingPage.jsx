@@ -188,7 +188,7 @@ export default function LandingPage() {
           </div>
           <div className="tiers">
             <div className="tier">
-              <h3>Sole Proprietor</h3>
+              <h3>Starter</h3>
               <div className="price">
                 <span className="amt">${formatUsdAmount(soloPrice)}</span>
                 <span className="per">/ mo</span>
@@ -198,7 +198,7 @@ export default function LandingPage() {
             </div>
             <div className="tier pop">
               <span className="badge">MOST POPULAR</span>
-              <h3>Business</h3>
+              <h3>Pro</h3>
               <BillingCycleToggle value={billingCycle} onChange={setBillingCycle} />
               <div className="price">
                 <span className="amt">${formatUsdAmount(smallPrice)}</span>

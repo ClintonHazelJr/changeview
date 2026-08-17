@@ -70,8 +70,8 @@ export const TAG_OPTIONS = ['Training', 'Huddle', 'Email', 'Documentation'];
 
 /** Plan tier IDs match DB plan_tier: solo | small | enterprise. */
 export const PLAN_LABELS = {
-  solo: 'Sole Proprietor',
-  small: 'Business',
+  solo: 'Starter',
+  small: 'Pro',
   enterprise: 'Enterprise',
 };
 
@@ -81,6 +81,21 @@ export const PLAN_LIMITS = {
   small: { workspaces: null, users: 5 },
   enterprise: { workspaces: null, users: null },
 };
+
+/** Rank for upgrade/downgrade comparisons (display labels differ; IDs stay solo/small/enterprise). */
+export const PLAN_TIER_RANK = { solo: 0, small: 1, enterprise: 2 };
+
+export function planTierRank(tier) {
+  return PLAN_TIER_RANK[tier] ?? 0;
+}
+
+/** Reports free on every paid/trialing plan including Starter (solo). */
+export const FREE_REPORT_KEYS = new Set(['requirements', 'cia', 'schedule']);
+
+/** Reports that require Pro (small) or Enterprise when not on trial. */
+export function isPaidReport(key) {
+  return !FREE_REPORT_KEYS.has(key);
+}
 
 export function formatPlanLimit(used, limit) {
   const usedN = Number(used) || 0;
@@ -137,7 +152,7 @@ export function trialDaysLeft(subscription) {
 }
 
 /**
- * Tasks, Schedule, multi-user — locked on Sole Proprietor when paid.
+ * Tasks, Schedule, multi-user, paid reports — locked on Starter when paid.
  * Stripe `trialing` unlocks full Enterprise-level access regardless of selected tier.
  */
 export const hasPaidPlanFeatures = (tier, subscription = null) => {
@@ -166,8 +181,8 @@ export function formatReference(num) {
 
 export function parseDbError(err) {
   const msg = err?.message || err?.error_description || 'Something went wrong';
-  if (msg.includes('Tier 1 accounts are limited') || msg.includes('Sole Proprietor plans are limited') || msg.includes('solo accounts are limited')) {
-    return 'Sole Proprietor plans are limited to a single Workspace. Upgrade to Business or Enterprise to add more.';
+  if (msg.includes('Tier 1 accounts are limited') || msg.includes('Sole Proprietor plans are limited') || msg.includes('solo accounts are limited') || msg.includes('Starter plans are limited')) {
+    return 'Starter plans are limited to a single Workspace. Upgrade to Pro or Enterprise to add more.';
   }
   return msg;
 }

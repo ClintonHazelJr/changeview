@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, ClipboardList, FileText, Grid3X3, CalendarRange, Download, Loader2,
-  GraduationCap, CheckSquare, ListChecks, Activity,
+  GraduationCap, CheckSquare, ListChecks, Activity, Lock,
 } from 'lucide-react';
-import { C, HEAD, BODY, SEVERITY_COLOR, STATUS_COLOR, tint, isRatedSeverity, stripInitiativeMeta } from '../../lib/constants';
+import { C, HEAD, BODY, SEVERITY_COLOR, STATUS_COLOR, tint, isRatedSeverity, stripInitiativeMeta, isPaidReport, PLAN_LABELS } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { exportElementToPdf } from '../../lib/exportReportPdf';
@@ -13,6 +13,7 @@ import {
   TaskCompletionReport,
 } from './CompletionReports';
 import StatusReportPanel from './StatusReport';
+import UpgradePrompt from '../ui/UpgradePrompt';
 
 const SEV_SCORE = { none: 0, low: 1, medium: 2, high: 3 };
 const SEV_COLS = [
@@ -891,16 +892,46 @@ function ScheduleReport({ workspaceId, workspaceName, exportRef }) {
   );
 }
 
-export default function ReportsPanel() {
-  const { activeWorkspace, activeWorkspaceId } = useWorkspace();
+export default function ReportsPanel({ onUpgrade }) {
+  const { activeWorkspace, activeWorkspaceId, hasPaidFeatures } = useWorkspace();
   const [active, setActive] = useState(null);
   const exportRef = useRef(null);
   const meta = REPORTS.find((r) => r.key === active);
+  const reportLocked = Boolean(active && isPaidReport(active) && !hasPaidFeatures);
 
   if (!activeWorkspaceId) {
     return (
       <div className="flex-1 p-8" style={BODY}>
         <p className="text-sm" style={{ color: C.sub }}>Select a workspace to view reports.</p>
+      </div>
+    );
+  }
+
+  if (reportLocked) {
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="px-8 pt-6">
+          <button
+            type="button"
+            onClick={() => setActive(null)}
+            className="flex items-center gap-1.5 text-xs font-semibold"
+            style={{ color: C.purple }}
+          >
+            <ArrowLeft size={14} /> All reports
+          </button>
+        </div>
+        <UpgradePrompt
+          feature={meta?.title || 'This report'}
+          title={`${meta?.title || 'This report'} unlocks on ${PLAN_LABELS.small}`}
+          body={(
+            <>
+              {PLAN_LABELS.small} unlocks Schedule, Tasks, and 5 more reports — Heat Map, Change Readiness,
+              Requirements Completion, Task Completion, and Change Status Report.
+              Requirements list, Change Impact Assessment, and Schedule Report stay free on every plan.
+            </>
+          )}
+          onUpgrade={onUpgrade}
+        />
       </div>
     );
   }
@@ -917,21 +948,37 @@ export default function ReportsPanel() {
             <p className="text-sm" style={{ color: C.sub }}>Choose a report to run for this workspace.</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {REPORTS.map((r) => (
-              <button
-                key={r.key}
-                type="button"
-                onClick={() => setActive(r.key)}
-                className="text-left rounded-3xl p-5 text-white shadow-sm hover:opacity-95 transition-opacity"
-                style={{ background: r.color }}
-              >
-                <div className="w-10 h-10 rounded-full bg-white/25 flex items-center justify-center mb-3">
-                  <r.icon size={18} />
-                </div>
-                <div className="text-sm font-extrabold mb-1" style={HEAD}>{r.title}</div>
-                <p className="text-xs opacity-90">{r.desc}</p>
-              </button>
-            ))}
+            {REPORTS.map((r) => {
+              const locked = isPaidReport(r.key) && !hasPaidFeatures;
+              return (
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() => setActive(r.key)}
+                  className="text-left rounded-3xl p-5 text-white shadow-sm hover:opacity-95 transition-opacity relative"
+                  style={{ background: r.color }}
+                >
+                  {locked && (
+                    <span
+                      className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/25 flex items-center justify-center"
+                      title={`${PLAN_LABELS.small} and up`}
+                    >
+                      <Lock size={13} />
+                    </span>
+                  )}
+                  <div className="w-10 h-10 rounded-full bg-white/25 flex items-center justify-center mb-3">
+                    <r.icon size={18} />
+                  </div>
+                  <div className="text-sm font-extrabold mb-1" style={HEAD}>{r.title}</div>
+                  <p className="text-xs opacity-90">{r.desc}</p>
+                  {locked && (
+                    <p className="text-[11px] font-semibold mt-2 opacity-95">
+                      {PLAN_LABELS.small}+ · tap to upgrade
+                    </p>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </>
       ) : (

@@ -32,10 +32,11 @@ function AppShell() {
     reload,
   } = useWorkspace();
   const isOwner = profile?.role === 'owner';
-  // Trial must unlock Schedule/Tasks/Users even on Sole Proprietor tier.
+  // Trial unlocks Schedule/Tasks/Users/paid reports even on Starter tier.
   const featuresUnlocked = paid || trialActive;
   const [params, setParams] = useSearchParams();
   const [checkoutMsg, setCheckoutMsg] = useState('');
+  const [profileUpgradeOpen, setProfileUpgradeOpen] = useState(false);
 
   const [section, setSection] = useState('dashboard');
   const [initiativeFocusId, setInitiativeFocusId] = useState(null);
@@ -193,9 +194,15 @@ function AppShell() {
     else if (target.section !== 'settings') setAdminTabFocus(null);
   }, []);
 
+  const openUpgradePlan = useCallback(() => {
+    setProfileUpgradeOpen(true);
+    setSection('profile');
+  }, []);
+
   let body = null;
-  if (section === 'dashboard') body = <Dashboard onOpenInitiative={openInitiative} />;
-  else if (section === 'program') {
+  if (section === 'dashboard') {
+    body = <Dashboard onOpenInitiative={openInitiative} onUpgrade={openUpgradePlan} />;
+  } else if (section === 'program') {
     body = (
       <ProgramsPanel
         initialProgramId={programFocusId}
@@ -222,13 +229,23 @@ function AppShell() {
           onTaskFocusConsumed={() => setTaskFocusId(null)}
         />
       )
-      : <UpgradePrompt feature="Tasks" />;
+      : (
+        <UpgradePrompt
+          feature="Tasks"
+          onUpgrade={openUpgradePlan}
+        />
+      );
   } else if (section === 'schedule') {
     body = featuresUnlocked
       ? <SchedulePanel onOpenRecord={openFromSchedule} />
-      : <UpgradePrompt feature="Schedule" />;
+      : (
+        <UpgradePrompt
+          feature="Schedule"
+          onUpgrade={openUpgradePlan}
+        />
+      );
   } else if (section === 'reports') {
-    body = <ReportsPanel />;
+    body = <ReportsPanel onUpgrade={openUpgradePlan} />;
   } else if (section === 'users') {
     if (!featuresUnlocked) {
       body = (
@@ -241,6 +258,7 @@ function AppShell() {
               colleagues and assign them to workspaces.
             </>
           )}
+          onUpgrade={openUpgradePlan}
         />
       );
     } else if (!isOwner) {
@@ -253,8 +271,14 @@ function AppShell() {
     } else {
       body = <UsersPanel />;
     }
-  } else if (section === 'profile') body = <ProfilePanel />;
-  else if (section === 'settings') {
+  } else if (section === 'profile') {
+    body = (
+      <ProfilePanel
+        initialUpgradeOpen={profileUpgradeOpen}
+        onUpgradeOpenConsumed={() => setProfileUpgradeOpen(false)}
+      />
+    );
+  } else if (section === 'settings') {
     body = (
       <SystemAdmin
         initialTab={adminTabFocus}

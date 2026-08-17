@@ -64,7 +64,7 @@ Every draft is editable before you save it. Comms in ChangeView are copy-paste, 
 
 - **Archiving** a Program or Initiative hides it from your default view without deleting anything, fully reversible. **Deleting** is permanent and takes everything under it with it, ChangeView asks you to confirm twice before letting that happen.
 - **Deactivating** a Person or Department removes them from future assignment pickers without touching anything they're already tied to historically.
-- If you're on **Sole Proprietor**, Schedule and Tasks aren't included, everything else is. Upgrade any time from your Profile.
+- If you're on **Starter**, Schedule, Tasks, and several reports aren't included — Requirements list, Change Impact Assessment, and Schedule Report stay free. Upgrade any time from Profile → Upgrade Plan.
 
 That's the whole loop: scope the impact, plan the comms and training, track it through launch, report on it afterward. Start wherever your current project actually is, you don't need to run the whole sequence from day one to get value out of any single part of it.
 `;

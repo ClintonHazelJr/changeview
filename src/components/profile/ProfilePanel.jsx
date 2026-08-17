@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { CreditCard, LogOut, Trash2, AlertTriangle } from 'lucide-react';
-import { C, HEAD, BODY, inputClass, inputStyle, initials, tint, PLAN_LABELS, isPlatformAdminEmail, PLATFORM_RESET_CONFIRM, effectivePlanLimits, formatPlanLimit, trialDaysLeft as calcTrialDays } from '../../lib/constants';
+import { CreditCard, LogOut, Trash2, AlertTriangle, Sparkles } from 'lucide-react';
+import { C, HEAD, BODY, inputClass, inputStyle, initials, tint, PLAN_LABELS, PLAN_LIMITS, isPlatformAdminEmail, PLATFORM_RESET_CONFIRM, effectivePlanLimits, formatPlanLimit, trialDaysLeft as calcTrialDays, planTierRank } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { startBillingPortal } from '../../lib/checkout';
+import { startBillingPortal, updateSubscriptionPlan } from '../../lib/checkout';
 import { Field, SaveRow } from '../ui/shared';
 import Modal from '../ui/Modal';
 import { FormWorkspace } from '../forms/AdminForms';
@@ -62,7 +62,7 @@ function ConfirmDeleteModal({
   );
 }
 
-export default function ProfilePanel() {
+export default function ProfilePanel({ initialUpgradeOpen = false, onUpgradeOpenConsumed }) {
   const { profile, session, refreshProfile, signOut } = useAuth();
   const { workspaces, reload, createWorkspace, subscription, planTier, trialActive, trialDaysLeft } = useWorkspace();
   const { plans } = usePlanPrices();
@@ -87,10 +87,26 @@ export default function ProfilePanel() {
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState('');
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [upgradeBusy, setUpgradeBusy] = useState(null);
+  const [upgradeError, setUpgradeError] = useState('');
+  const [upgradeSuccess, setUpgradeSuccess] = useState('');
+  const [upgradeCycle, setUpgradeCycle] = useState('monthly');
   const isOwner = profile?.role === 'owner';
   const isPlatformAdmin = isPlatformAdminEmail(profile?.email || session?.user?.email);
   const accountName = profile?.accounts?.name || '';
   const hasStripeCustomer = Boolean(subscription?.stripe_customer_id);
+  const hasStripeSubscription = Boolean(subscription?.stripe_subscription_id);
+
+  useEffect(() => {
+    if (!initialUpgradeOpen) return;
+    setShowUpgrade(true);
+    onUpgradeOpenConsumed?.();
+  }, [initialUpgradeOpen, onUpgradeOpenConsumed]);
+
+  useEffect(() => {
+    setUpgradeCycle(subscription?.billing_cycle === 'annual' ? 'annual' : 'monthly');
+  }, [subscription?.billing_cycle]);
 
   useEffect(() => {
     setFullName(profile?.full_name || '');
@@ -166,6 +182,28 @@ export default function ProfilePanel() {
           : msg,
       );
       setBillingBusy(false);
+    }
+  };
+
+  const handleUpgradePlan = async (tier, billingCycle) => {
+    setUpgradeError('');
+    setUpgradeSuccess('');
+    if (!hasStripeSubscription) {
+      setUpgradeError('No active subscription to update. Complete checkout first.');
+      return;
+    }
+    const key = `${tier}:${billingCycle}`;
+    setUpgradeBusy(key);
+    try {
+      const result = await updateSubscriptionPlan(tier, billingCycle, {
+        accessToken: session?.access_token,
+      });
+      setUpgradeSuccess(result.message || 'Plan updated. Billing will refresh in a moment.');
+      await reload();
+    } catch (err) {
+      setUpgradeError(err.message || 'Could not update plan');
+    } finally {
+      setUpgradeBusy(null);
     }
   };
 
@@ -330,10 +368,12 @@ export default function ProfilePanel() {
     : subscription?.billing_cycle === 'monthly'
       ? 'Monthly'
       : '—';
+  const currentCycle = subscription?.billing_cycle === 'annual' ? 'annual' : 'monthly';
+  const currentRank = planTierRank(planTier);
   const planPriceLabel = formatPlanPrice(
     plans,
     planTier,
-    subscription?.billing_cycle === 'annual' ? 'annual' : 'monthly',
+    currentCycle,
   );
   const nextBilling = subscription?.current_period_end
     ? new Date(subscription.current_period_end).toLocaleDateString(undefined, {
@@ -343,6 +383,34 @@ export default function ProfilePanel() {
   const daysLeft = trialActive
     ? (typeof trialDaysLeft === 'number' ? trialDaysLeft : calcTrialDays(subscription))
     : 0;
+
+  const upgradeOptions = ['solo', 'small', 'enterprise'].flatMap((tier) => {
+    const cycles = tier === 'solo' ? ['monthly'] : ['monthly', 'annual'];
+    return cycles
+      .filter((cycle) => {
+        const rank = planTierRank(tier);
+        if (rank > currentRank) return true;
+        if (rank === currentRank && cycle === 'annual' && currentCycle === 'monthly' && tier !== 'solo') {
+          return true;
+        }
+        return false;
+      })
+      .map((cycle) => ({
+        tier,
+        cycle,
+        label: PLAN_LABELS[tier],
+        price: formatPlanPrice(plans, tier, cycle),
+        blurb: tier === 'small'
+          ? 'Schedule, Tasks, 5 more reports, 5 users, unlimited workspaces'
+          : tier === 'enterprise'
+            ? 'Unlimited users and workspaces'
+            : '1 user, 1 workspace',
+        limits: PLAN_LIMITS[tier],
+      }));
+  }).filter((opt) => {
+    if (upgradeCycle === 'annual') return opt.cycle === 'annual' || opt.tier === 'solo';
+    return opt.cycle === 'monthly';
+  });
 
   const workspaceList = isOwner
     ? null
@@ -525,18 +593,107 @@ export default function ProfilePanel() {
           {!hasStripeCustomer ? (
             <p className="text-sm" style={{ color: C.sub }}>No billing information on file yet.</p>
           ) : (
-            <button
-              type="button"
-              disabled={billingBusy}
-              onClick={handleManageBilling}
-              className="inline-flex items-center gap-2 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-50"
-              style={{ background: C.purple }}
-            >
-              <CreditCard size={15} />
-              {billingBusy ? 'Opening…' : 'Manage Billing'}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={billingBusy}
+                onClick={handleManageBilling}
+                className="inline-flex items-center gap-2 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-50"
+                style={{ background: C.purple }}
+              >
+                <CreditCard size={15} />
+                {billingBusy ? 'Opening…' : 'Manage Billing'}
+              </button>
+              {hasStripeSubscription && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUpgrade((v) => !v);
+                    setUpgradeError('');
+                    setUpgradeSuccess('');
+                  }}
+                  className="inline-flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-full border"
+                  style={{ borderColor: C.purple, color: C.purple, background: tint(C.purple, '10') }}
+                >
+                  <Sparkles size={15} />
+                  {showUpgrade ? 'Hide upgrades' : 'Upgrade Plan'}
+                </button>
+              )}
+            </div>
           )}
           {billingError && <p className="text-xs mt-3" style={{ color: C.coral }}>{billingError}</p>}
+
+          {showUpgrade && hasStripeSubscription && (
+            <div className="mt-5 pt-5 border-t" style={{ borderColor: C.border }}>
+              <p className="text-xs mb-3" style={{ color: C.sub }}>
+                You’ll be charged the prorated difference immediately, and your billing cycle restarts today
+                {trialActive ? ' (after trial ends if you’re still trialing)' : ''}.
+              </p>
+              {planTier !== 'solo' && (
+                <div className="flex gap-2 mb-3">
+                  {['monthly', 'annual'].map((cycle) => (
+                    <button
+                      key={cycle}
+                      type="button"
+                      onClick={() => setUpgradeCycle(cycle)}
+                      className="text-xs font-bold px-3 py-1.5 rounded-full"
+                      style={{
+                        background: upgradeCycle === cycle ? C.purple : tint(C.purple, '12'),
+                        color: upgradeCycle === cycle ? '#fff' : C.purple,
+                      }}
+                    >
+                      {cycle === 'annual' ? 'Annual' : 'Monthly'}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!upgradeOptions.length ? (
+                <p className="text-sm" style={{ color: C.sub }}>
+                  You’re on the highest plan
+                  {currentCycle === 'annual' ? '' : ' for this billing cycle'}.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {upgradeOptions.map((opt) => {
+                    const busyKey = `${opt.tier}:${opt.cycle}`;
+                    return (
+                      <div
+                        key={busyKey}
+                        className="rounded-2xl border p-4"
+                        style={{ borderColor: C.border }}
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div>
+                            <div className="text-sm font-extrabold" style={{ ...HEAD, color: C.ink }}>
+                              {opt.label}
+                              <span className="font-semibold ml-1" style={{ color: C.sub }}>
+                                · {opt.cycle === 'annual' ? 'Annual' : 'Monthly'}
+                              </span>
+                            </div>
+                            <p className="text-xs mt-0.5" style={{ color: C.sub }}>{opt.blurb}</p>
+                          </div>
+                          <div className="text-sm font-bold shrink-0" style={{ color: C.ink }}>
+                            {opt.price || '—'}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={Boolean(upgradeBusy)}
+                          onClick={() => handleUpgradePlan(opt.tier, opt.cycle)}
+                          className="text-sm font-bold text-white px-4 py-2 rounded-full disabled:opacity-50"
+                          style={{ background: C.purple }}
+                        >
+                          {upgradeBusy === busyKey ? 'Updating…' : `Upgrade to ${opt.label}`}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {upgradeError && <p className="text-xs mt-3" style={{ color: C.coral }}>{upgradeError}</p>}
+              {upgradeSuccess && <p className="text-xs mt-3" style={{ color: C.green }}>{upgradeSuccess}</p>}
+            </div>
+          )}
         </div>
       )}
 

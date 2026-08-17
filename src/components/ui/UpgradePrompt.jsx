@@ -7,10 +7,21 @@ export default function UpgradePrompt({
   feature = 'This feature',
   title,
   body,
+  onUpgrade,
 }) {
   const { plans } = usePlanPrices();
   const smallPrice = formatPlanPrice(plans, 'small', 'monthly');
   const enterprisePrice = formatPlanPrice(plans, 'enterprise', 'monthly');
+
+  const defaultBody = (
+    <>
+      Your plan is <strong style={{ color: C.ink }}>{PLAN_LABELS.solo}</strong>.
+      {' '}{PLAN_LABELS.small} unlocks Schedule, Tasks, and 5 more reports
+      {smallPrice ? ` (${smallPrice})` : ''}
+      — or go {PLAN_LABELS.enterprise}
+      {enterprisePrice ? ` (${enterprisePrice})` : ''} for unlimited seats and workspaces.
+    </>
+  );
 
   return (
     <div className="flex-1 p-8 max-w-xl w-full mx-auto flex items-center justify-center" style={BODY}>
@@ -22,27 +33,29 @@ export default function UpgradePrompt({
           <Sparkles size={22} style={{ color: C.purple }} />
         </div>
         <h2 className="text-xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>
-          {title || `${feature} is on ${PLAN_LABELS.small} and ${PLAN_LABELS.enterprise}`}
+          {title || `${feature} is ready when you are — unlock with ${PLAN_LABELS.small}`}
         </h2>
         <p className="text-sm mb-6" style={{ color: C.sub }}>
-          {body || (
-            <>
-              Your plan is <strong style={{ color: C.ink }}>{PLAN_LABELS.solo}</strong>.
-              Upgrade to {PLAN_LABELS.small}
-              {smallPrice ? ` (${smallPrice})` : ''} or{' '}
-              <strong style={{ color: C.ink }}>{PLAN_LABELS.enterprise}</strong>
-              {enterprisePrice ? ` (${enterprisePrice})` : ''} for
-              Tasks, Schedule, unlimited workspaces, and multi-user access.
-            </>
-          )}
+          {body || defaultBody}
         </p>
-        <a
-          href="/#pricing"
-          className="inline-flex text-sm font-bold text-white px-6 py-3 rounded-full no-underline"
-          style={{ background: C.purple }}
-        >
-          View pricing
-        </a>
+        {onUpgrade ? (
+          <button
+            type="button"
+            onClick={onUpgrade}
+            className="inline-flex text-sm font-bold text-white px-6 py-3 rounded-full"
+            style={{ background: C.purple }}
+          >
+            Upgrade Plan
+          </button>
+        ) : (
+          <a
+            href="/#pricing"
+            className="inline-flex text-sm font-bold text-white px-6 py-3 rounded-full no-underline"
+            style={{ background: C.purple }}
+          >
+            View pricing
+          </a>
+        )}
       </div>
     </div>
   );
