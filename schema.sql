@@ -519,6 +519,38 @@ create index idx_task_requirements_requirement on task_requirements(requirement_
 create index idx_task_learning_needs_task on task_learning_needs(task_id);
 create index idx_task_learning_needs_learning_need on task_learning_needs(learning_need_id);
 
+-- ---------- Change Status Reports (weekly SteerCo snapshots) ----------
+-- Point-in-time snapshots: RAG is manual; metrics freeze at create time.
+
+create table status_reports (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  initiative_id uuid references initiatives(id) on delete cascade,
+  program_id uuid references programs(id) on delete cascade,
+  rag_status text not null check (rag_status in ('green', 'amber', 'red')),
+  highlights text,
+  risks_blockers text,
+  requirements_completion_pct numeric(5,2) not null default 0,
+  task_completion_pct numeric(5,2) not null default 0,
+  blocked_task_count integer not null default 0,
+  change_readiness_pct numeric(5,2) not null default 0,
+  high_severity_impact_count integer not null default 0,
+  budget_actual numeric(12,2) not null default 0,
+  budget_planned numeric(12,2),
+  created_by uuid references users(id),
+  created_at timestamptz not null default now(),
+  constraint status_reports_scope_check check (
+    (initiative_id is not null and program_id is null)
+    or (initiative_id is null and program_id is not null)
+  )
+);
+
+create index idx_status_reports_workspace on status_reports(workspace_id);
+create index idx_status_reports_initiative on status_reports(initiative_id);
+create index idx_status_reports_program on status_reports(program_id);
+create index idx_status_reports_created_at on status_reports(created_at desc);
+
 -- ============================================================
 -- Row Level Security (Supabase)
 -- Two-tier access, both checks are flat lookups, no deep joins,
@@ -540,6 +572,7 @@ alter table requirement_impacts enable row level security;
 alter table tasks enable row level security;
 alter table task_requirements enable row level security;
 alter table task_learning_needs enable row level security;
+alter table status_reports enable row level security;
 alter table cost_entries enable row level security;
 alter table programs enable row level security;
 alter table organizations enable row level security;

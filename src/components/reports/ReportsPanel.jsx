@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, ClipboardList, FileText, Grid3X3, CalendarRange, Download, Loader2,
-  GraduationCap, CheckSquare, ListChecks,
+  GraduationCap, CheckSquare, ListChecks, Activity,
 } from 'lucide-react';
 import { C, HEAD, BODY, SEVERITY_COLOR, STATUS_COLOR, tint, isRatedSeverity, stripInitiativeMeta } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
@@ -12,6 +12,7 @@ import {
   RequirementsCompletionReport,
   TaskCompletionReport,
 } from './CompletionReports';
+import StatusReportPanel from './StatusReport';
 
 const SEV_SCORE = { none: 0, low: 1, medium: 2, high: 3 };
 const SEV_COLS = [
@@ -62,6 +63,14 @@ const REPORTS = [
     icon: CheckSquare,
     color: C.teal,
     file: 'task-completion.pdf',
+  },
+  {
+    key: 'status',
+    title: 'Change Status Report',
+    desc: 'Weekly SteerCo snapshot — RAG judgment plus frozen completion and budget metrics.',
+    icon: Activity,
+    color: C.darknavy,
+    file: 'change-status-report.pdf',
   },
   {
     key: 'heatmap',
@@ -947,6 +956,7 @@ export default function ReportsPanel() {
           {active === 'readiness' && <ChangeReadinessReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
           {active === 'req-completion' && <RequirementsCompletionReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
           {active === 'task-completion' && <TaskCompletionReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
+          {active === 'status' && <StatusReportPanel workspaceId={activeWorkspaceId} exportRef={exportRef} />}
           {active === 'heatmap' && <HeatMapReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
           {active === 'schedule' && (
             <ScheduleReport
