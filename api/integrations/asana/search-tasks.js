@@ -15,10 +15,15 @@ export default async function handler(req, res) {
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const query = String(body.query || '').trim();
+  const workspaceId = body.workspaceId;
   if (!query) return res.status(400).json({ error: 'query is required' });
+  if (!workspaceId) return res.status(400).json({ error: 'workspaceId is required' });
 
   try {
-    const { integration, accessToken } = await getValidAsanaAccess(admin, caller.account_id);
+    const { integration, accessToken } = await getValidAsanaAccess(admin, {
+      accountId: caller.account_id,
+      workspaceId,
+    });
     const gid = parseAsanaTaskGid(query);
 
     if (gid && (/^\d+$/.test(query) || query.includes('asana.com') || query.includes('/task/'))) {

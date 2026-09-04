@@ -35,6 +35,7 @@ grant execute on function decrypt_integration_token(text, text) to service_role;
 create table if not exists integrations (
   id uuid primary key default gen_random_uuid(),
   account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
   provider text not null check (provider in ('asana', 'jira', 'monday')),
   status text not null default 'connected'
     check (status in ('connected', 'disconnected', 'error')),
@@ -47,7 +48,8 @@ create table if not exists integrations (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (account_id, provider)
+  -- One connection per provider per ChangeView workspace (not per account).
+  unique (workspace_id, provider)
 );
 
 create table if not exists integration_parent_links (
@@ -89,6 +91,7 @@ create table if not exists integration_task_links (
 );
 
 create index if not exists idx_integrations_account on integrations(account_id);
+create index if not exists idx_integrations_workspace on integrations(workspace_id);
 create index if not exists idx_integration_parent_links_initiative on integration_parent_links(initiative_id);
 create index if not exists idx_integration_parent_links_external on integration_parent_links(external_id);
 create index if not exists idx_integration_task_links_task on integration_task_links(task_id);
@@ -107,13 +110,16 @@ begin
   -- Prefer current_user_account_id() (001); fall back helpers may exist as current_account_id().
   create policy "integrations_owner_select" on integrations for select using (
     account_id = current_user_account_id()
+    and user_has_workspace_access(workspace_id)
   );
   create policy "integrations_owner_write" on integrations for all using (
     account_id = current_user_account_id()
     and current_user_role() = 'owner'
+    and user_has_workspace_access(workspace_id)
   ) with check (
     account_id = current_user_account_id()
     and current_user_role() = 'owner'
+    and user_has_workspace_access(workspace_id)
   );
 
   drop policy if exists "integration_parent_links_select" on integration_parent_links;

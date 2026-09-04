@@ -33,7 +33,10 @@ export default async function handler(req, res) {
       .single();
     if (plErr || !parentLink) return res.status(404).json({ error: 'Parent link not found' });
 
-    const { integration, accessToken } = await getValidAsanaAccess(admin, caller.account_id);
+    const { integration, accessToken } = await getValidAsanaAccess(admin, {
+      accountId: caller.account_id,
+      workspaceId: parentLink.workspace_id,
+    });
     if (parentLink.integration_id !== integration.id) {
       return res.status(400).json({ error: 'Parent link does not belong to this Asana connection' });
     }

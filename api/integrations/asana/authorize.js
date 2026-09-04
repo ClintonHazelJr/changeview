@@ -10,7 +10,8 @@ function signState(payload) {
 }
 
 /**
- * Start Asana OAuth — owner only. Returns { url } for the browser to open.
+ * Start Asana OAuth — owner only, scoped to the active ChangeView workspace.
+ * Returns { url } for the browser to open.
  */
 export default async function handler(req, res) {
   setCors(res);
@@ -27,14 +28,31 @@ export default async function handler(req, res) {
   const { caller, error: authError } = await requireAccountOwner(admin, req);
   if (authError) return res.status(authError.status).json({ error: authError.message });
 
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  const workspaceId = body.workspaceId;
+  if (!workspaceId) {
+    return res.status(400).json({ error: 'workspaceId is required — connect Asana for a specific workspace' });
+  }
+
+  const { data: ws, error: wsErr } = await admin
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .eq('account_id', caller.account_id)
+    .maybeSingle();
+  if (wsErr) return res.status(500).json({ error: wsErr.message });
+  if (!ws) return res.status(404).json({ error: 'Workspace not found on this account' });
+
   const origin = req.headers.origin
     || (typeof req.headers.referer === 'string' ? new URL(req.headers.referer).origin : null)
     || process.env.APP_ORIGIN
     || 'http://localhost:5173';
 
   const redirectUri = asanaRedirectUri(origin);
+  // workspaceId must survive the Asana round-trip — encoded in signed OAuth state.
   const state = signState({
     accountId: caller.account_id,
+    workspaceId,
     userId: caller.id,
     origin,
     exp: Date.now() + 15 * 60 * 1000,

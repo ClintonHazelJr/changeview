@@ -14,7 +14,9 @@ function verifyState(state) {
   if (sig !== expected) return null;
   try {
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
-    if (!payload?.accountId || !payload?.exp || payload.exp < Date.now()) return null;
+    if (!payload?.accountId || !payload?.workspaceId || !payload?.exp || payload.exp < Date.now()) {
+      return null;
+    }
     return payload;
   } catch {
     return null;
@@ -22,7 +24,8 @@ function verifyState(state) {
 }
 
 /**
- * Asana OAuth callback — exchanges code, stores encrypted tokens, redirects into the app.
+ * Asana OAuth callback — exchanges code, upserts encrypted tokens on the
+ * ChangeView workspace carried in OAuth state (unique per workspace + provider).
  */
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -52,16 +55,24 @@ export default async function handler(req, res) {
   if (!admin) return fail('Service not configured');
 
   try {
+    const { data: ws } = await admin
+      .from('workspaces')
+      .select('id')
+      .eq('id', payload.workspaceId)
+      .eq('account_id', payload.accountId)
+      .maybeSingle();
+    if (!ws) return fail('Workspace from OAuth state not found');
+
     const redirectUri = asanaRedirectUri(appOrigin);
     const tokens = await exchangeAsanaCode(code, redirectUri);
     const accessToken = tokens.access_token;
     const me = await asanaFetch(accessToken, '/users/me?opt_fields=gid,name,email,workspaces,workspaces.name');
     const user = me.data;
-    const workspaceGid = user.workspaces?.[0]?.gid || null;
+    const asanaWorkspaceGid = user.workspaces?.[0]?.gid || null;
 
-    const encAccess = await encryptIntegrationToken(admin, accessToken);
+    const encAccess = encryptIntegrationToken(accessToken);
     const encRefresh = tokens.refresh_token
-      ? await encryptIntegrationToken(admin, tokens.refresh_token)
+      ? encryptIntegrationToken(tokens.refresh_token)
       : null;
     const tokenExpiresAt = tokens.expires_in
       ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
@@ -69,12 +80,13 @@ export default async function handler(req, res) {
 
     const row = {
       account_id: payload.accountId,
+      workspace_id: payload.workspaceId,
       provider: 'asana',
       status: 'connected',
       access_token_encrypted: encAccess,
       refresh_token_encrypted: encRefresh,
       token_expires_at: tokenExpiresAt,
-      external_workspace_id: workspaceGid,
+      external_workspace_id: asanaWorkspaceGid,
       external_user_id: user.gid || null,
       external_user_name: user.name || user.email || null,
       metadata: {
@@ -83,9 +95,10 @@ export default async function handler(req, res) {
       updated_at: new Date().toISOString(),
     };
 
+    // Unique (workspace_id, provider) — reconnect updates the existing row.
     const { error } = await admin
       .from('integrations')
-      .upsert(row, { onConflict: 'account_id,provider' });
+      .upsert(row, { onConflict: 'workspace_id,provider' });
 
     if (error) return fail(error.message);
 

@@ -53,6 +53,7 @@ export default async function handler(req, res) {
       .from('integration_parent_links')
       .select('*')
       .eq('account_id', accountId)
+      .eq('workspace_id', task.workspace_id)
       .eq('initiative_id', task.initiative_id)
       .maybeSingle();
 
@@ -60,7 +61,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, skipped: true, reason: 'Initiative has no Asana parent link' });
     }
 
-    const { integration, accessToken } = await getValidAsanaAccess(admin, accountId);
+    const { integration, accessToken } = await getValidAsanaAccess(admin, {
+      accountId,
+      workspaceId: task.workspace_id,
+    });
     if (parentLink.integration_id !== integration.id) {
       return res.status(200).json({ ok: true, skipped: true, reason: 'Asana not connected for this link' });
     }

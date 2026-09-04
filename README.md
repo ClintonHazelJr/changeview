@@ -70,12 +70,12 @@ Also apply: `010_stripe_customer_id.sql`, `011_account_deleted_at.sql`, and `012
 2. Create an Asana OAuth app; set redirect URI to
    `https://<your-domain>/api/integrations/asana/callback` (and the same for local via
    `vercel dev` / tunnel).
-3. Env: `INTEGRATION_TOKEN_ENCRYPTION_KEY`, `ASANA_CLIENT_ID`, `ASANA_CLIENT_SECRET`,
-   `APP_ORIGIN`. Tokens are encrypted via `encrypt_integration_token` — the key never
-   lives in the database.
-4. Owner connects from **Integrations** (sidebar, next to System Admin). Link one parent
-   ticket per Initiative, then **Import subtasks**. Outbound sync runs from the Tasks UI;
-   inbound uses Asana webhooks on that parent (needs public HTTPS).
+3. Env: `INTEGRATION_TOKEN_ENCRYPTION_KEY` (min 16 chars; AES-256-GCM in app code —
+   never stored in the DB), `ASANA_CLIENT_ID`, `ASANA_CLIENT_SECRET`, `APP_ORIGIN`.
+4. Owner connects from **Integrations** for the **active workspace** (OAuth `state`
+   carries `workspace_id`). Link one parent ticket per Initiative, then **Import
+   subtasks**. Outbound sync runs from the Tasks UI; inbound uses Asana webhooks on
+   that parent (needs public HTTPS).
 
 Status mapping: Asana `completed` → ChangeView `done`; incomplete → `in_progress`.
 Outbound: `done` ↔ completed; other CV statuses stay incomplete on Asana.

@@ -1,6 +1,6 @@
 import { adminClient, setCors, requireAccountOwner } from '../../_adminAuth.js';
 
-/** Disconnect Asana locally (no Asana revoke call in v1). */
+/** Disconnect Asana for one ChangeView workspace (no Asana revoke call in v1). */
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -12,10 +12,15 @@ export default async function handler(req, res) {
   const { caller, error: authError } = await requireAccountOwner(admin, req);
   if (authError) return res.status(authError.status).json({ error: authError.message });
 
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  const workspaceId = body.workspaceId;
+  if (!workspaceId) return res.status(400).json({ error: 'workspaceId is required' });
+
   const { data: integration } = await admin
     .from('integrations')
     .select('id')
     .eq('account_id', caller.account_id)
+    .eq('workspace_id', workspaceId)
     .eq('provider', 'asana')
     .maybeSingle();
 
@@ -35,5 +40,5 @@ export default async function handler(req, res) {
     .eq('id', integration.id);
 
   if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json({ ok: true, status: 'disconnected' });
+  return res.status(200).json({ ok: true, status: 'disconnected', workspaceId });
 }

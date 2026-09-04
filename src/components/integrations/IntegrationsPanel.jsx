@@ -35,14 +35,17 @@ export default function IntegrationsPanel() {
   const [selectedTask, setSelectedTask] = useState(null);
 
   const reload = useCallback(async () => {
-    if (!token || !isOwner) {
+    if (!token || !isOwner || !activeWorkspaceId) {
       setLoading(false);
+      setConnected(false);
+      setIntegration(null);
+      setParentLinks([]);
       return;
     }
     setLoading(true);
     setError('');
     try {
-      const data = await fetchAsanaStatus(token);
+      const data = await fetchAsanaStatus(token, activeWorkspaceId);
       setConnected(Boolean(data.connected));
       setIntegration(data.integration || null);
       setParentLinks(data.parentLinks || []);
@@ -51,7 +54,7 @@ export default function IntegrationsPanel() {
     } finally {
       setLoading(false);
     }
-  }, [token, isOwner]);
+  }, [token, isOwner, activeWorkspaceId]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -86,10 +89,14 @@ export default function IntegrationsPanel() {
   }, []);
 
   const onConnect = async () => {
+    if (!activeWorkspaceId) {
+      setError('Select a workspace before connecting Asana.');
+      return;
+    }
     setBusy('connect');
     setError('');
     try {
-      await startAsanaConnect(token);
+      await startAsanaConnect(token, activeWorkspaceId);
     } catch (err) {
       setError(err.message);
       setBusy('');
@@ -97,12 +104,12 @@ export default function IntegrationsPanel() {
   };
 
   const onDisconnect = async () => {
-    if (!window.confirm('Disconnect Asana? Existing parent links stay until you remove them.')) return;
+    if (!window.confirm('Disconnect Asana for this workspace? Existing parent links stay until you remove them.')) return;
     setBusy('disconnect');
     setError('');
     try {
-      await disconnectAsana(token);
-      setNotice('Asana disconnected.');
+      await disconnectAsana(token, activeWorkspaceId);
+      setNotice('Asana disconnected for this workspace.');
       await reload();
     } catch (err) {
       setError(err.message);
@@ -118,7 +125,7 @@ export default function IntegrationsPanel() {
     setError('');
     setSelectedTask(null);
     try {
-      const data = await searchAsanaTasks(token, searchQuery.trim());
+      const data = await searchAsanaTasks(token, searchQuery.trim(), activeWorkspaceId);
       setSearchResults(data.tasks || []);
       if (!(data.tasks || []).length) setNotice('No Asana tasks matched.');
     } catch (err) {
@@ -203,9 +210,10 @@ export default function IntegrationsPanel() {
     <div className="flex-1 p-8 max-w-3xl w-full mx-auto overflow-y-auto" style={BODY}>
       <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Integrations</h2>
       <p className="text-sm mb-6" style={{ color: C.sub }}>
-        Connect a single parent ticket in Asana to a ChangeView Initiative. Only that ticket’s
-        subtasks sync — nothing else in the project. Connecting and linking is owner-only; once
-        linked, every teammate’s Task edits sync automatically in the background.
+        Connect Asana for the currently selected workspace only — each client workspace gets its
+        own connection. Link one parent ticket to an Initiative; only that ticket’s subtasks sync.
+        Connecting and linking is owner-only; once linked, every teammate’s Task edits sync
+        automatically in the background.
       </p>
 
       {error && (
@@ -234,10 +242,10 @@ export default function IntegrationsPanel() {
                   : 'Not connected'}
             </p>
           </div>
-          {connected ? (
+              {connected ? (
             <button
               type="button"
-              disabled={Boolean(busy)}
+              disabled={Boolean(busy) || !activeWorkspaceId}
               onClick={onDisconnect}
               className="inline-flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-full border disabled:opacity-50"
               style={{ borderColor: C.border, color: C.coral }}
@@ -248,7 +256,7 @@ export default function IntegrationsPanel() {
           ) : (
             <button
               type="button"
-              disabled={Boolean(busy) || loading}
+              disabled={Boolean(busy) || loading || !activeWorkspaceId}
               onClick={onConnect}
               className="inline-flex items-center gap-2 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-50"
               style={{ background: C.purple }}
@@ -258,6 +266,11 @@ export default function IntegrationsPanel() {
             </button>
           )}
         </div>
+        {!activeWorkspaceId && (
+          <p className="text-xs mb-2" style={{ color: C.amber }}>
+            Select a workspace in the top nav — Asana connects per workspace.
+          </p>
+        )}
 
         {connected && (
           <>

@@ -125,22 +125,25 @@ export async function refreshAsanaToken(refreshToken) {
   return json;
 }
 
-/** Load integration row, refresh token if needed, return { integration, accessToken }. */
-export async function getValidAsanaAccess(admin, accountId) {
+/** Load integration row for this ChangeView workspace, refresh token if needed. */
+export async function getValidAsanaAccess(admin, { accountId, workspaceId }) {
+  if (!workspaceId) throw new Error('workspaceId is required for Asana access');
+
   const { data: integration, error } = await admin
     .from('integrations')
     .select('*')
     .eq('account_id', accountId)
+    .eq('workspace_id', workspaceId)
     .eq('provider', 'asana')
     .maybeSingle();
 
   if (error) throw new Error(error.message);
   if (!integration || integration.status !== 'connected') {
-    throw new Error('Asana is not connected');
+    throw new Error('Asana is not connected for this workspace');
   }
 
-  let accessToken = await decryptIntegrationToken(admin, integration.access_token_encrypted);
-  const refreshToken = await decryptIntegrationToken(admin, integration.refresh_token_encrypted);
+  let accessToken = decryptIntegrationToken(integration.access_token_encrypted);
+  const refreshToken = decryptIntegrationToken(integration.refresh_token_encrypted);
   const expiresAt = integration.token_expires_at ? new Date(integration.token_expires_at).getTime() : 0;
   const needsRefresh = !accessToken || !expiresAt || expiresAt < Date.now() + 60_000;
 
@@ -148,9 +151,9 @@ export async function getValidAsanaAccess(admin, accountId) {
     if (!refreshToken) throw new Error('Asana session expired — reconnect');
     const refreshed = await refreshAsanaToken(refreshToken);
     accessToken = refreshed.access_token;
-    const encAccess = await encryptIntegrationToken(admin, refreshed.access_token);
+    const encAccess = encryptIntegrationToken(refreshed.access_token);
     const encRefresh = refreshed.refresh_token
-      ? await encryptIntegrationToken(admin, refreshed.refresh_token)
+      ? encryptIntegrationToken(refreshed.refresh_token)
       : integration.refresh_token_encrypted;
     const tokenExpiresAt = refreshed.expires_in
       ? new Date(Date.now() + refreshed.expires_in * 1000).toISOString()

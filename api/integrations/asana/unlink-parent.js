@@ -29,7 +29,10 @@ export default async function handler(req, res) {
 
   if (link.webhook_gid) {
     try {
-      const { accessToken } = await getValidAsanaAccess(admin, caller.account_id);
+      const { accessToken } = await getValidAsanaAccess(admin, {
+        accountId: caller.account_id,
+        workspaceId: link.workspace_id,
+      });
       await asanaFetch(accessToken, `/webhooks/${link.webhook_gid}`, { method: 'DELETE' });
     } catch (err) {
       console.warn('[asana/unlink-parent] webhook delete failed', err.message);

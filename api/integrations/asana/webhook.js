@@ -88,7 +88,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, skipped: true });
     }
 
-    const { accessToken } = await getValidAsanaAccess(admin, parentLink.account_id);
+    const { accessToken } = await getValidAsanaAccess(admin, {
+      accountId: parentLink.account_id,
+      workspaceId: parentLink.workspace_id,
+    });
     const seen = new Set();
 
     for (const event of events) {

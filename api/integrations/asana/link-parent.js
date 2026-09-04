@@ -41,7 +41,10 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'Initiative not found in this workspace' });
     }
 
-    const { integration, accessToken } = await getValidAsanaAccess(admin, caller.account_id);
+    const { integration, accessToken } = await getValidAsanaAccess(admin, {
+      accountId: caller.account_id,
+      workspaceId,
+    });
 
     const taskRes = await asanaFetch(
       accessToken,
