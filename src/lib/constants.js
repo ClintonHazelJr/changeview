@@ -75,9 +75,9 @@ export const PLAN_LABELS = {
   enterprise: 'Enterprise',
 };
 
-/** Seat / workspace caps. null = unlimited. Aligns with marketing + DB workspace trigger. */
+/** Seat / workspace caps. null = unlimited. Aligns with marketing + DB plan_max_users(). */
 export const PLAN_LIMITS = {
-  solo: { workspaces: 1, users: 1 },
+  solo: { workspaces: 1, users: 2 },
   small: { workspaces: null, users: 5 },
   enterprise: { workspaces: null, users: null },
 };
@@ -152,7 +152,7 @@ export function trialDaysLeft(subscription) {
 }
 
 /**
- * Tasks, Schedule, multi-user, paid reports — locked on Starter when paid.
+ * Tasks, Schedule, paid reports — locked on Starter when paid (seat invites still allowed up to plan_max_users).
  * Stripe `trialing` unlocks full Enterprise-level access regardless of selected tier.
  */
 export const hasPaidPlanFeatures = (tier, subscription = null) => {
@@ -183,6 +183,9 @@ export function parseDbError(err) {
   const msg = err?.message || err?.error_description || 'Something went wrong';
   if (msg.includes('Tier 1 accounts are limited') || msg.includes('Sole Proprietor plans are limited') || msg.includes('solo accounts are limited') || msg.includes('Starter plans are limited')) {
     return 'Starter plans are limited to a single Workspace. Upgrade to Pro or Enterprise to add more.';
+  }
+  if (msg.includes('plan_max_users') || msg.includes('user limit') || msg.includes('seat limit') || msg.includes('maximum number of users')) {
+    return 'This plan’s user limit is reached. Starter allows 2 users; upgrade to Pro (5) or contact us for Enterprise.';
   }
   return msg;
 }

@@ -114,4 +114,4 @@ Push to GitHub and connect to Vercel. Set all env vars in Vercel project setting
 
 ## Pricing
 
-**Starter** (internal `solo`) $39/mo (monthly only), **Pro** (internal `small`) $99/mo or $990/yr, **Enterprise** $199/mo or $1,990/yr (annual = 10× monthly / “2 months free”). UI amounts come from Stripe Price `unit_amount` via `/api/plan-prices`, with `shared/planPrices.js` as fallback. Checkout still uses the Stripe Price IDs above based on tier + billing cycle.
+**Starter** (internal `solo`) $39/mo (monthly only, 2 users / 1 workspace), **Pro** (internal `small`) $99/mo or $990/yr (5 users), **Enterprise** sales-assisted (Contact Us — no self-serve Checkout; Stripe Enterprise Price env vars remain for manual setup). UI amounts for Starter/Pro come from Stripe Price `unit_amount` via `/api/plan-prices`, with `shared/planPrices.js` as fallback.

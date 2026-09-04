@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { C, HEAD, BODY, PLAN_LABELS, inputClass, inputStyle } from '../lib/constants';
 import { useAuth } from '../contexts/AuthContext';
 import { rememberCheckoutIntent, startCheckout } from '../lib/checkout';
 import { usePlanPrices } from '../hooks/usePlanPrices';
 import { formatPlanPrice } from '../../shared/planPrices.js';
 
-const VALID_PLANS = new Set(['solo', 'small', 'enterprise']);
+const VALID_PLANS = new Set(['solo', 'small']);
 
 export default function SignupPage() {
   const { signUp, signOut, session, loading } = useAuth();
@@ -32,8 +32,9 @@ export default function SignupPage() {
   const autoCheckoutStarted = useRef(false);
 
   useEffect(() => {
+    if (planParam === 'enterprise') return;
     rememberCheckoutIntent(planTier, billingCycle);
-  }, [planTier, billingCycle]);
+  }, [planParam, planTier, billingCycle]);
 
   useEffect(() => {
     if (loading) return;
@@ -44,6 +45,7 @@ export default function SignupPage() {
 
   // Logged-in visit from a pricing card: checkout that card's tier (do not dump into /app Solo gate).
   useEffect(() => {
+    if (planParam === 'enterprise') return;
     if (loading || !arrivedLoggedIn.current || !session?.access_token) return;
     if (autoCheckoutStarted.current) return;
     autoCheckoutStarted.current = true;
@@ -57,7 +59,12 @@ export default function SignupPage() {
       setError(err.message || 'Could not start checkout');
       setBusy(false);
     });
-  }, [loading, session?.access_token, session?.user?.email, planTier, billingCycle]);
+  }, [planParam, loading, session?.access_token, session?.user?.email, planTier, billingCycle]);
+
+  // Enterprise is sales-assisted — no self-serve signup path.
+  if (planParam === 'enterprise') {
+    return <Navigate to="/contact" replace />;
+  }
 
   if (loading) return null;
 

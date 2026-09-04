@@ -43,6 +43,12 @@ export default async function handler(req, res) {
   if (!tier || !PLAN_TIERS.has(tier)) {
     return res.status(400).json({ error: 'Invalid plan tier' });
   }
+  // Enterprise is sales-assisted only — never update via this endpoint.
+  if (tier === 'enterprise') {
+    return res.status(400).json({
+      error: 'Enterprise is set up with our team. Use Contact Us — there is no self-serve upgrade.',
+    });
+  }
 
   const { data: sub, error: subErr } = await admin
     .from('subscriptions')
@@ -66,9 +72,9 @@ export default async function handler(req, res) {
         admin.from('workspaces').select('id', { count: 'exact', head: true }).eq('account_id', caller.account_id),
         admin.from('users').select('id', { count: 'exact', head: true }).eq('account_id', caller.account_id).neq('is_active', false),
       ]);
-      if ((wsCount ?? 0) > 1 || (userCount ?? 0) > 1) {
+      if ((wsCount ?? 0) > 1 || (userCount ?? 0) > 2) {
         return res.status(400).json({
-          error: `Cannot switch to Starter while this account has ${wsCount ?? 0} workspaces and ${userCount ?? 0} users. Starter allows 1 workspace and 1 user. Remove extras first, or stay on Pro/Enterprise.`,
+          error: `Cannot switch to Starter while this account has ${wsCount ?? 0} workspaces and ${userCount ?? 0} users. Starter allows 1 workspace and 2 users. Remove extras first, or stay on Pro/Enterprise.`,
         });
       }
     }

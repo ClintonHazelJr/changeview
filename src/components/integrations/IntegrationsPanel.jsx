@@ -190,7 +190,11 @@ export default function IntegrationsPanel() {
     return (
       <div className="flex-1 p-8 max-w-2xl w-full mx-auto" style={BODY}>
         <h2 className="text-xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>Integrations</h2>
-        <p className="text-sm" style={{ color: C.sub }}>Only the account owner can connect external tools.</p>
+        <p className="text-sm mb-3" style={{ color: C.sub }}>
+          Only the account owner can connect providers and link parent tickets. Your Tasks still
+          sync in the background when an owner has linked this Initiative — create and edit Tasks
+          as usual.
+        </p>
       </div>
     );
   }
@@ -200,7 +204,8 @@ export default function IntegrationsPanel() {
       <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Integrations</h2>
       <p className="text-sm mb-6" style={{ color: C.sub }}>
         Connect a single parent ticket in Asana to a ChangeView Initiative. Only that ticket’s
-        subtasks sync — nothing else in the project.
+        subtasks sync — nothing else in the project. Connecting and linking is owner-only; once
+        linked, every teammate’s Task edits sync automatically in the background.
       </p>
 
       {error && (

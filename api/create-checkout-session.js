@@ -76,6 +76,12 @@ export default async function handler(req, res) {
   });
 
   if (!tier) return res.status(400).json({ error: 'Unknown plan tier' });
+  // Enterprise is sales-assisted only — no self-serve Checkout.
+  if (tier === 'enterprise') {
+    return res.status(400).json({
+      error: 'Enterprise is set up with our team. Use Contact Us — there is no self-serve purchase.',
+    });
+  }
   if (tier === 'solo' && billingCycle !== 'monthly') {
     return res.status(400).json({ error: 'Starter is billed monthly only' });
   }

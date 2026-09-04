@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CreditCard, LogOut, Trash2, AlertTriangle, Sparkles } from 'lucide-react';
-import { C, HEAD, BODY, inputClass, inputStyle, initials, tint, PLAN_LABELS, PLAN_LIMITS, isPlatformAdminEmail, PLATFORM_RESET_CONFIRM, effectivePlanLimits, formatPlanLimit, trialDaysLeft as calcTrialDays, planTierRank } from '../../lib/constants';
+import { C, HEAD, BODY, inputClass, inputStyle, initials, tint, PLAN_LABELS, isPlatformAdminEmail, PLATFORM_RESET_CONFIRM, effectivePlanLimits, formatPlanLimit, trialDaysLeft as calcTrialDays, planTierRank } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -384,31 +384,37 @@ export default function ProfilePanel({ initialUpgradeOpen = false, onUpgradeOpen
     ? (typeof trialDaysLeft === 'number' ? trialDaysLeft : calcTrialDays(subscription))
     : 0;
 
-  const upgradeOptions = ['solo', 'small', 'enterprise'].flatMap((tier) => {
-    const cycles = tier === 'solo' ? ['monthly'] : ['monthly', 'annual'];
-    return cycles
-      .filter((cycle) => {
-        const rank = planTierRank(tier);
-        if (rank > currentRank) return true;
-        if (rank === currentRank && cycle === 'annual' && currentCycle === 'monthly' && tier !== 'solo') {
-          return true;
-        }
-        return false;
-      })
-      .map((cycle) => ({
-        tier,
-        cycle,
-        label: PLAN_LABELS[tier],
-        price: formatPlanPrice(plans, tier, cycle),
-        blurb: tier === 'small'
-          ? 'Schedule, Tasks, 5 more reports, 5 users, unlimited workspaces'
-          : tier === 'enterprise'
-            ? 'Unlimited users and workspaces'
-            : '1 user, 1 workspace',
-        limits: PLAN_LIMITS[tier],
-      }));
+  const upgradeOptions = ['small', 'enterprise'].flatMap((tier) => {
+    const rank = planTierRank(tier);
+    if (tier === 'enterprise') {
+      if (rank <= currentRank) return [];
+      return [{
+        tier: 'enterprise',
+        cycle: null,
+        label: PLAN_LABELS.enterprise,
+        price: null,
+        salesAssisted: true,
+        blurb: 'Unlimited users and workspaces — sales-assisted setup',
+      }];
+    }
+    // Pro (small)
+    const cycles = [];
+    if (rank > currentRank) {
+      cycles.push('monthly', 'annual');
+    } else if (rank === currentRank && currentCycle === 'monthly') {
+      cycles.push('annual');
+    }
+    return cycles.map((cycle) => ({
+      tier,
+      cycle,
+      label: PLAN_LABELS[tier],
+      price: formatPlanPrice(plans, tier, cycle),
+      salesAssisted: false,
+      blurb: 'Schedule, Tasks, 5 more reports, 5 users, unlimited workspaces',
+    }));
   }).filter((opt) => {
-    if (upgradeCycle === 'annual') return opt.cycle === 'annual' || opt.tier === 'solo';
+    if (opt.salesAssisted) return true;
+    if (upgradeCycle === 'annual') return opt.cycle === 'annual';
     return opt.cycle === 'monthly';
   });
 
@@ -629,7 +635,7 @@ export default function ProfilePanel({ initialUpgradeOpen = false, onUpgradeOpen
                 You’ll be charged the prorated difference immediately, and your billing cycle restarts today
                 {trialActive ? ' (after trial ends if you’re still trialing)' : ''}.
               </p>
-              {planTier !== 'solo' && (
+              {planTier !== 'enterprise' && (
                 <div className="flex gap-2 mb-3">
                   {['monthly', 'annual'].map((cycle) => (
                     <button
@@ -649,13 +655,14 @@ export default function ProfilePanel({ initialUpgradeOpen = false, onUpgradeOpen
               )}
               {!upgradeOptions.length ? (
                 <p className="text-sm" style={{ color: C.sub }}>
-                  You’re on the highest plan
+                  You’re on the highest self-serve plan
                   {currentCycle === 'annual' ? '' : ' for this billing cycle'}.
+                  {' '}For Enterprise, contact us.
                 </p>
               ) : (
                 <div className="space-y-3">
                   {upgradeOptions.map((opt) => {
-                    const busyKey = `${opt.tier}:${opt.cycle}`;
+                    const busyKey = opt.salesAssisted ? 'enterprise' : `${opt.tier}:${opt.cycle}`;
                     return (
                       <div
                         key={busyKey}
@@ -666,25 +673,37 @@ export default function ProfilePanel({ initialUpgradeOpen = false, onUpgradeOpen
                           <div>
                             <div className="text-sm font-extrabold" style={{ ...HEAD, color: C.ink }}>
                               {opt.label}
-                              <span className="font-semibold ml-1" style={{ color: C.sub }}>
-                                · {opt.cycle === 'annual' ? 'Annual' : 'Monthly'}
-                              </span>
+                              {!opt.salesAssisted && (
+                                <span className="font-semibold ml-1" style={{ color: C.sub }}>
+                                  · {opt.cycle === 'annual' ? 'Annual' : 'Monthly'}
+                                </span>
+                              )}
                             </div>
                             <p className="text-xs mt-0.5" style={{ color: C.sub }}>{opt.blurb}</p>
                           </div>
                           <div className="text-sm font-bold shrink-0" style={{ color: C.ink }}>
-                            {opt.price || '—'}
+                            {opt.salesAssisted ? 'Custom' : (opt.price || '—')}
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          disabled={Boolean(upgradeBusy)}
-                          onClick={() => handleUpgradePlan(opt.tier, opt.cycle)}
-                          className="text-sm font-bold text-white px-4 py-2 rounded-full disabled:opacity-50"
-                          style={{ background: C.purple }}
-                        >
-                          {upgradeBusy === busyKey ? 'Updating…' : `Upgrade to ${opt.label}`}
-                        </button>
+                        {opt.salesAssisted ? (
+                          <Link
+                            to="/contact"
+                            className="inline-flex text-sm font-bold text-white px-4 py-2 rounded-full no-underline"
+                            style={{ background: C.purple }}
+                          >
+                            Contact Us
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={Boolean(upgradeBusy)}
+                            onClick={() => handleUpgradePlan(opt.tier, opt.cycle)}
+                            className="text-sm font-bold text-white px-4 py-2 rounded-full disabled:opacity-50"
+                            style={{ background: C.purple }}
+                          >
+                            {upgradeBusy === busyKey ? 'Updating…' : `Upgrade to ${opt.label}`}
+                          </button>
+                        )}
                       </div>
                     );
                   })}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { C, BODY, PLAN_LABELS } from '../lib/constants';
+import { C, BODY } from '../lib/constants';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { WorkspaceProvider, useWorkspace } from '../contexts/WorkspaceContext';
@@ -252,21 +252,7 @@ function AppShell() {
   } else if (section === 'reports') {
     body = <ReportsPanel onUpgrade={openUpgradePlan} />;
   } else if (section === 'users') {
-    if (!featuresUnlocked) {
-      body = (
-        <UpgradePrompt
-          feature="Users"
-          title="Multi-user access requires a paid plan"
-          body={(
-            <>
-              {PLAN_LABELS.solo} is single-user. Upgrade to {PLAN_LABELS.small} or {PLAN_LABELS.enterprise} to invite
-              colleagues and assign them to workspaces.
-            </>
-          )}
-          onUpgrade={openUpgradePlan}
-        />
-      );
-    } else if (!isOwner) {
+    if (!isOwner) {
       body = (
         <UpgradePrompt
           title="Owners only"

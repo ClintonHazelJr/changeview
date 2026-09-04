@@ -1,4 +1,5 @@
 import { Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { C, HEAD, BODY, tint, PLAN_LABELS } from '../../lib/constants';
 import { usePlanPrices } from '../../hooks/usePlanPrices';
 import { formatPlanPrice } from '../../../shared/planPrices.js';
@@ -11,15 +12,15 @@ export default function UpgradePrompt({
 }) {
   const { plans } = usePlanPrices();
   const smallPrice = formatPlanPrice(plans, 'small', 'monthly');
-  const enterprisePrice = formatPlanPrice(plans, 'enterprise', 'monthly');
 
   const defaultBody = (
     <>
       Your plan is <strong style={{ color: C.ink }}>{PLAN_LABELS.solo}</strong>.
       {' '}{PLAN_LABELS.small} unlocks Schedule, Tasks, and 5 more reports
       {smallPrice ? ` (${smallPrice})` : ''}
-      — or go {PLAN_LABELS.enterprise}
-      {enterprisePrice ? ` (${enterprisePrice})` : ''} for unlimited seats and workspaces.
+      . Need unlimited seats?{' '}
+      <Link to="/contact" style={{ color: C.purple }}>Contact us</Link>
+      {' '}for {PLAN_LABELS.enterprise}.
     </>
   );
 

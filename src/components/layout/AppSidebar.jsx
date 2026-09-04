@@ -71,9 +71,9 @@ export default function AppSidebar({ section, setSection }) {
         >
           <Users size={16} style={{ color: section === 'users' ? C.purple : C.sub }} />
           <span className="flex-1" style={HEAD}>Users</span>
-          {(!featuresUnlocked || !isOwner) && (
+          {!isOwner && (
             <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: tint(C.purple, '14'), color: C.purple }}>
-              {!featuresUnlocked ? 'Pro' : 'Owner'}
+              Owner
             </span>
           )}
         </button>

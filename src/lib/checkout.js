@@ -69,6 +69,9 @@ export async function startCheckout(
   if (!normalizedTier) {
     throw new Error(`Unknown checkout tier: ${tier}`);
   }
+  if (normalizedTier === 'enterprise') {
+    throw new Error('Enterprise is sales-assisted. Use Contact Us — there is no self-serve checkout.');
+  }
 
   rememberCheckoutIntent(normalizedTier, normalizedCycle);
   console.log('[checkout] startCheckout', {
@@ -130,6 +133,9 @@ export async function updateSubscriptionPlan(
   const normalizedCycle = billingCycle === 'annual' && normalizedTier !== 'solo' ? 'annual' : 'monthly';
   if (!normalizedTier) {
     throw new Error(`Unknown plan tier: ${tier}`);
+  }
+  if (normalizedTier === 'enterprise') {
+    throw new Error('Enterprise is sales-assisted. Use Contact Us — there is no self-serve upgrade.');
   }
 
   const headers = { 'Content-Type': 'application/json' };
