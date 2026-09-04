@@ -13,7 +13,13 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
 
   if (loading) return null;
-  if (session) return <Navigate to="/app" replace />;
+  if (session) {
+    if (!session.user?.email_confirmed_at) {
+      const q = session.user?.email ? `?email=${encodeURIComponent(session.user.email)}` : '';
+      return <Navigate to={`/check-email${q}`} replace />;
+    }
+    return <Navigate to="/app" replace />;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,7 +34,12 @@ export default function LoginPage() {
         await signIn({ email, password });
       }
     } catch (err) {
-      setError(err.message);
+      const msg = err.message || 'Could not sign in';
+      if (/confirm|not confirmed|email not confirmed/i.test(msg)) {
+        setError('Confirm your email before logging in. Check your inbox for the link.');
+      } else {
+        setError(msg);
+      }
     } finally {
       setBusy(false);
     }
@@ -85,7 +96,19 @@ export default function LoginPage() {
               </div>
             </>
           )}
-          {error && <p className="text-xs mb-3" style={{ color: C.coral }}>{error}</p>}
+          {error && (
+            <p className="text-xs mb-3" style={{ color: C.coral }}>
+              {error}
+              {/confirm your email/i.test(error) && (
+                <>
+                  {' '}
+                  <Link to={`/check-email?email=${encodeURIComponent(email)}`} style={{ color: C.purple }}>
+                    Resend / fix email
+                  </Link>
+                </>
+              )}
+            </p>
+          )}
           {info && <p className="text-xs mb-3" style={{ color: C.green }}>{info}</p>}
           <button
             type="submit"

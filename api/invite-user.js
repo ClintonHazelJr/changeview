@@ -49,10 +49,10 @@ export default async function handler(req, res) {
     && sub?.trial_ends_at
     && new Date(sub.trial_ends_at).getTime() > Date.now();
   const canInvite = trialActive
-    || ((sub?.plan_tier === 'small' || sub?.plan_tier === 'tier_2')
+    || ((sub?.plan_tier === 'solo' || sub?.plan_tier === 'small' || sub?.plan_tier === 'enterprise')
       && (sub?.status === 'active' || sub?.status === 'past_due'));
   if (!canInvite) {
-    return res.status(403).json({ error: 'Inviting users requires Business, Enterprise, or an active trial' });
+    return res.status(403).json({ error: 'Inviting users requires an active plan or trial. Starter allows 2 users.' });
   }
 
   const email = String(req.body?.email || '').trim().toLowerCase();

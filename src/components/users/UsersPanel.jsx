@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { UserPlus, Mail, UserX, UserCheck, X } from 'lucide-react';
 import { C, HEAD, BODY, inputClass, inputStyle, tint, initials } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
@@ -9,6 +9,7 @@ import Modal from '../ui/Modal';
 import ViewToggle from '../ui/ViewToggle';
 import ListTable from '../ui/ListTable';
 import StatusPill from '../ui/StatusPill';
+import ShowInactiveToggle from '../ui/ShowInactiveToggle';
 
 const ROLE_COLOR = { owner: C.purple, member: C.teal };
 
@@ -25,6 +26,7 @@ export default function UsersPanel() {
   const [saving, setSaving] = useState(false);
   const [busyUserId, setBusyUserId] = useState(null);
   const [viewMode, setViewMode] = useState('tiles');
+  const [showInactive, setShowInactive] = useState(false);
 
   const load = useCallback(async () => {
     if (!profile?.account_id) {
@@ -147,6 +149,10 @@ export default function UsersPanel() {
 
   const activeCount = rows.filter((u) => u.is_active).length;
   const inactiveCount = rows.filter((u) => !u.is_active).length;
+  const visibleRows = useMemo(
+    () => (showInactive ? rows : rows.filter((u) => u.is_active)),
+    [rows, showInactive],
+  );
 
   const userColumns = [
     {
@@ -185,17 +191,51 @@ export default function UsersPanel() {
       label: 'Workspaces',
       render: (u) => (u.workspaces || []).map((ws) => ws.name).join(', ') || '—',
     },
+    {
+      key: 'actions',
+      label: '',
+      render: (u) => {
+        if (u.id === profile?.id) return null;
+        const inactive = !u.is_active;
+        const busy = busyUserId === u.id;
+        return (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              if (inactive) setActive(u.id, true);
+              else if (window.confirm(`Deactivate ${u.full_name || u.email}? They will not be able to sign in until reactivated.`)) {
+                setActive(u.id, false);
+              }
+            }}
+            className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full disabled:opacity-50"
+            style={{
+              background: inactive ? tint(C.green, '18') : tint(C.coral, '18'),
+              color: inactive ? C.green : C.coral,
+            }}
+          >
+            {inactive ? <UserCheck size={12} /> : <UserX size={12} />}
+            {busy ? '…' : inactive ? 'Reactivate' : 'Deactivate'}
+          </button>
+        );
+      },
+    },
   ];
 
   return (
     <div className="flex-1 p-8 max-w-4xl w-full mx-auto overflow-y-auto" style={BODY}>
       <div className="flex items-center justify-between gap-3 mb-6">
         <div>
-          <div className="flex items-center gap-3 mb-1">
+          <div className="flex items-center gap-3 mb-1 flex-wrap">
             <h2 className="text-xl font-extrabold" style={{ ...HEAD, color: C.ink }}>Users</h2>
             {!loading && rows.length > 0 && (
               <ViewToggle value={viewMode} onChange={setViewMode} />
             )}
+            <ShowInactiveToggle
+              show={showInactive}
+              onChange={setShowInactive}
+              inactiveCount={inactiveCount}
+            />
           </div>
           <p className="text-sm" style={{ color: C.sub }}>
             People on your account and the workspaces they can access.
@@ -245,11 +285,17 @@ export default function UsersPanel() {
         <div className="text-center py-12 bg-white rounded-3xl border border-dashed" style={{ borderColor: C.border }}>
           <div className="text-sm" style={{ color: C.sub }}>No users yet.</div>
         </div>
+      ) : visibleRows.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-3xl border border-dashed" style={{ borderColor: C.border }}>
+          <div className="text-sm" style={{ color: C.sub }}>
+            No active users. Turn on Show inactive to find and reactivate someone.
+          </div>
+        </div>
       ) : viewMode === 'list' ? (
-        <ListTable columns={userColumns} rows={rows} initialSortKey="full_name" />
+        <ListTable columns={userColumns} rows={visibleRows} initialSortKey="full_name" />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {rows.map((u) => {
+          {visibleRows.map((u) => {
             const roleColor = ROLE_COLOR[u.role] || C.sub;
             const inactive = !u.is_active;
             const isSelf = u.id === profile?.id;

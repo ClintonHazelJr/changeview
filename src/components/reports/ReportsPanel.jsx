@@ -1,9 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ClipboardList, FileText, Grid3X3, Download, Loader2 } from 'lucide-react';
-import { C, HEAD, BODY, SEVERITY_COLOR, STATUS_COLOR, tint, isRatedSeverity } from '../../lib/constants';
+import {
+  ArrowLeft, ClipboardList, FileText, Grid3X3, CalendarRange, Download, Loader2,
+  GraduationCap, CheckSquare, ListChecks, Activity, Lock,
+} from 'lucide-react';
+import { C, HEAD, BODY, SEVERITY_COLOR, STATUS_COLOR, tint, isRatedSeverity, stripInitiativeMeta, isPaidReport, PLAN_LABELS } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { exportElementToPdf } from '../../lib/exportReportPdf';
+import {
+  ChangeReadinessReport,
+  RequirementsCompletionReport,
+  TaskCompletionReport,
+} from './CompletionReports';
+import StatusReportPanel from './StatusReport';
+import UpgradePrompt from '../ui/UpgradePrompt';
 
 const SEV_SCORE = { none: 0, low: 1, medium: 2, high: 3 };
 const SEV_COLS = [
@@ -26,26 +36,83 @@ const REPORTS = [
   {
     key: 'cia',
     title: 'Change Impact Assessment',
-    desc: 'Document-style assessment of impacts and learning needs for one initiative.',
+    desc: 'Impacts and learning needs for one initiative, or every initiative under a program.',
     icon: FileText,
     color: C.coral,
     file: 'change-impact-assessment.pdf',
+  },
+  {
+    key: 'readiness',
+    title: 'Change Readiness',
+    desc: 'Learning Need completion for an initiative — overall %, by department, and task linkage.',
+    icon: GraduationCap,
+    color: '#16A34A',
+    file: 'change-readiness.pdf',
+  },
+  {
+    key: 'req-completion',
+    title: 'Requirements Completion',
+    desc: 'Requirements completed vs remaining, status distribution, and linked-task flags.',
+    icon: ListChecks,
+    color: C.navy,
+    file: 'requirements-completion.pdf',
+  },
+  {
+    key: 'task-completion',
+    title: 'Task Completion',
+    desc: 'Task done rate, status breakdown (including Blocked), and completion by assignee.',
+    icon: CheckSquare,
+    color: C.teal,
+    file: 'task-completion.pdf',
+  },
+  {
+    key: 'status',
+    title: 'Change Status Report',
+    desc: 'Weekly SteerCo snapshot — RAG judgment plus frozen completion and budget metrics.',
+    icon: Activity,
+    color: C.darknavy,
+    file: 'change-status-report.pdf',
   },
   {
     key: 'heatmap',
     title: 'Impact heat map',
     desc: 'Departments × severity categories — where change pressure concentrates.',
     icon: Grid3X3,
-    color: C.teal,
+    color: C.blue3,
     file: 'impact-heat-map.pdf',
+  },
+  {
+    key: 'schedule',
+    title: 'Schedule Report',
+    desc: 'Dated Program → Initiative → Task / Hypercare timeline with Comms and go-live milestones.',
+    icon: CalendarRange,
+    color: C.royal,
+    file: 'schedule-report.pdf',
   },
 ];
 
-function cellColor(score, max) {
-  if (!score || !max) return C.bg;
-  const t = Math.min(1, score / max);
-  const a = Math.round(18 + t * 70).toString(16).padStart(2, '0');
-  return `${C.coral}${a}`;
+function formatReportDate(value) {
+  if (!value) return '—';
+  const d = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function dateRangeLabel(start, end) {
+  if (!start && !end) return 'No dates set';
+  if (start && end) return `${formatReportDate(start)} → ${formatReportDate(end)}`;
+  return formatReportDate(start || end);
+}
+
+/** Discrete traffic-light buckets from average severity (0–3 scale). */
+function heatMapCellStyle(avg) {
+  const score = Number(avg) || 0;
+  let background = SEVERITY_COLOR.none;
+  if (score >= 2.5) background = SEVERITY_COLOR.high;
+  else if (score >= 1.5) background = SEVERITY_COLOR.medium;
+  else if (score >= 0.5) background = SEVERITY_COLOR.low;
+  const color = background === SEVERITY_COLOR.medium ? C.ink : '#fff';
+  return { background, color };
 }
 
 function ExportBar({ exportRef, filename, disabled }) {
@@ -120,7 +187,7 @@ function RequirementsReport({ workspaceId, exportRef }) {
         </select>
         <select className="text-sm rounded-xl border px-3 py-2" style={{ borderColor: C.border, color: C.ink }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="">All statuses</option>
-          {['draft', 'approved', 'rejected'].map((s) => <option key={s} value={s}>{s}</option>)}
+          {['draft', 'approved', 'completed', 'rejected'].map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
       <div ref={exportRef} className="bg-white rounded-2xl border overflow-x-auto p-4" style={{ borderColor: C.border }}>
@@ -171,36 +238,198 @@ function RequirementsReport({ workspaceId, exportRef }) {
   );
 }
 
+function CiaInitiativeBody({ initiative, impacts, learning, departments, people, headingLevel = 'h3' }) {
+  const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
+  const personName = (id) => (id && people.find((p) => p.id === id)?.name) || '';
+  const description = stripInitiativeMeta(initiative.description);
+  const owners = [
+    ['Change Owner', personName(initiative.change_owner_id)],
+    ['Product Owner', personName(initiative.product_owner_id)],
+    ['Business Owner', personName(initiative.business_owner_id)],
+    ['Project Manager', personName(initiative.project_manager_id)],
+  ].filter(([, name]) => name);
+  const TitleTag = headingLevel;
+
+  return (
+    <>
+      <header className="border-b pb-5 mb-8" style={{ borderColor: C.border }}>
+        <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: C.sub }}>
+          ChangeView · Change Impact Assessment
+        </div>
+        <TitleTag className="text-2xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>{initiative.name}</TitleTag>
+        <div className="flex flex-wrap gap-3 text-xs mb-3" style={{ color: C.sub }}>
+          {initiative.status && <span className="capitalize">Status: {initiative.status}</span>}
+          {initiative.proposed_go_live_date && (
+            <span>Proposed go-live: {initiative.proposed_go_live_date}</span>
+          )}
+          <span>Prepared {new Date().toLocaleDateString()}</span>
+        </div>
+        {owners.length > 0 && (
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-3" style={{ color: C.ink }}>
+            {owners.map(([label, name]) => (
+              <span key={label}><span style={{ color: C.sub }}>{label}:</span> {name}</span>
+            ))}
+          </div>
+        )}
+        {description && (
+          <p className="text-sm leading-relaxed" style={{ color: C.ink }}>{description}</p>
+        )}
+      </header>
+
+      <section className="mb-8">
+        <h4 className="text-sm font-extrabold uppercase tracking-wide mb-2" style={{ ...HEAD, color: C.ink }}>
+          Executive summary
+        </h4>
+        <p className="text-sm leading-relaxed" style={{ color: C.sub }}>
+          This assessment covers {impacts.length} impact area{impacts.length === 1 ? '' : 's'} and {learning.length} learning need{learning.length === 1 ? '' : 's'}
+          {' '}for {initiative.name}. Use it to brief stakeholders on who is affected, how severely, and what training is planned.
+        </p>
+      </section>
+
+      {impacts.length === 0 ? (
+        <p className="text-sm" style={{ color: C.sub }}>No impacts recorded for this initiative.</p>
+      ) : impacts.map((imp, idx) => {
+        const linked = learning.filter((l) => l.impact_id === imp.id);
+        return (
+          <section key={imp.id} className={`${idx > 0 ? 'border-t pt-7 mt-7' : ''}`} style={{ borderColor: C.border }}>
+            <h4 className="text-base font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
+              {idx + 1}. {deptName(imp.department_id)}
+              {imp.headcount_impacted != null && (
+                <span className="text-sm font-semibold ml-2" style={{ color: C.sub }}>· {imp.headcount_impacted} impacted</span>
+              )}
+            </h4>
+            {imp.status && (
+              <div className="mb-2">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize" style={{ background: tint(STATUS_COLOR[imp.status] || C.sub, '22'), color: STATUS_COLOR[imp.status] || C.sub }}>
+                  {imp.status}
+                </span>
+              </div>
+            )}
+            {imp.impact_description && (
+              <p className="text-sm mb-4 leading-relaxed" style={{ color: C.ink }}>{imp.impact_description}</p>
+            )}
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <div className="rounded-2xl p-3" style={{ background: C.bg }}>
+                <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Current state</div>
+                <p className="text-sm mb-1" style={{ color: C.ink }}><span style={{ color: C.sub }}>System:</span> {imp.current_state_system || '—'}</p>
+                <p className="text-sm" style={{ color: C.ink }}><span style={{ color: C.sub }}>Process:</span> {imp.current_state_process || '—'}</p>
+              </div>
+              <div className="rounded-2xl p-3" style={{ background: C.bg }}>
+                <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Future state</div>
+                <p className="text-sm mb-1" style={{ color: C.ink }}><span style={{ color: C.sub }}>System:</span> {imp.future_state_system || '—'}</p>
+                <p className="text-sm" style={{ color: C.ink }}><span style={{ color: C.sub }}>Process:</span> {imp.future_state_process || '—'}</p>
+              </div>
+            </div>
+            <div className="mb-3">
+              <div className="text-[11px] font-bold uppercase mb-2" style={{ color: C.sub }}>Severity</div>
+              <div className="flex flex-wrap gap-2">
+                {SEV_COLS.map(({ key, label }) => {
+                  const v = imp[key] || 'none';
+                  const show = isRatedSeverity(v);
+                  return (
+                    <span
+                      key={key}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
+                      style={{
+                        background: show ? tint(SEVERITY_COLOR[v], '22') : C.bg,
+                        color: show ? SEVERITY_COLOR[v] : C.sub,
+                      }}
+                    >
+                      {label}: {v === 'none' ? 'No Impact' : v}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+            {(imp.intervention_tags || []).length > 0 && (
+              <div className="mb-3">
+                <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Interventions</div>
+                <p className="text-sm capitalize" style={{ color: C.ink }}>{(imp.intervention_tags || []).join(', ')}</p>
+              </div>
+            )}
+            {linked.length > 0 && (
+              <div>
+                <div className="text-[11px] font-bold uppercase mb-2" style={{ color: C.sub }}>Learning needs</div>
+                <ul className="space-y-1.5">
+                  {linked.map((l) => (
+                    <li key={l.id} className="text-sm" style={{ color: C.ink }}>
+                      <strong>{l.team || 'Team'}</strong>
+                      {l.goal ? ` — ${l.goal}` : ''}
+                      <span style={{ color: C.sub }}>
+                        {' '}· {l.type || 'Training'} · {l.headcount || 0} people · {l.session_count || 0} sessions · {l.time_hours || 0}h
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        );
+      })}
+    </>
+  );
+}
+
 function CiaReport({ workspaceId, exportRef }) {
+  const [scope, setScope] = useState('initiative');
+  const [programs, setPrograms] = useState([]);
+  const [programId, setProgramId] = useState('');
   const [initiatives, setInitiatives] = useState([]);
   const [initiativeId, setInitiativeId] = useState('');
   const [impacts, setImpacts] = useState([]);
   const [learning, setLearning] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [people, setPeople] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => new Set());
+
+  const INIT_SELECT = 'id, name, description, status, proposed_go_live_date, program_id, change_owner_id, product_owner_id, business_owner_id, project_manager_id';
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data } = await supabase.from('initiatives').select('id, name, description, status, proposed_go_live_date').eq('workspace_id', workspaceId).order('name');
+      const [initRes, progRes, peopleRes] = await Promise.all([
+        supabase.from('initiatives').select(INIT_SELECT).eq('workspace_id', workspaceId).order('name'),
+        supabase.from('programs').select('id, name').eq('workspace_id', workspaceId).order('name'),
+        supabase.from('people').select('id, name').eq('workspace_id', workspaceId),
+      ]);
       if (cancelled) return;
-      setInitiatives(data || []);
-      if (data?.[0] && !initiativeId) setInitiativeId(data[0].id);
+      const initRows = initRes.data || [];
+      const progRows = progRes.data || [];
+      setInitiatives(initRows);
+      setPrograms(progRows);
+      setPeople(peopleRes.data || []);
+      if (initRows[0] && !initiativeId) setInitiativeId(initRows[0].id);
+      if (progRows[0] && !programId) setProgramId(progRows[0].id);
     })();
     return () => { cancelled = true; };
   }, [workspaceId]);
 
+  const programInitiatives = useMemo(
+    () => (programId ? initiatives.filter((i) => i.program_id === programId) : []),
+    [initiatives, programId],
+  );
+
+  const activeInitiativeIds = useMemo(() => {
+    if (scope === 'program') return programInitiatives.map((i) => i.id);
+    return initiativeId ? [initiativeId] : [];
+  }, [scope, programInitiatives, initiativeId]);
+
+  const activeInitiativeKey = activeInitiativeIds.join(',');
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!initiativeId) {
+      if (!activeInitiativeKey) {
         setImpacts([]);
         setLearning([]);
+        setDepartments([]);
         return;
       }
       setLoading(true);
+      const ids = activeInitiativeKey.split(',');
       const [imp, ln, dept] = await Promise.all([
-        supabase.from('impacts').select('*').eq('initiative_id', initiativeId).order('created_at'),
+        supabase.from('impacts').select('*').in('initiative_id', ids).order('created_at'),
         supabase.from('learning_needs').select('*').eq('workspace_id', workspaceId).order('created_at'),
         supabase.from('departments').select('id, name').eq('workspace_id', workspaceId),
       ]);
@@ -213,143 +442,151 @@ function CiaReport({ workspaceId, exportRef }) {
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [initiativeId, workspaceId]);
+  }, [activeInitiativeKey, workspaceId]);
+
+  useEffect(() => {
+    setCollapsed(new Set());
+  }, [programId, scope]);
 
   const initiative = initiatives.find((i) => i.id === initiativeId);
-  const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
+  const program = programs.find((p) => p.id === programId);
+
+  const toggleCollapsed = (id) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   return (
     <div>
-      <div className="mb-4">
-        <label className="text-xs font-semibold block mb-1.5" style={{ color: C.sub }}>Initiative</label>
-        <select
-          className="text-sm rounded-xl border px-3 py-2 min-w-[260px]"
-          style={{ borderColor: C.border, color: C.ink }}
-          value={initiativeId}
-          onChange={(e) => setInitiativeId(e.target.value)}
-        >
-          {initiatives.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-        </select>
+      <div className="flex flex-wrap gap-3 mb-4 items-end">
+        <div>
+          <label className="text-xs font-semibold block mb-1.5" style={{ color: C.sub }}>Scope</label>
+          <div className="flex rounded-xl border overflow-hidden" style={{ borderColor: C.border }}>
+            {[
+              { key: 'initiative', label: 'Initiative' },
+              { key: 'program', label: 'Program' },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setScope(opt.key)}
+                className="text-sm font-semibold px-3 py-2"
+                style={{
+                  background: scope === opt.key ? C.coral : '#fff',
+                  color: scope === opt.key ? '#fff' : C.ink,
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {scope === 'initiative' ? (
+          <div>
+            <label className="text-xs font-semibold block mb-1.5" style={{ color: C.sub }}>Initiative</label>
+            <select
+              className="text-sm rounded-xl border px-3 py-2 min-w-[260px]"
+              style={{ borderColor: C.border, color: C.ink }}
+              value={initiativeId}
+              onChange={(e) => setInitiativeId(e.target.value)}
+            >
+              {initiatives.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+            </select>
+          </div>
+        ) : (
+          <div>
+            <label className="text-xs font-semibold block mb-1.5" style={{ color: C.sub }}>Program</label>
+            <select
+              className="text-sm rounded-xl border px-3 py-2 min-w-[260px]"
+              style={{ borderColor: C.border, color: C.ink }}
+              value={programId}
+              onChange={(e) => setProgramId(e.target.value)}
+            >
+              {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
       {loading ? (
         <p className="text-sm" style={{ color: C.sub }}>Loading…</p>
-      ) : !initiative ? (
-        <p className="text-sm" style={{ color: C.sub }}>No initiatives in this workspace.</p>
+      ) : scope === 'initiative' ? (
+        !initiative ? (
+          <p className="text-sm" style={{ color: C.sub }}>No initiatives in this workspace.</p>
+        ) : (
+          <article
+            ref={exportRef}
+            className="bg-white rounded-3xl border shadow-sm p-10 max-w-3xl"
+            style={{ borderColor: C.border }}
+          >
+            <CiaInitiativeBody
+              initiative={initiative}
+              impacts={impacts.filter((imp) => imp.initiative_id === initiative.id)}
+              learning={learning}
+              departments={departments}
+              people={people}
+            />
+          </article>
+        )
+      ) : !program ? (
+        <p className="text-sm" style={{ color: C.sub }}>No programs in this workspace.</p>
+      ) : programInitiatives.length === 0 ? (
+        <p className="text-sm" style={{ color: C.sub }}>No initiatives under this program.</p>
       ) : (
-        <article
-          ref={exportRef}
-          className="bg-white rounded-3xl border shadow-sm p-10 max-w-3xl"
-          style={{ borderColor: C.border }}
-        >
-          <header className="border-b pb-5 mb-8" style={{ borderColor: C.border }}>
+        <div ref={exportRef} className="max-w-3xl space-y-4">
+          <div className="bg-white rounded-3xl border shadow-sm p-6" style={{ borderColor: C.border }}>
             <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: C.sub }}>
               ChangeView · Change Impact Assessment
             </div>
-            <h3 className="text-2xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>{initiative.name}</h3>
-            <div className="flex flex-wrap gap-3 text-xs mb-3" style={{ color: C.sub }}>
-              {initiative.status && <span className="capitalize">Status: {initiative.status}</span>}
-              {initiative.proposed_go_live_date && (
-                <span>Proposed go-live: {initiative.proposed_go_live_date}</span>
-              )}
-              <span>Prepared {new Date().toLocaleDateString()}</span>
-            </div>
-            {initiative.description && (
-              <p className="text-sm leading-relaxed" style={{ color: C.ink }}>{initiative.description}</p>
-            )}
-          </header>
-
-          <section className="mb-8">
-            <h4 className="text-sm font-extrabold uppercase tracking-wide mb-2" style={{ ...HEAD, color: C.ink }}>
-              Executive summary
-            </h4>
-            <p className="text-sm leading-relaxed" style={{ color: C.sub }}>
-              This assessment covers {impacts.length} impact area{impacts.length === 1 ? '' : 's'} and {learning.length} learning need{learning.length === 1 ? '' : 's'}
-              {' '}for {initiative.name}. Use it to brief stakeholders on who is affected, how severely, and what training is planned.
+            <h3 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>{program.name}</h3>
+            <p className="text-sm" style={{ color: C.sub }}>
+              Program-level assessment covering {programInitiatives.length} initiative{programInitiatives.length === 1 ? '' : 's'}.
+              {' '}Prepared {new Date().toLocaleDateString()}.
             </p>
-          </section>
-
-          {impacts.length === 0 ? (
-            <p className="text-sm" style={{ color: C.sub }}>No impacts recorded for this initiative.</p>
-          ) : impacts.map((imp, idx) => {
-            const linked = learning.filter((l) => l.impact_id === imp.id);
+          </div>
+          {programInitiatives.map((init) => {
+            const initImpacts = impacts.filter((imp) => imp.initiative_id === init.id);
+            const impactIds = new Set(initImpacts.map((i) => i.id));
+            const initLearning = learning.filter((l) => impactIds.has(l.impact_id));
+            const isCollapsed = collapsed.has(init.id);
             return (
-              <section key={imp.id} className={`${idx > 0 ? 'border-t pt-7 mt-7' : ''}`} style={{ borderColor: C.border }}>
-                <h4 className="text-base font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
-                  {idx + 1}. {deptName(imp.department_id)}
-                  {imp.headcount_impacted != null && (
-                    <span className="text-sm font-semibold ml-2" style={{ color: C.sub }}>· {imp.headcount_impacted} impacted</span>
-                  )}
-                </h4>
-                {imp.status && (
-                  <div className="mb-2">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize" style={{ background: tint(STATUS_COLOR[imp.status] || C.sub, '22'), color: STATUS_COLOR[imp.status] || C.sub }}>
-                      {imp.status}
-                    </span>
+              <article
+                key={init.id}
+                className="bg-white rounded-3xl border shadow-sm overflow-hidden"
+                style={{ borderColor: C.border }}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleCollapsed(init.id)}
+                  className="w-full flex items-center gap-2 px-6 py-4 text-left border-b"
+                  style={{ borderColor: C.border, background: C.bg }}
+                >
+                  <span className="text-sm font-bold" style={{ color: C.sub }}>{isCollapsed ? '▸' : '▾'}</span>
+                  <span className="text-base font-extrabold flex-1" style={{ ...HEAD, color: C.ink }}>{init.name}</span>
+                  <span className="text-xs" style={{ color: C.sub }}>
+                    {initImpacts.length} impact{initImpacts.length === 1 ? '' : 's'}
+                  </span>
+                </button>
+                {!isCollapsed && (
+                  <div className="p-8">
+                    <CiaInitiativeBody
+                      initiative={init}
+                      impacts={initImpacts}
+                      learning={initLearning}
+                      departments={departments}
+                      people={people}
+                      headingLevel="h4"
+                    />
                   </div>
                 )}
-                {imp.impact_description && (
-                  <p className="text-sm mb-4 leading-relaxed" style={{ color: C.ink }}>{imp.impact_description}</p>
-                )}
-                <div className="grid md:grid-cols-2 gap-4 mb-4">
-                  <div className="rounded-2xl p-3" style={{ background: C.bg }}>
-                    <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Current state</div>
-                    <p className="text-sm mb-1" style={{ color: C.ink }}><span style={{ color: C.sub }}>System:</span> {imp.current_state_system || '—'}</p>
-                    <p className="text-sm" style={{ color: C.ink }}><span style={{ color: C.sub }}>Process:</span> {imp.current_state_process || '—'}</p>
-                  </div>
-                  <div className="rounded-2xl p-3" style={{ background: C.bg }}>
-                    <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Future state</div>
-                    <p className="text-sm mb-1" style={{ color: C.ink }}><span style={{ color: C.sub }}>System:</span> {imp.future_state_system || '—'}</p>
-                    <p className="text-sm" style={{ color: C.ink }}><span style={{ color: C.sub }}>Process:</span> {imp.future_state_process || '—'}</p>
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <div className="text-[11px] font-bold uppercase mb-2" style={{ color: C.sub }}>Severity</div>
-                  <div className="flex flex-wrap gap-2">
-                    {SEV_COLS.map(({ key, label }) => {
-                      const v = imp[key] || 'none';
-                      const show = isRatedSeverity(v);
-                      return (
-                        <span
-                          key={key}
-                          className="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
-                          style={{
-                            background: show ? tint(SEVERITY_COLOR[v], '22') : C.bg,
-                            color: show ? SEVERITY_COLOR[v] : C.sub,
-                          }}
-                        >
-                          {label}: {v === 'none' ? 'No Impact' : v}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-                {(imp.intervention_tags || []).length > 0 && (
-                  <div className="mb-3">
-                    <div className="text-[11px] font-bold uppercase mb-1" style={{ color: C.sub }}>Interventions</div>
-                    <p className="text-sm capitalize" style={{ color: C.ink }}>{(imp.intervention_tags || []).join(', ')}</p>
-                  </div>
-                )}
-                {linked.length > 0 && (
-                  <div>
-                    <div className="text-[11px] font-bold uppercase mb-2" style={{ color: C.sub }}>Learning needs</div>
-                    <ul className="space-y-1.5">
-                      {linked.map((l) => (
-                        <li key={l.id} className="text-sm" style={{ color: C.ink }}>
-                          <strong>{l.team || 'Team'}</strong>
-                          {l.goal ? ` — ${l.goal}` : ''}
-                          <span style={{ color: C.sub }}>
-                            {' '}· {l.type || 'Training'} · {l.headcount || 0} people · {l.session_count || 0} sessions · {l.time_hours || 0}h
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </section>
+              </article>
             );
           })}
-        </article>
+        </div>
       )}
     </div>
   );
@@ -377,6 +614,7 @@ function HeatMapReport({ workspaceId, exportRef }) {
           sums[deptId] = {
             id: deptId,
             name: deptMap[deptId] || 'Unassigned',
+            count: 0,
             severity_org: 0,
             severity_people: 0,
             severity_process: 0,
@@ -384,23 +622,24 @@ function HeatMapReport({ workspaceId, exportRef }) {
             severity_environment: 0,
           };
         }
+        sums[deptId].count += 1;
         SEV_COLS.forEach(({ key }) => {
           sums[deptId][key] += SEV_SCORE[imp[key]] ?? 0;
         });
       });
-      setCells(Object.values(sums).sort((a, b) => a.name.localeCompare(b.name)));
+      const rows = Object.values(sums).map((row) => {
+        const n = row.count || 1;
+        const next = { id: row.id, name: row.name, count: row.count };
+        SEV_COLS.forEach(({ key }) => {
+          next[key] = row[key] / n;
+        });
+        return next;
+      }).sort((a, b) => a.name.localeCompare(b.name));
+      setCells(rows);
       setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [workspaceId]);
-
-  const max = useMemo(() => {
-    let m = 0;
-    cells.forEach((row) => {
-      SEV_COLS.forEach(({ key }) => { m = Math.max(m, row[key] || 0); });
-    });
-    return m || 1;
-  }, [cells]);
 
   if (loading) return <p className="text-sm" style={{ color: C.sub }}>Loading…</p>;
   if (cells.length === 0) return <p className="text-sm" style={{ color: C.sub }}>No impacts to map yet.</p>;
@@ -410,6 +649,19 @@ function HeatMapReport({ workspaceId, exportRef }) {
       <div className="mb-3 px-1">
         <div className="text-[11px] font-bold uppercase tracking-wide" style={{ color: C.sub }}>ChangeView</div>
         <h3 className="text-lg font-extrabold" style={{ ...HEAD, color: C.ink }}>Impact heat map</h3>
+      </div>
+      <div className="flex flex-wrap gap-2 mb-3 px-1 text-[11px] font-semibold">
+        {[
+          { label: 'No Impact', color: SEVERITY_COLOR.none },
+          { label: 'Low', color: SEVERITY_COLOR.low },
+          { label: 'Medium', color: SEVERITY_COLOR.medium },
+          { label: 'High', color: SEVERITY_COLOR.high },
+        ].map((item) => (
+          <span key={item.label} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ background: C.bg, color: C.ink }}>
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: item.color }} />
+            {item.label}
+          </span>
+        ))}
       </div>
       <table className="w-full text-sm min-w-[700px]">
         <thead>
@@ -424,42 +676,262 @@ function HeatMapReport({ workspaceId, exportRef }) {
           {cells.map((row) => (
             <tr key={row.id} className="border-b" style={{ borderColor: C.border }}>
               <td className="px-3 py-2 font-semibold" style={{ color: C.ink }}>{row.name}</td>
-              {SEV_COLS.map(({ key }) => (
-                <td key={key} className="px-2 py-2 text-center">
-                  <div
-                    className="mx-auto rounded-lg py-2 font-bold text-xs"
-                    style={{
-                      background: cellColor(row[key], max),
-                      color: row[key] > max * 0.55 ? C.ink : C.sub,
-                      minWidth: 48,
-                    }}
-                    title={`Sum severity score: ${row[key]}`}
-                  >
-                    {row[key]}
-                  </div>
-                </td>
-              ))}
+              {SEV_COLS.map(({ key }) => {
+                const avg = row[key] || 0;
+                const style = heatMapCellStyle(avg);
+                return (
+                  <td key={key} className="px-2 py-2 text-center">
+                    <div
+                      className="mx-auto rounded-lg py-2 font-bold text-xs"
+                      style={{
+                        ...style,
+                        minWidth: 48,
+                      }}
+                      title={`Average severity: ${avg.toFixed(2)} (none=0 … high=3)`}
+                    >
+                      {avg.toFixed(1)}
+                    </div>
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
       </table>
       <p className="px-4 py-3 text-[11px]" style={{ color: C.sub }}>
-        Cell values are summed severity scores across impacts (none=0, low=1, medium=2, high=3). Darker cells = higher cumulative impact.
+        Cell values are average severity per department (none=0, low=1, medium=2, high=3).
+        Colors are discrete buckets: 0–0.5 No Impact, 0.5–1.5 Low, 1.5–2.5 Medium, 2.5–3 High.
       </p>
     </div>
   );
 }
 
-export default function ReportsPanel() {
-  const { activeWorkspace, activeWorkspaceId } = useWorkspace();
+function ScheduleReport({ workspaceId, workspaceName, exportRef }) {
+  const [programs, setPrograms] = useState([]);
+  const [initiatives, setInitiatives] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [comms, setComms] = useState([]);
+  const [hypercareRows, setHypercareRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const [p, i, t, c, h] = await Promise.all([
+        supabase.from('programs').select('id, name, start_date, proposed_go_live_date').eq('workspace_id', workspaceId).order('name'),
+        supabase.from('initiatives').select('id, name, start_date, proposed_go_live_date, program_id').eq('workspace_id', workspaceId).order('name'),
+        supabase.from('tasks').select('id, name, start_date, finish_date, initiative_id').eq('workspace_id', workspaceId).order('name'),
+        supabase.from('comms').select('id, initiative_id, delivery_date, key_message').eq('workspace_id', workspaceId).order('delivery_date'),
+        supabase.from('hypercare').select('id, initiative_id, start_date, end_date, duration').eq('workspace_id', workspaceId),
+      ]);
+      if (cancelled) return;
+      setPrograms(p.data || []);
+      setInitiatives(i.data || []);
+      setTasks(t.data || []);
+      setComms(c.data || []);
+      setHypercareRows(h.data || []);
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [workspaceId]);
+
+  const sections = useMemo(() => {
+    const initsByProgram = new Map();
+    const orphans = [];
+    initiatives.forEach((init) => {
+      if (!init.program_id) {
+        orphans.push(init);
+        return;
+      }
+      if (!initsByProgram.has(init.program_id)) initsByProgram.set(init.program_id, []);
+      initsByProgram.get(init.program_id).push(init);
+    });
+    const tasksByInit = new Map();
+    tasks.forEach((task) => {
+      if (!task.initiative_id) return;
+      if (!tasksByInit.has(task.initiative_id)) tasksByInit.set(task.initiative_id, []);
+      tasksByInit.get(task.initiative_id).push(task);
+    });
+    const hcByInit = new Map();
+    hypercareRows.forEach((h) => {
+      if (h.initiative_id) hcByInit.set(h.initiative_id, h);
+    });
+    const commsByInit = new Map();
+    comms.forEach((c) => {
+      if (!c.initiative_id) return;
+      if (!commsByInit.has(c.initiative_id)) commsByInit.set(c.initiative_id, []);
+      commsByInit.get(c.initiative_id).push(c);
+    });
+
+    const buildInitBlock = (init) => ({
+      init,
+      tasks: tasksByInit.get(init.id) || [],
+      hypercare: hcByInit.get(init.id) || null,
+      comms: (commsByInit.get(init.id) || []).slice().sort((a, b) => String(a.delivery_date || '').localeCompare(String(b.delivery_date || ''))),
+    });
+
+    const blocks = programs.map((program) => ({
+      program,
+      initiatives: (initsByProgram.get(program.id) || []).map(buildInitBlock),
+    }));
+    if (orphans.length) {
+      blocks.push({
+        program: { id: 'orphan', name: 'Unassigned initiatives' },
+        initiatives: orphans.map(buildInitBlock),
+      });
+    }
+    return blocks;
+  }, [programs, initiatives, tasks, hypercareRows, comms]);
+
+  if (loading) return <p className="text-sm" style={{ color: C.sub }}>Loading…</p>;
+
+  if (!programs.length && !initiatives.length) {
+    return <p className="text-sm" style={{ color: C.sub }}>No programs or initiatives in this workspace yet.</p>;
+  }
+
+  return (
+    <article
+      ref={exportRef}
+      className="bg-white rounded-3xl border shadow-sm p-10 max-w-3xl"
+      style={{ borderColor: C.border }}
+    >
+      <header className="border-b pb-5 mb-8" style={{ borderColor: C.border }}>
+        <div className="text-[11px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: C.sub }}>
+          ChangeView · Schedule Report
+        </div>
+        <h3 className="text-2xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>
+          {workspaceName || 'Workspace'} timeline
+        </h3>
+        <p className="text-xs" style={{ color: C.sub }}>Prepared {new Date().toLocaleDateString()}</p>
+      </header>
+
+      <div className="space-y-8">
+        {sections.map(({ program, initiatives: initBlocks }) => (
+          <section key={program.id}>
+            <h4 className="text-lg font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
+              Program · {program.name}
+            </h4>
+            <p className="text-sm mb-4" style={{ color: C.sub }}>
+              {dateRangeLabel(program.start_date, program.proposed_go_live_date)}
+              {program.proposed_go_live_date ? ` · Go live ${formatReportDate(program.proposed_go_live_date)}` : ''}
+            </p>
+
+            {initBlocks.length === 0 ? (
+              <p className="text-sm pl-3" style={{ color: C.sub }}>No initiatives under this program.</p>
+            ) : (
+              <div className="space-y-5 pl-3 border-l-2" style={{ borderColor: C.border }}>
+                {initBlocks.map(({ init, tasks: initTasks, hypercare, comms: initComms }) => (
+                  <div key={init.id}>
+                    <h5 className="text-sm font-extrabold mb-1" style={{ color: C.ink }}>
+                      Initiative · {init.name}
+                    </h5>
+                    <p className="text-xs mb-2" style={{ color: C.sub }}>
+                      Timeline: {dateRangeLabel(init.start_date, init.proposed_go_live_date)}
+                    </p>
+                    {init.proposed_go_live_date && (
+                      <p className="text-xs font-semibold mb-2" style={{ color: C.navy }}>
+                        Go Live milestone: {formatReportDate(init.proposed_go_live_date)}
+                      </p>
+                    )}
+
+                    <div className="overflow-x-auto mb-3">
+                      <table className="w-full text-xs" style={{ color: C.ink }}>
+                        <thead>
+                          <tr className="text-left" style={{ color: C.sub }}>
+                            <th className="py-1.5 pr-3 font-semibold">Item</th>
+                            <th className="py-1.5 pr-3 font-semibold">Type</th>
+                            <th className="py-1.5 font-semibold">Dates</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {initTasks.map((task) => (
+                            <tr key={task.id} className="border-t" style={{ borderColor: C.border }}>
+                              <td className="py-1.5 pr-3">{task.name}</td>
+                              <td className="py-1.5 pr-3">Task</td>
+                              <td className="py-1.5">{dateRangeLabel(task.start_date, task.finish_date)}</td>
+                            </tr>
+                          ))}
+                          {hypercare && (
+                            <tr className="border-t" style={{ borderColor: C.border }}>
+                              <td className="py-1.5 pr-3">Hypercare</td>
+                              <td className="py-1.5 pr-3">Hypercare</td>
+                              <td className="py-1.5">
+                                {dateRangeLabel(hypercare.start_date, hypercare.end_date)}
+                                {hypercare.duration ? ` (${hypercare.duration})` : ''}
+                              </td>
+                            </tr>
+                          )}
+                          {initComms.map((c) => (
+                            <tr key={c.id} className="border-t" style={{ borderColor: C.border }}>
+                              <td className="py-1.5 pr-3">{c.key_message || 'Untitled comms'}</td>
+                              <td className="py-1.5 pr-3">Comms</td>
+                              <td className="py-1.5">
+                                {c.delivery_date ? `Delivery ${formatReportDate(c.delivery_date)}` : 'No delivery date'}
+                              </td>
+                            </tr>
+                          ))}
+                          {!initTasks.length && !hypercare && !initComms.length && (
+                            <tr className="border-t" style={{ borderColor: C.border }}>
+                              <td className="py-1.5" colSpan={3} style={{ color: C.sub }}>
+                                No tasks, hypercare, or comms yet.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+export default function ReportsPanel({ onUpgrade }) {
+  const { activeWorkspace, activeWorkspaceId, hasPaidFeatures } = useWorkspace();
   const [active, setActive] = useState(null);
   const exportRef = useRef(null);
   const meta = REPORTS.find((r) => r.key === active);
+  const reportLocked = Boolean(active && isPaidReport(active) && !hasPaidFeatures);
 
   if (!activeWorkspaceId) {
     return (
       <div className="flex-1 p-8" style={BODY}>
         <p className="text-sm" style={{ color: C.sub }}>Select a workspace to view reports.</p>
+      </div>
+    );
+  }
+
+  if (reportLocked) {
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="px-8 pt-6">
+          <button
+            type="button"
+            onClick={() => setActive(null)}
+            className="flex items-center gap-1.5 text-xs font-semibold"
+            style={{ color: C.purple }}
+          >
+            <ArrowLeft size={14} /> All reports
+          </button>
+        </div>
+        <UpgradePrompt
+          feature={meta?.title || 'This report'}
+          title={`${meta?.title || 'This report'} unlocks on ${PLAN_LABELS.small}`}
+          body={(
+            <>
+              {PLAN_LABELS.small} unlocks Schedule, Tasks, and 5 more reports — Heat Map, Change Readiness,
+              Requirements Completion, Task Completion, and Change Status Report.
+              Requirements list, Change Impact Assessment, and Schedule Report stay free on every plan.
+            </>
+          )}
+          onUpgrade={onUpgrade}
+        />
       </div>
     );
   }
@@ -475,22 +947,38 @@ export default function ReportsPanel() {
             <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Reports — {activeWorkspace?.name}</h2>
             <p className="text-sm" style={{ color: C.sub }}>Choose a report to run for this workspace.</p>
           </div>
-          <div className="grid md:grid-cols-3 gap-4">
-            {REPORTS.map((r) => (
-              <button
-                key={r.key}
-                type="button"
-                onClick={() => setActive(r.key)}
-                className="text-left rounded-3xl p-5 text-white shadow-sm hover:opacity-95 transition-opacity"
-                style={{ background: r.color }}
-              >
-                <div className="w-10 h-10 rounded-full bg-white/25 flex items-center justify-center mb-3">
-                  <r.icon size={18} />
-                </div>
-                <div className="text-sm font-extrabold mb-1" style={HEAD}>{r.title}</div>
-                <p className="text-xs opacity-90">{r.desc}</p>
-              </button>
-            ))}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {REPORTS.map((r) => {
+              const locked = isPaidReport(r.key) && !hasPaidFeatures;
+              return (
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() => setActive(r.key)}
+                  className="text-left rounded-3xl p-5 text-white shadow-sm hover:opacity-95 transition-opacity relative"
+                  style={{ background: r.color }}
+                >
+                  {locked && (
+                    <span
+                      className="absolute top-3 right-3 w-7 h-7 rounded-full bg-black/25 flex items-center justify-center"
+                      title={`${PLAN_LABELS.small} and up`}
+                    >
+                      <Lock size={13} />
+                    </span>
+                  )}
+                  <div className="w-10 h-10 rounded-full bg-white/25 flex items-center justify-center mb-3">
+                    <r.icon size={18} />
+                  </div>
+                  <div className="text-sm font-extrabold mb-1" style={HEAD}>{r.title}</div>
+                  <p className="text-xs opacity-90">{r.desc}</p>
+                  {locked && (
+                    <p className="text-[11px] font-semibold mt-2 opacity-95">
+                      {PLAN_LABELS.small}+ · tap to upgrade
+                    </p>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </>
       ) : (
@@ -512,7 +1000,18 @@ export default function ReportsPanel() {
           </h2>
           {active === 'requirements' && <RequirementsReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
           {active === 'cia' && <CiaReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
+          {active === 'readiness' && <ChangeReadinessReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
+          {active === 'req-completion' && <RequirementsCompletionReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
+          {active === 'task-completion' && <TaskCompletionReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
+          {active === 'status' && <StatusReportPanel workspaceId={activeWorkspaceId} exportRef={exportRef} />}
           {active === 'heatmap' && <HeatMapReport workspaceId={activeWorkspaceId} exportRef={exportRef} />}
+          {active === 'schedule' && (
+            <ScheduleReport
+              workspaceId={activeWorkspaceId}
+              workspaceName={activeWorkspace?.name}
+              exportRef={exportRef}
+            />
+          )}
         </>
       )}
     </div>

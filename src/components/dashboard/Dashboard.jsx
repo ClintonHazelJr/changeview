@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { LayoutGrid, AlertTriangle, ClipboardList, ChevronRight } from 'lucide-react';
-import { C, HEAD, BODY, SEVERITY_COLOR, tint, STATUS_COLOR } from '../../lib/constants';
+import { LayoutGrid, AlertTriangle, ClipboardList, ChevronRight, X, Sparkles } from 'lucide-react';
+import { C, HEAD, BODY, SEVERITY_COLOR, tint, STATUS_COLOR, PLAN_LABELS, isSoloPlan } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 
-export default function Dashboard({ onOpenInitiative }) {
-  const { activeWorkspace, activeWorkspaceId } = useWorkspace();
+const NUDGE_SESSION_KEY = 'cv_solo_upgrade_nudge_dismissed';
+
+export default function Dashboard({ onOpenInitiative, onUpgrade }) {
+  const { activeWorkspace, activeWorkspaceId, planTier, hasPaidFeatures, trialActive } = useWorkspace();
   const [stats, setStats] = useState({
     byStatus: {},
     bySeverity: { none: 0, low: 0, medium: 0, high: 0 },
@@ -13,6 +15,15 @@ export default function Dashboard({ onOpenInitiative }) {
     recent: [],
   });
   const [loading, setLoading] = useState(true);
+  const [nudgeDismissed, setNudgeDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem(NUDGE_SESSION_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const showSoloNudge = isSoloPlan(planTier) && !hasPaidFeatures && !trialActive && !nudgeDismissed;
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +67,15 @@ export default function Dashboard({ onOpenInitiative }) {
     return () => { cancelled = true; };
   }, [activeWorkspaceId]);
 
+  const dismissNudge = () => {
+    setNudgeDismissed(true);
+    try {
+      sessionStorage.setItem(NUDGE_SESSION_KEY, '1');
+    } catch {
+      /* ignore */
+    }
+  };
+
   const cards = [
     { label: 'Planning', count: stats.byStatus.planning || 0, icon: LayoutGrid, color: C.purple },
     { label: 'Delivery', count: stats.byStatus.delivery || 0, icon: LayoutGrid, color: C.teal },
@@ -74,6 +94,48 @@ export default function Dashboard({ onOpenInitiative }) {
         </h2>
         <p className="text-sm" style={{ color: C.sub }}>A snapshot of change work in this workspace.</p>
       </div>
+
+      {showSoloNudge && (
+        <div
+          className="mb-6 rounded-2xl border px-4 py-3 flex flex-wrap items-start gap-3"
+          style={{ borderColor: tint(C.purple, '40'), background: tint(C.purple, '10') }}
+        >
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: tint(C.purple, '18') }}
+          >
+            <Sparkles size={16} style={{ color: C.purple }} />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <p className="text-sm font-semibold mb-0.5" style={{ color: C.ink }}>
+              See your whole program on one timeline
+            </p>
+            <p className="text-xs" style={{ color: C.sub }}>
+              Upgrade to {PLAN_LABELS.small} to unlock Schedule and Tasks — plus Heat Map, Change Readiness,
+              and more reports.
+            </p>
+            {onUpgrade && (
+              <button
+                type="button"
+                onClick={onUpgrade}
+                className="mt-2 text-xs font-bold underline"
+                style={{ color: C.purple }}
+              >
+                Upgrade to {PLAN_LABELS.small}
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={dismissNudge}
+            className="p-1 rounded-lg shrink-0"
+            style={{ color: C.sub }}
+            aria-label="Dismiss"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <p className="text-sm" style={{ color: C.sub }}>Loading…</p>

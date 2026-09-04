@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Briefcase, ChevronDown, Check, Plus, Pencil,
+  Briefcase, ChevronDown, Check, Plus, Pencil, CircleHelp,
 } from 'lucide-react';
 import { C, HEAD, BODY, tint, initials, PLAN_LABELS } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
@@ -92,7 +92,7 @@ export default function TopNav({ onNavigate }) {
           ChangeView
         </Link>
 
-        <div className="relative shrink-0">
+        <div className="relative shrink-0" data-tour="workspace-picker">
           <button
             type="button"
             onClick={() => { setPickerOpen(!pickerOpen); setRenamingId(null); }}
@@ -169,9 +169,9 @@ export default function TopNav({ onNavigate }) {
                   <Plus size={14} /> New workspace
                 </button>
               )}
-              {planTier === 'tier_1' && !hasPaidFeatures && (
+              {planTier === 'solo' && !hasPaidFeatures && (
                 <div className="px-4 py-2 text-[11px] border-t" style={{ color: C.sub, borderColor: C.border }}>
-                  {PLAN_LABELS.tier_1} includes 1 workspace. Upgrade to {PLAN_LABELS.small} or {PLAN_LABELS.tier_2} for unlimited.
+                  {PLAN_LABELS.solo} includes 1 workspace. Upgrade to {PLAN_LABELS.small} or {PLAN_LABELS.enterprise} for unlimited.
                 </div>
               )}
             </div>
@@ -184,15 +184,28 @@ export default function TopNav({ onNavigate }) {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => onNavigate?.({ section: 'profile' })}
-          title="Profile"
-          className="ml-auto w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 relative z-10"
-          style={{ background: C.purple }}
-        >
-          {initials(profile?.full_name || activeWorkspace?.name)}
-        </button>
+        <div className="ml-auto flex items-center gap-2 shrink-0 relative z-10">
+          <Link
+            to="/guide"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="User guide"
+            aria-label="Open user guide"
+            className="w-8 h-8 rounded-full flex items-center justify-center border"
+            style={{ borderColor: C.border, color: C.sub, background: '#fff' }}
+          >
+            <CircleHelp size={16} />
+          </Link>
+          <button
+            type="button"
+            onClick={() => onNavigate?.({ section: 'profile' })}
+            title="Profile"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
+            style={{ background: C.purple }}
+          >
+            {initials(profile?.full_name || activeWorkspace?.name)}
+          </button>
+        </div>
       </div>
 
       {modal === 'newWorkspace' && (

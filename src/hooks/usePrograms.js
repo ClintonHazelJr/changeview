@@ -22,7 +22,7 @@ export function usePrograms() {
     const ws = activeWorkspaceId;
     const [p, o] = await Promise.all([
       supabase.from('programs').select('*').eq('workspace_id', ws).order('created_at', { ascending: false }),
-      supabase.from('organizations').select('id, name').eq('workspace_id', ws).order('name'),
+      supabase.from('organizations').select('id, name, is_active').eq('workspace_id', ws).order('name'),
     ]);
     setPrograms(p.data || []);
     setOrgs(o.data || []);
@@ -46,6 +46,8 @@ export function usePrograms() {
         budget: vals.budget ? Number(vals.budget) : null,
         goal: vals.goal || null,
         benefits: vals.benefits || null,
+        program_manager_id: vals.programManagerId || null,
+        sponsor_id: vals.sponsorId || null,
       })
       .select()
       .single();
@@ -67,6 +69,8 @@ export function usePrograms() {
         budget: vals.budget ? Number(vals.budget) : null,
         goal: vals.goal || null,
         benefits: vals.benefits || null,
+        program_manager_id: vals.programManagerId || null,
+        sponsor_id: vals.sponsorId || null,
       })
       .eq('id', id)
       .select()
@@ -76,5 +80,23 @@ export function usePrograms() {
     return data;
   };
 
-  return { programs, orgs, loading, reload: load, addProgram, updateProgram };
+  const setProgramArchived = async (id, archived) => {
+    const { error } = await supabase
+      .from('programs')
+      .update({ archived_at: archived ? new Date().toISOString() : null })
+      .eq('id', id);
+    if (error) throw new Error(parseDbError(error));
+    await load();
+  };
+
+  const deleteProgram = async (id) => {
+    const { error } = await supabase.from('programs').delete().eq('id', id);
+    if (error) throw new Error(parseDbError(error));
+    await load();
+  };
+
+  return {
+    programs, orgs, loading, reload: load,
+    addProgram, updateProgram, setProgramArchived, deleteProgram,
+  };
 }
