@@ -63,6 +63,24 @@ Signup goes through Stripe Checkout with `trial_period_days: 7` (card on file, $
 
 Also apply: `010_stripe_customer_id.sql`, `011_account_deleted_at.sql`, and `012_stripe_managed_trials.sql` (new accounts start as `incomplete` until Checkout completes).
 
+### Asana integration
+
+1. Apply `supabase/migrations/024_integrations.sql` (generic `integrations` /
+   `integration_parent_links` / `integration_task_links` + encrypt/decrypt helpers).
+2. Create an Asana OAuth app; set redirect URI to
+   `https://<your-domain>/api/integrations/asana/callback` (and the same for local via
+   `vercel dev` / tunnel).
+3. Env: `INTEGRATION_TOKEN_ENCRYPTION_KEY`, `ASANA_CLIENT_ID`, `ASANA_CLIENT_SECRET`,
+   `APP_ORIGIN`. Tokens are encrypted via `encrypt_integration_token` — the key never
+   lives in the database.
+4. Owner connects from **Integrations** (sidebar, next to System Admin). Link one parent
+   ticket per Initiative, then **Import subtasks**. Outbound sync runs from the Tasks UI;
+   inbound uses Asana webhooks on that parent (needs public HTTPS).
+
+Status mapping: Asana `completed` → ChangeView `done`; incomplete → `in_progress`.
+Outbound: `done` ↔ completed; other CV statuses stay incomplete on Asana.
+Conflicts: last-write-wins by timestamp; echoes of our own outbound pushes are skipped.
+
 ### Auth redirect URLs (Supabase Dashboard → Authentication → URL Configuration)
 
 Allow these Redirect URLs (adjust host for local/prod):

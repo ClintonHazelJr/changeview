@@ -3,10 +3,11 @@ import { supabase } from '../lib/supabase';
 import { parseDbError } from '../lib/constants';
 import { useWorkspace } from '../contexts/WorkspaceContext';
 import { useAuth } from '../contexts/AuthContext';
+import { syncTaskOutbound } from '../lib/asanaIntegration';
 
 export function useTasks() {
   const { activeWorkspaceId } = useWorkspace();
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [initiatives, setInitiatives] = useState([]);
   const [people, setPeople] = useState([]);
@@ -14,6 +15,12 @@ export function useTasks() {
   const [requirements, setRequirements] = useState([]);
   const [learningNeeds, setLearningNeeds] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const pushOutbound = useCallback(async (taskId) => {
+    const accessToken = session?.access_token;
+    if (!accessToken || !taskId) return;
+    await syncTaskOutbound(accessToken, taskId);
+  }, [session?.access_token]);
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) {
@@ -128,6 +135,8 @@ export function useTasks() {
     }
 
     await load();
+    // Application-layer outbound sync (not a DB trigger).
+    void pushOutbound(task.id);
     return task;
   };
 
@@ -138,6 +147,7 @@ export function useTasks() {
       .eq('id', taskId);
     if (error) throw new Error(parseDbError(error));
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
+    void pushOutbound(taskId);
   };
 
   const deleteTask = async (taskId) => {

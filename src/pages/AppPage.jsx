@@ -19,6 +19,7 @@ import TasksPanel from '../components/tasks/TasksPanel';
 import UpgradePrompt from '../components/ui/UpgradePrompt';
 import BillingGate from '../components/ui/BillingGate';
 import OnboardingTour from '../components/onboarding/OnboardingTour';
+import IntegrationsPanel from '../components/integrations/IntegrationsPanel';
 
 function AppShell() {
   const { profile, session } = useAuth();
@@ -113,6 +114,10 @@ function AppShell() {
       params.delete('checkout');
       setParams(params, { replace: true });
       return undefined;
+    }
+
+    if (params.get('integrations') === 'asana') {
+      setSection('integrations');
     }
 
     const sessionId = params.get('session_id');
@@ -278,6 +283,8 @@ function AppShell() {
         onUpgradeOpenConsumed={() => setProfileUpgradeOpen(false)}
       />
     );
+  } else if (section === 'integrations') {
+    body = <IntegrationsPanel />;
   } else if (section === 'settings') {
     body = (
       <SystemAdmin
