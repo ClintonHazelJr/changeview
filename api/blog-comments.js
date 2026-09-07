@@ -4,17 +4,12 @@ import { clientIp, consumeRateLimit } from './_rateLimit.js';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-/** Keep in sync with src/content/blogPosts.js */
+/** Keep in sync with published posts in src/content/blogPosts.js */
 const ALLOWED_SLUGS = new Set([
   'ocm-vs-dap-vs-itsm',
   'change-compass-alternative',
   'pricing-comparison',
   'servicenow-vs-ocm',
-  'ai-and-change-management',
-  'state-of-change-management',
-  'change-management-systems',
-  'change-managers-no-systems',
-  'how-to-scope-impact',
 ]);
 
 const MAX_NAME = 80;

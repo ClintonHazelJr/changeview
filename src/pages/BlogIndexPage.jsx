@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
 import SiteShell from '../components/landing/SiteShell';
-import { BLOG_POSTS } from '../content/blogPosts';
+import { getPublishedPosts } from '../content/blogPosts';
 
 export default function BlogIndexPage() {
+  const posts = getPublishedPosts();
+
   return (
     <SiteShell title="Blog — changeview">
       <main className="page">
@@ -14,7 +16,7 @@ export default function BlogIndexPage() {
             </p>
           </div>
           <ul className="post-list">
-            {BLOG_POSTS.map((post) => (
+            {posts.map((post) => (
               <li key={post.slug} className="post-card">
                 <Link className="post-card-media" to={`/blog/${post.slug}`}>
                   <img src={post.image} alt={post.imageAlt || ''} loading="lazy" />
