@@ -1,6 +1,7 @@
 import { Link, Navigate, useParams } from 'react-router-dom';
 import SiteShell from '../components/landing/SiteShell';
 import MarkdownBody from '../components/landing/MarkdownBody';
+import BlogComments from '../components/landing/BlogComments';
 import { getPostBySlug } from '../content/blogPosts';
 
 export default function BlogPostPage() {
@@ -23,6 +24,7 @@ export default function BlogPostPage() {
             </figure>
           ) : null}
           <MarkdownBody source={post.markdown} />
+          <BlogComments slug={post.slug} />
         </div>
       </main>
     </SiteShell>
