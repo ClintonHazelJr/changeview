@@ -902,6 +902,124 @@
   font-weight: 600;
 }
 
+.cv-landing .post-card-media-fallback {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #e8eef6, #f4f4f2);
+}
+
+.cv-landing.blog-admin {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f7f8fa 0%, #eef1f5 100%);
+}
+
+.cv-landing .blog-admin-title {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0 0 20px;
+  color: var(--ink);
+}
+
+.cv-landing .blog-admin-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.cv-landing .blog-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.cv-landing .blog-admin-section {
+  margin-bottom: 48px;
+}
+
+.cv-landing .blog-admin-section h2 {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0 0 16px;
+  color: var(--ink);
+}
+
+.cv-landing .blog-admin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.cv-landing .blog-admin-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.cv-landing .blog-admin-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cv-landing .blog-admin-row-main strong {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.cv-landing .blog-admin-slug {
+  font-size: 13px;
+  color: #8a8884;
+}
+
+.cv-landing .blog-admin-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.cv-landing .blog-admin-toggle {
+  display: inline-flex;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.cv-landing .blog-admin-toggle input {
+  width: auto;
+  margin: 0;
+}
+
+.cv-landing .blog-admin-remove {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.cv-landing .blog-admin-form {
+  max-width: 720px;
+}
+
+.cv-landing .blog-admin-actions .btn,
+.cv-landing .blog-admin-form .btn {
+  padding: 10px 16px;
+  font-size: 14px;
+}
+
 @media (max-width: 900px) {
   .cv-landing .wrap {
     padding: 0 24px;

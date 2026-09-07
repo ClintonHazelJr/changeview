@@ -8,6 +8,7 @@ import TermsPage from './pages/TermsPage';
 import GuidePage from './pages/GuidePage';
 import BlogIndexPage from './pages/BlogIndexPage';
 import BlogPostPage from './pages/BlogPostPage';
+import AdminBlogPage from './pages/AdminBlogPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import CheckEmailPage from './pages/CheckEmailPage';
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/guide" element={<GuidePage />} />
         <Route path="/blog" element={<BlogIndexPage />} />
         <Route path="/blog/:slug" element={<BlogPostPage />} />
+        <Route path="/admin/blog" element={<AdminBlogPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/check-email" element={<CheckEmailPage />} />

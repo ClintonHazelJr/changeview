@@ -4,14 +4,6 @@ import { clientIp, consumeRateLimit } from './_rateLimit.js';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-/** Keep in sync with published posts in src/content/blogPosts.js */
-const ALLOWED_SLUGS = new Set([
-  'ocm-vs-dap-vs-itsm',
-  'change-compass-alternative',
-  'pricing-comparison',
-  'servicenow-vs-ocm',
-]);
-
 const MAX_NAME = 80;
 const MAX_EMAIL = 160;
 const MAX_COMMENT = 2000;
@@ -24,6 +16,17 @@ function setCors(res) {
 
 function normalizeSlug(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+async function publishedPostExists(admin, slug) {
+  const { data, error } = await admin
+    .from('blog_posts')
+    .select('slug')
+    .eq('slug', slug)
+    .eq('published', true)
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data?.slug);
 }
 
 /**
@@ -46,13 +49,22 @@ export default async function handler(req, res) {
 
 async function listComments(req, res) {
   const slug = normalizeSlug(req.query?.slug);
-  if (!slug || !SLUG_RE.test(slug) || !ALLOWED_SLUGS.has(slug)) {
+  if (!slug || !SLUG_RE.test(slug)) {
     return res.status(400).json({ error: 'Invalid post.' });
   }
 
   const admin = adminClient();
   if (!admin) {
     return res.status(500).json({ error: 'Service not configured (SUPABASE_SERVICE_ROLE_KEY)' });
+  }
+
+  try {
+    if (!(await publishedPostExists(admin, slug))) {
+      return res.status(400).json({ error: 'Invalid post.' });
+    }
+  } catch (err) {
+    console.error('[blog-comments] post lookup failed', err.message);
+    return res.status(500).json({ error: 'Could not load comments.' });
   }
 
   const { data, error } = await admin
@@ -90,7 +102,6 @@ async function submitComment(req, res) {
     });
   }
 
-  // Honeypot: bots fill this; humans never see it. Silent success.
   const honeypot = String(req.body?.website || '').trim();
   if (honeypot) {
     console.log('[blog-comments] honeypot trip', { ip });
@@ -104,7 +115,7 @@ async function submitComment(req, res) {
     .toLowerCase();
   const commentText = String(req.body?.commentText || req.body?.comment_text || '').trim();
 
-  if (!postSlug || !SLUG_RE.test(postSlug) || !ALLOWED_SLUGS.has(postSlug)) {
+  if (!postSlug || !SLUG_RE.test(postSlug)) {
     return res.status(400).json({ error: 'Invalid post.' });
   }
   if (!authorName || authorName.length > MAX_NAME) {
@@ -120,6 +131,15 @@ async function submitComment(req, res) {
   const admin = adminClient();
   if (!admin) {
     return res.status(500).json({ error: 'Service not configured (SUPABASE_SERVICE_ROLE_KEY)' });
+  }
+
+  try {
+    if (!(await publishedPostExists(admin, postSlug))) {
+      return res.status(400).json({ error: 'Invalid post.' });
+    }
+  } catch (err) {
+    console.error('[blog-comments] post lookup failed', err.message);
+    return res.status(500).json({ error: 'Could not submit comment.' });
   }
 
   const { error } = await admin.from('blog_comments').insert({
