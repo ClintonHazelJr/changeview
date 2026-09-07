@@ -3,6 +3,7 @@ import { Fragment } from 'react';
 /** Minimal markdown → React for marketing posts (h1/h2/p/ul + *em* / **strong**). */
 export default function MarkdownBody({ source }) {
   const blocks = String(source || '')
+    .replace(/^\uFEFF/, '')
     .replace(/\r\n/g, '\n')
     .trim()
     .split(/\n{2,}/);

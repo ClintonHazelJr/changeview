@@ -15,12 +15,17 @@ export default function BlogIndexPage() {
           </div>
           <ul className="post-list">
             {BLOG_POSTS.map((post) => (
-              <li key={post.slug}>
-                <h2>
-                  <Link to={`/blog/${post.slug}`}>{post.title}</Link>
-                </h2>
-                <p>{post.excerpt}</p>
-                <Link className="read" to={`/blog/${post.slug}`}>Read</Link>
+              <li key={post.slug} className="post-card">
+                <Link className="post-card-media" to={`/blog/${post.slug}`}>
+                  <img src={post.image} alt={post.imageAlt || ''} loading="lazy" />
+                </Link>
+                <div className="post-card-body">
+                  <h2>
+                    <Link to={`/blog/${post.slug}`}>{post.title}</Link>
+                  </h2>
+                  <p>{post.excerpt}</p>
+                  <Link className="read" to={`/blog/${post.slug}`}>Read</Link>
+                </div>
               </li>
             ))}
           </ul>

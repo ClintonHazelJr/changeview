@@ -14,6 +14,14 @@ export default function BlogPostPage() {
       <main className="page">
         <div className="wrap narrow">
           <Link className="back-link" to="/blog">← Back to blog</Link>
+          {post.image ? (
+            <figure className="post-hero">
+              <img src={post.image} alt={post.imageAlt || ''} />
+              {post.imageCredit ? (
+                <figcaption className="post-hero-credit">{post.imageCredit}</figcaption>
+              ) : null}
+            </figure>
+          ) : null}
           <MarkdownBody source={post.markdown} />
         </div>
       </main>
