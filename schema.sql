@@ -30,17 +30,18 @@ create table users (
   -- Soft deactivate: frees a seat; login blocked via Auth ban in /api/deactivate-user.
   -- Do not hard-delete users — their id is referenced as owners/assignees/authors.
   is_active boolean not null default true,
+  terms_accepted_at timestamptz,
+  onboarding_completed_at timestamptz,
   created_at timestamptz not null default now()
 );
 
--- Billing: 2 tiers.
--- Tier 1: single org, month-to-month only.
--- Tier 2: unlimited orgs, unlocks Reports + Schedule, monthly or annual (discounted).
+-- Billing: 3 tiers (solo | small | enterprise).
+-- Solo: single workspace, month-to-month only.
+-- Small / Enterprise: unlocks Reports + Schedule + multi-user; monthly or annual.
 create table subscriptions (
   id uuid primary key default gen_random_uuid(),
   account_id uuid not null unique references accounts(id) on delete cascade,
-  -- Solo=tier_1, Small=small, Enterprise=tier_2
-  plan_tier text not null check (plan_tier in ('tier_1', 'small', 'tier_2')),
+  plan_tier text not null check (plan_tier in ('solo', 'small', 'enterprise')),
   billing_cycle text not null default 'monthly' check (billing_cycle in ('monthly', 'annual')),
   status text not null default 'incomplete' check (status in ('incomplete', 'trialing', 'active', 'cancelled', 'past_due')),
   trial_ends_at timestamptz,
@@ -49,8 +50,8 @@ create table subscriptions (
   stripe_subscription_id text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  -- Tier 1 can only ever be monthly, enforce it in the schema, not just app logic
-  constraint tier_1_must_be_monthly check (plan_tier != 'tier_1' or billing_cycle = 'monthly')
+  -- Solo can only ever be monthly
+  constraint solo_must_be_monthly check (plan_tier != 'solo' or billing_cycle = 'monthly')
 );
 
 -- ---------- Reference numbering ----------
@@ -83,11 +84,8 @@ end;
 $$ language plpgsql;
 
 -- ---------- Workspace (tier-gated container) ----------
--- Tier 1 accounts get exactly one Workspace. Tier 2 accounts can create
--- unlimited Workspaces. Enforced below via trigger, not just app logic,
--- so a bug in the UI can't silently let a Tier 1 account create a second one.
--- This sits between Account and Company/Org: a consultant on Tier 2 might
--- run one Workspace per client relationship, each holding several Companies.
+-- Solo accounts get exactly one Workspace. Small/Enterprise can create unlimited.
+-- Enforced below via trigger, not just app logic.
 
 create table workspaces (
   id uuid primary key default gen_random_uuid(),
@@ -104,10 +102,10 @@ declare
 begin
   select plan_tier into v_plan_tier from subscriptions where account_id = new.account_id;
 
-  if v_plan_tier = 'tier_1' then
+  if v_plan_tier = 'solo' then
     select count(*) into v_existing_count from workspaces where account_id = new.account_id;
     if v_existing_count >= 1 then
-      raise exception 'Tier 1 accounts are limited to a single Workspace. Upgrade to Tier 2 to add more.';
+      raise exception 'Sole Proprietor plans are limited to a single Workspace. Upgrade to Business or Enterprise to add more.';
     end if;
   end if;
 
@@ -151,6 +149,7 @@ create table organizations (
   account_id uuid not null references accounts(id) on delete cascade,
   workspace_id uuid not null references workspaces(id) on delete cascade,
   name text not null,
+  is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
 
@@ -295,7 +294,7 @@ create table requirements (
   initiative_id uuid not null references initiatives(id) on delete cascade,
   reference_number text,
   description text not null,
-  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected')),
+  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected', 'completed')),
   priority text check (priority in ('low', 'medium', 'high')),
   author_id uuid references people(id),
   business_approver_id uuid references people(id),
@@ -379,7 +378,7 @@ create table learning_needs (
   type text, -- training, huddle
   session_count int default 1,
   time_hours numeric(5,2) default 0,
-  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected')),
+  status text not null default 'draft' check (status in ('draft', 'approved', 'rejected', 'completed')),
   created_at timestamptz not null default now()
 );
 
@@ -430,6 +429,8 @@ create table hypercare (
   pilot_success_criteria text,
   assumptions text,
   duration text,
+  start_date date,
+  end_date date,
   created_at timestamptz not null default now()
 );
 
@@ -462,6 +463,14 @@ create table task_requirements (
   task_id uuid not null references tasks(id) on delete cascade,
   requirement_id uuid not null references requirements(id) on delete cascade,
   primary key (task_id, requirement_id)
+);
+
+create table task_learning_needs (
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  task_id uuid not null references tasks(id) on delete cascade,
+  learning_need_id uuid not null references learning_needs(id) on delete cascade,
+  primary key (task_id, learning_need_id)
 );
 
 -- ============================================================
@@ -507,6 +516,40 @@ create index idx_tasks_initiative on tasks(initiative_id);
 create index idx_tasks_status on tasks(status);
 create index idx_task_requirements_task on task_requirements(task_id);
 create index idx_task_requirements_requirement on task_requirements(requirement_id);
+create index idx_task_learning_needs_task on task_learning_needs(task_id);
+create index idx_task_learning_needs_learning_need on task_learning_needs(learning_need_id);
+
+-- ---------- Change Status Reports (weekly SteerCo snapshots) ----------
+-- Point-in-time snapshots: RAG is manual; metrics freeze at create time.
+
+create table status_reports (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references accounts(id) on delete cascade,
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  initiative_id uuid references initiatives(id) on delete cascade,
+  program_id uuid references programs(id) on delete cascade,
+  rag_status text not null check (rag_status in ('green', 'amber', 'red')),
+  highlights text,
+  risks_blockers text,
+  requirements_completion_pct numeric(5,2) not null default 0,
+  task_completion_pct numeric(5,2) not null default 0,
+  blocked_task_count integer not null default 0,
+  change_readiness_pct numeric(5,2) not null default 0,
+  high_severity_impact_count integer not null default 0,
+  budget_actual numeric(12,2) not null default 0,
+  budget_planned numeric(12,2),
+  created_by uuid references users(id),
+  created_at timestamptz not null default now(),
+  constraint status_reports_scope_check check (
+    (initiative_id is not null and program_id is null)
+    or (initiative_id is null and program_id is not null)
+  )
+);
+
+create index idx_status_reports_workspace on status_reports(workspace_id);
+create index idx_status_reports_initiative on status_reports(initiative_id);
+create index idx_status_reports_program on status_reports(program_id);
+create index idx_status_reports_created_at on status_reports(created_at desc);
 
 -- ============================================================
 -- Row Level Security (Supabase)
@@ -528,6 +571,8 @@ alter table requirements enable row level security;
 alter table requirement_impacts enable row level security;
 alter table tasks enable row level security;
 alter table task_requirements enable row level security;
+alter table task_learning_needs enable row level security;
+alter table status_reports enable row level security;
 alter table cost_entries enable row level security;
 alter table programs enable row level security;
 alter table organizations enable row level security;

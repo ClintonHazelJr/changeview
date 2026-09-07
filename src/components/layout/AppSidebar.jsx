@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Layers, LayoutGrid, ClipboardList,
-  CalendarRange, BarChart3, Settings, Users, CheckSquare,
+  CalendarRange, BarChart3, Settings, Users, CheckSquare, Plug,
 } from 'lucide-react';
 import { C, HEAD, tint } from '../../lib/constants';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -38,6 +38,7 @@ export default function AppSidebar({ section, setSection }) {
             <button
               key={item.key}
               type="button"
+              data-tour={item.key === 'initiatives' ? 'nav-initiatives' : undefined}
               onClick={() => setSection(item.key)}
               className="w-full flex items-center gap-2.5 pl-3 pr-2.5 py-2.5 rounded-xl text-sm text-left"
               style={{
@@ -70,14 +71,33 @@ export default function AppSidebar({ section, setSection }) {
         >
           <Users size={16} style={{ color: section === 'users' ? C.purple : C.sub }} />
           <span className="flex-1" style={HEAD}>Users</span>
-          {(!featuresUnlocked || !isOwner) && (
+          {!isOwner && (
             <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: tint(C.purple, '14'), color: C.purple }}>
-              {!featuresUnlocked ? 'Pro' : 'Owner'}
+              Owner
             </span>
           )}
         </button>
         <button
           type="button"
+          onClick={() => setSection('integrations')}
+          className="w-full flex items-center gap-2.5 pl-3 pr-2.5 py-2.5 rounded-xl text-sm text-left"
+          style={{
+            background: section === 'integrations' ? tint(C.purple, '12') : 'transparent',
+            color: section === 'integrations' ? C.ink : C.sub,
+            fontWeight: section === 'integrations' ? 700 : 500,
+          }}
+        >
+          <Plug size={16} style={{ color: section === 'integrations' ? C.purple : C.sub }} />
+          <span style={HEAD}>Integrations</span>
+          {!isOwner && (
+            <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: tint(C.purple, '14'), color: C.purple }}>
+              Owner
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          data-tour="nav-settings"
           onClick={() => setSection('settings')}
           className="w-full flex items-center gap-2.5 pl-3 pr-2.5 py-2.5 rounded-xl text-sm text-left"
           style={{
@@ -87,7 +107,7 @@ export default function AppSidebar({ section, setSection }) {
           }}
         >
           <Settings size={16} style={{ color: section === 'settings' ? C.purple : C.sub }} />
-          <span style={HEAD}>Settings</span>
+          <span style={HEAD}>System Admin</span>
         </button>
       </div>
     </aside>

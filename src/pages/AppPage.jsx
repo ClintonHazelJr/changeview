@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
-import { C, BODY, PLAN_LABELS } from '../lib/constants';
+import { C, BODY } from '../lib/constants';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { WorkspaceProvider, useWorkspace } from '../contexts/WorkspaceContext';
 import TopNav from '../components/layout/TopNav';
@@ -17,6 +18,8 @@ import UsersPanel from '../components/users/UsersPanel';
 import TasksPanel from '../components/tasks/TasksPanel';
 import UpgradePrompt from '../components/ui/UpgradePrompt';
 import BillingGate from '../components/ui/BillingGate';
+import OnboardingTour from '../components/onboarding/OnboardingTour';
+import IntegrationsPanel from '../components/integrations/IntegrationsPanel';
 
 function AppShell() {
   const { profile, session } = useAuth();
@@ -25,17 +28,84 @@ function AppShell() {
     trialActive,
     pastDue,
     needsCheckout: checkoutNeeded,
+    activeWorkspaceId,
+    loading: workspaceLoading,
     reload,
   } = useWorkspace();
   const isOwner = profile?.role === 'owner';
-  // Trial must unlock Schedule/Tasks/Users even on Sole Proprietor tier.
+  // Trial unlocks Schedule/Tasks/Users/paid reports even on Starter tier.
   const featuresUnlocked = paid || trialActive;
   const [params, setParams] = useSearchParams();
   const [checkoutMsg, setCheckoutMsg] = useState('');
+  const [profileUpgradeOpen, setProfileUpgradeOpen] = useState(false);
 
   const [section, setSection] = useState('dashboard');
   const [initiativeFocusId, setInitiativeFocusId] = useState(null);
+  const [initiativeFocusTab, setInitiativeFocusTab] = useState(null);
+  const [programFocusId, setProgramFocusId] = useState(null);
+  const [taskFocusId, setTaskFocusId] = useState(null);
   const [adminTabFocus, setAdminTabFocus] = useState(null);
+  const [openAddOrg, setOpenAddOrg] = useState(false);
+  // true when this workspace still needs a first Org (checked once per workspace)
+  const [needsOrgSetup, setNeedsOrgSetup] = useState(false);
+  const [orgCheckDone, setOrgCheckDone] = useState(false);
+  const orgSetupCheckedForWs = useRef(null);
+
+  const tourPending = Boolean(profile && !profile.onboarding_completed_at);
+
+  // Detect empty workspace. Do not open Add Org yet if the tour is still pending —
+  // the tour finishes by handing off into that prompt.
+  useEffect(() => {
+    if (workspaceLoading || !activeWorkspaceId) return undefined;
+    if (orgSetupCheckedForWs.current === activeWorkspaceId) return undefined;
+
+    let cancelled = false;
+    setOrgCheckDone(false);
+    (async () => {
+      const { count, error } = await supabase
+        .from('organizations')
+        .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', activeWorkspaceId);
+      if (cancelled) return;
+      orgSetupCheckedForWs.current = activeWorkspaceId;
+      const empty = !error && (count ?? 0) === 0;
+      setNeedsOrgSetup(empty);
+      setOrgCheckDone(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId, workspaceLoading]);
+
+  const startAddOrgFlow = useCallback(() => {
+    setSection('settings');
+    setAdminTabFocus('org');
+    setOpenAddOrg(true);
+  }, []);
+
+  const markOrgSetupComplete = useCallback(() => {
+    setNeedsOrgSetup(false);
+    setOpenAddOrg(false);
+  }, []);
+
+  // After the tour is done (or if they already finished it), require Add Org when none exists.
+  useEffect(() => {
+    if (!orgCheckDone || tourPending || !needsOrgSetup) return;
+    startAddOrgFlow();
+  }, [orgCheckDone, tourPending, needsOrgSetup, startAddOrgFlow]);
+
+  // Keep them on System Admin while mandatory Add Org is showing (post-tour).
+  useEffect(() => {
+    if (tourPending || !needsOrgSetup) return;
+    if (section !== 'settings') {
+      setSection('settings');
+      setAdminTabFocus('org');
+      setOpenAddOrg(true);
+    }
+  }, [tourPending, needsOrgSetup, section]);
+
+  const handleTourFinished = useCallback(() => {
+    if (needsOrgSetup) startAddOrgFlow();
+  }, [needsOrgSetup, startAddOrgFlow]);
 
   useEffect(() => {
     const checkout = params.get('checkout');
@@ -44,6 +114,10 @@ function AppShell() {
       params.delete('checkout');
       setParams(params, { replace: true });
       return undefined;
+    }
+
+    if (params.get('integrations') === 'asana') {
+      setSection('integrations');
     }
 
     const sessionId = params.get('session_id');
@@ -83,55 +157,102 @@ function AppShell() {
     return () => { cancelled = true; };
   }, [params, setParams, session?.access_token, reload]);
 
-  const openInitiative = (id) => {
+  const openInitiative = (id, tab = 'details') => {
     setInitiativeFocusId(id);
+    setInitiativeFocusTab(tab);
     setSection('initiatives');
   };
+
+  const openFromSchedule = useCallback((target) => {
+    if (!target?.type) return;
+    if (target.type === 'program') {
+      setProgramFocusId(target.id);
+      setSection('program');
+      return;
+    }
+    if (target.type === 'initiative') {
+      setInitiativeFocusId(target.id);
+      setInitiativeFocusTab('details');
+      setSection('initiatives');
+      return;
+    }
+    if (target.type === 'task') {
+      setTaskFocusId(target.id);
+      setSection('tasks');
+      return;
+    }
+    if (target.type === 'hypercare' && target.initiativeId) {
+      setInitiativeFocusId(target.initiativeId);
+      setInitiativeFocusTab('hypercare');
+      setSection('initiatives');
+    }
+  }, []);
 
   const handleNavigate = useCallback((target) => {
     if (!target?.section) return;
     setSection(target.section);
-    if (target.initiativeId) setInitiativeFocusId(target.initiativeId);
+    if (target.initiativeId) {
+      setInitiativeFocusId(target.initiativeId);
+      setInitiativeFocusTab(target.initTab || 'details');
+    }
     if (target.adminTab) setAdminTabFocus(target.adminTab);
     else if (target.section !== 'settings') setAdminTabFocus(null);
   }, []);
 
+  const openUpgradePlan = useCallback(() => {
+    setProfileUpgradeOpen(true);
+    setSection('profile');
+  }, []);
+
   let body = null;
-  if (section === 'dashboard') body = <Dashboard onOpenInitiative={openInitiative} />;
-  else if (section === 'program') body = <ProgramsPanel />;
-  else if (section === 'initiatives') {
+  if (section === 'dashboard') {
+    body = <Dashboard onOpenInitiative={openInitiative} onUpgrade={openUpgradePlan} />;
+  } else if (section === 'program') {
+    body = (
+      <ProgramsPanel
+        initialProgramId={programFocusId}
+        onProgramFocusConsumed={() => setProgramFocusId(null)}
+      />
+    );
+  } else if (section === 'initiatives') {
     body = (
       <InitiativesPanel
         initialSelectedId={initiativeFocusId}
-        onSelectedConsumed={() => setInitiativeFocusId(null)}
+        initialTab={initiativeFocusTab}
+        onSelectedConsumed={() => {
+          setInitiativeFocusId(null);
+          setInitiativeFocusTab(null);
+        }}
       />
     );
   } else if (section === 'requirements') body = <RequirementsPanel />;
   else if (section === 'tasks') {
     body = featuresUnlocked
-      ? <TasksPanel />
-      : <UpgradePrompt feature="Tasks" />;
-  } else if (section === 'schedule') {
-    body = featuresUnlocked
-      ? <SchedulePanel />
-      : <UpgradePrompt feature="Schedule" />;
-  } else if (section === 'reports') {
-    body = <ReportsPanel />;
-  } else if (section === 'users') {
-    if (!featuresUnlocked) {
-      body = (
+      ? (
+        <TasksPanel
+          initialTaskId={taskFocusId}
+          onTaskFocusConsumed={() => setTaskFocusId(null)}
+        />
+      )
+      : (
         <UpgradePrompt
-          feature="Users"
-          title="Multi-user access requires a paid plan"
-          body={(
-            <>
-              {PLAN_LABELS.tier_1} is single-user. Upgrade to {PLAN_LABELS.small} or {PLAN_LABELS.tier_2} to invite
-              colleagues and assign them to workspaces.
-            </>
-          )}
+          feature="Tasks"
+          onUpgrade={openUpgradePlan}
         />
       );
-    } else if (!isOwner) {
+  } else if (section === 'schedule') {
+    body = featuresUnlocked
+      ? <SchedulePanel onOpenRecord={openFromSchedule} />
+      : (
+        <UpgradePrompt
+          feature="Schedule"
+          onUpgrade={openUpgradePlan}
+        />
+      );
+  } else if (section === 'reports') {
+    body = <ReportsPanel onUpgrade={openUpgradePlan} />;
+  } else if (section === 'users') {
+    if (!isOwner) {
       body = (
         <UpgradePrompt
           title="Owners only"
@@ -141,24 +262,46 @@ function AppShell() {
     } else {
       body = <UsersPanel />;
     }
-  } else if (section === 'profile') body = <ProfilePanel />;
-  else if (section === 'settings') {
+  } else if (section === 'profile') {
+    body = (
+      <ProfilePanel
+        initialUpgradeOpen={profileUpgradeOpen}
+        onUpgradeOpenConsumed={() => setProfileUpgradeOpen(false)}
+      />
+    );
+  } else if (section === 'integrations') {
+    body = <IntegrationsPanel />;
+  } else if (section === 'settings') {
     body = (
       <SystemAdmin
         initialTab={adminTabFocus}
         onInitialTabConsumed={() => setAdminTabFocus(null)}
+        initialOpenAddOrg={openAddOrg}
+        onInitialOpenAddOrgConsumed={() => setOpenAddOrg(false)}
+        requireOrg={!tourPending && needsOrgSetup}
+        onOrgCreated={markOrgSetupComplete}
       />
     );
   }
 
-  const showIncompleteGate = isOwner && checkoutNeeded && !pastDue;
-  const showPastDueGate = isOwner && pastDue;
+  // Wait until subscription fetch finishes — needsCheckout(null) is true both while
+  // loading and when checkout is genuinely required; only trust it after load.
+  const showIncompleteGate = !workspaceLoading && isOwner && checkoutNeeded && !pastDue;
+  const showPastDueGate = !workspaceLoading && isOwner && pastDue;
+  const showOnboardingTour = !workspaceLoading && tourPending && orgCheckDone;
 
   return (
     <div className="min-h-screen w-full flex flex-col" style={{ ...BODY, background: C.bg }}>
       {showIncompleteGate && <BillingGate mode="incomplete" />}
       {showPastDueGate && <BillingGate mode="past_due" />}
       <TopNav onNavigate={handleNavigate} />
+      {showOnboardingTour && (
+        <OnboardingTour
+          onNavigate={handleNavigate}
+          needsOrgSetup={needsOrgSetup}
+          onFinished={handleTourFinished}
+        />
+      )}
       {checkoutMsg && (
         <div
           className="px-6 py-2 text-xs font-semibold text-center"
@@ -194,6 +337,12 @@ export default function AppPage() {
   }
 
   if (!session) return <Navigate to="/login" replace />;
+
+  // App access requires a confirmed email (checkout/signup may precede confirmation).
+  if (!session.user?.email_confirmed_at) {
+    const email = session.user?.email ? encodeURIComponent(session.user.email) : '';
+    return <Navigate to={`/check-email${email ? `?email=${email}` : ''}`} replace />;
+  }
 
   return (
     <WorkspaceProvider>

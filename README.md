@@ -44,14 +44,16 @@ STRIPE_PUBLISHABLE_KEY=
 STRIPE_WEBHOOK_SECRET=              # signing secret for /api/stripe-webhook
 ```
 
-Stripe Price IDs (for checkout — create one Product per tier in Stripe):
+Stripe Price IDs (for checkout — create one Product per tier in Stripe).
+Display prices are fetched live from these Price objects (`/api/plan-prices`);
+fallback amounts live in `shared/planPrices.js`.
 
 ```
-STRIPE_PRICE_SOLO_MONTHLY=          # $59 / month
-STRIPE_PRICE_SMALL_MONTHLY=         # $149 / month
-STRIPE_PRICE_SMALL_ANNUAL=          # $1,490 / year
-STRIPE_PRICE_ENTERPRISE_MONTHLY=    # $299 / month
-STRIPE_PRICE_ENTERPRISE_ANNUAL=     # $2,990 / year
+STRIPE_PRICE_SOLO_MONTHLY=          # $39 / month
+STRIPE_PRICE_SMALL_MONTHLY=         # $99 / month
+STRIPE_PRICE_SMALL_ANNUAL=          # $990 / year (2 months free)
+STRIPE_PRICE_ENTERPRISE_MONTHLY=    # $199 / month
+STRIPE_PRICE_ENTERPRISE_ANNUAL=     # $1,990 / year (2 months free)
 ```
 
 Webhook endpoint (Stripe Dashboard → Developers → Webhooks): `https://<your-domain>/api/stripe-webhook`  
@@ -60,6 +62,24 @@ Events: `checkout.session.completed`, `customer.subscription.created`, `customer
 Signup goes through Stripe Checkout with `trial_period_days: 7` (card on file, $0 today). Enable the Stripe Customer Portal for payment-method updates (`/api/create-portal-session`).
 
 Also apply: `010_stripe_customer_id.sql`, `011_account_deleted_at.sql`, and `012_stripe_managed_trials.sql` (new accounts start as `incomplete` until Checkout completes).
+
+### Asana integration
+
+1. Apply `supabase/migrations/024_integrations.sql` (generic `integrations` /
+   `integration_parent_links` / `integration_task_links` + encrypt/decrypt helpers).
+2. Create an Asana OAuth app; set redirect URI to
+   `https://<your-domain>/api/integrations/asana/callback` (and the same for local via
+   `vercel dev` / tunnel).
+3. Env: `INTEGRATION_TOKEN_ENCRYPTION_KEY` (min 16 chars; AES-256-GCM in app code —
+   never stored in the DB), `ASANA_CLIENT_ID`, `ASANA_CLIENT_SECRET`, `APP_ORIGIN`.
+4. Owner connects from **Integrations** for the **active workspace** (OAuth `state`
+   carries `workspace_id`). Link one parent ticket per Initiative, then **Import
+   subtasks**. Outbound sync runs from the Tasks UI; inbound uses Asana webhooks on
+   that parent (needs public HTTPS).
+
+Status mapping: Asana `completed` → ChangeView `done`; incomplete → `in_progress`.
+Outbound: `done` ↔ completed; other CV statuses stay incomplete on Asana.
+Conflicts: last-write-wins by timestamp; echoes of our own outbound pushes are skipped.
 
 ### Auth redirect URLs (Supabase Dashboard → Authentication → URL Configuration)
 
@@ -94,4 +114,4 @@ Push to GitHub and connect to Vercel. Set all env vars in Vercel project setting
 
 ## Pricing
 
-Landing page plans: **Sole Proprietor** $59/mo (monthly only), **Business** $149/mo or $1,490/yr, **Enterprise** $299/mo or $2,990/yr. Checkout uses the Stripe Price IDs above based on tier + billing cycle.
+**Starter** (internal `solo`) $39/mo (monthly only, 2 users / 1 workspace), **Pro** (internal `small`) $99/mo or $990/yr (5 users), **Enterprise** sales-assisted (Contact Us — no self-serve Checkout; Stripe Enterprise Price env vars remain for manual setup). UI amounts for Starter/Pro come from Stripe Price `unit_amount` via `/api/plan-prices`, with `shared/planPrices.js` as fallback.

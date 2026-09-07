@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Upload } from 'lucide-react';
 import { C } from '../../lib/constants';
 import ViewToggle from './ViewToggle';
 
@@ -64,13 +64,13 @@ export function SaveRow({ label = 'Save', disabled, onDelete }) {
   );
 }
 
-export function ListCard({ icon: Icon, color, title, subtitle, tag }) {
-  return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border flex items-center gap-3" style={{ borderColor: C.border }}>
+export function ListCard({ icon: Icon, color, title, subtitle, tag, onClick }) {
+  const body = (
+    <>
       <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: color + '18' }}>
         <Icon size={16} style={{ color }} />
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 text-left">
         <div className="text-sm font-bold truncate" style={{ color: C.ink }}>{title}</div>
         {subtitle && <div className="text-xs truncate" style={{ color: C.sub }}>{subtitle}</div>}
       </div>
@@ -79,6 +79,23 @@ export function ListCard({ icon: Icon, color, title, subtitle, tag }) {
           {tag}
         </span>
       )}
+    </>
+  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="bg-white rounded-2xl p-4 shadow-sm border flex items-center gap-3 w-full hover:brightness-[0.99]"
+        style={{ borderColor: C.border }}
+      >
+        {body}
+      </button>
+    );
+  }
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm border flex items-center gap-3" style={{ borderColor: C.border }}>
+      {body}
     </div>
   );
 }
@@ -86,6 +103,7 @@ export function ListCard({ icon: Icon, color, title, subtitle, tag }) {
 export function TabSection({
   title, subtitle, onAdd, addLabel, color, disabled, disabledText, empty, emptyText, emptyIcon: EmptyIcon,
   viewMode, onViewChange, viewModes = ['tiles', 'list'], children,
+  onBulkUpload, bulkLabel = 'Bulk Upload',
 }) {
   return (
     <div>
@@ -96,15 +114,28 @@ export function TabSection({
             <ViewToggle value={viewMode || 'tiles'} onChange={onViewChange} modes={viewModes} />
           )}
         </div>
-        <button
-          type="button"
-          onClick={onAdd}
-          disabled={disabled}
-          className="flex items-center gap-1.5 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-40 shadow-sm shrink-0"
-          style={{ background: color }}
-        >
-          <Plus size={15} /> {addLabel}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {typeof onBulkUpload === 'function' && (
+            <button
+              type="button"
+              onClick={onBulkUpload}
+              disabled={disabled}
+              className="flex items-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-full border disabled:opacity-40 shadow-sm"
+              style={{ borderColor: C.border, color: C.ink, background: '#fff' }}
+            >
+              <Upload size={15} /> {bulkLabel}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onAdd}
+            disabled={disabled}
+            className="flex items-center gap-1.5 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-40 shadow-sm"
+            style={{ background: color }}
+          >
+            <Plus size={15} /> {addLabel}
+          </button>
+        </div>
       </div>
       <p className="text-sm mb-5" style={{ color: C.sub }}>{disabled ? disabledText : subtitle}</p>
       {empty ? (

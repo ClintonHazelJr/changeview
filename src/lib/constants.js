@@ -1,61 +1,120 @@
+/** Brand tokens (landing + app). Legacy keys (purple/teal/…) alias into this system. */
 export const C = {
-  purple: '#7C6FF0',
-  teal: '#2DD4BF',
-  coral: '#FF8C82',
-  green: '#34D399',
-  amber: '#FBBF24',
-  ink: '#1E2140',
-  sub: '#8A8CA5',
-  bg: '#F8F8FC',
-  border: '#EFEFF6',
+  ink: '#17181c',
+  paper: '#f7f7f6',
+  navy: '#1c2f8f',
+  royal: '#3a54c4',
+  blue3: '#5f79df',
+  blue4: '#93a6ee',
+  red: '#ff1717',
+  darknavy: '#0f1633',
+  trust: '#eef0f7',
+  sub: '#575653',
+  bg: '#f7f7f6',
+  border: '#e6e5e2',
+
+  // Legacy aliases — keep existing C.purple / C.coral call sites on the new palette
+  purple: '#1c2f8f', // navy (primary)
+  teal: '#5f79df', // blue3
+  coral: '#ff1717', // red (urgent / error only)
+  green: '#1c2f8f', // navy (approved / done)
+  amber: '#3a54c4', // royal (medium)
 };
 
-export const HEAD = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
-export const BODY = { fontFamily: "'Inter', sans-serif" };
+export const HEAD = {
+  fontFamily: "'Sora', sans-serif",
+  letterSpacing: '-0.03em',
+  fontWeight: 800,
+};
+export const BODY = { fontFamily: "'Sora', sans-serif" };
 
 export const tint = (hex, a = '16') => hex + a;
 
 export const initials = (name = '') =>
   name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?';
 
+const GRAY = '#8a8986';
+
 export const SEVERITY_COLOR = {
-  none: '#2A2D3A',
-  low: C.green,
-  medium: C.amber,
-  high: C.coral,
+  none: C.ink, // No Impact — ink, not pure black
+  low: '#22C55E',
+  medium: '#FBBF24',
+  high: C.red, // #ff1717
 };
 export const SEVERITY_LEVELS = ['none', 'low', 'medium', 'high'];
 export const isRatedSeverity = (value) => Boolean(value) && value !== 'none';
 export const STATUS_COLOR = {
-  planning: C.purple,
-  delivery: C.teal,
-  hypercare: C.amber,
-  closed: C.sub,
-  draft: C.amber,
-  approved: C.green,
-  rejected: C.coral,
-  none: '#2A2D3A',
-  low: C.green,
-  medium: C.amber,
-  high: C.coral,
-  backlog: C.sub,
-  ready: C.purple,
-  in_progress: C.teal,
-  blocked: C.coral,
-  done: C.green,
+  // Initiative
+  planning: C.blue4,
+  delivery: C.blue3,
+  hypercare: C.royal,
+  closed: GRAY,
+  // Requirement / impact
+  draft: GRAY,
+  approved: C.navy,
+  rejected: C.red,
+  completed: '#16A34A', // green — distinct from approved (navy)
+  // Severity (shared keys — traffic light)
+  none: C.ink,
+  low: '#22C55E',
+  medium: '#FBBF24',
+  high: C.red,
+  // Task Kanban
+  backlog: GRAY,
+  ready: C.blue4,
+  in_progress: C.blue3,
+  blocked: C.red,
+  done: C.navy,
 };
 export const TAG_OPTIONS = ['Training', 'Huddle', 'Email', 'Documentation'];
 
-/** DB: tier_1 / small / tier_2. Display labels only — IDs stay solo/small/enterprise. */
+/** Plan tier IDs match DB plan_tier: solo | small | enterprise. */
 export const PLAN_LABELS = {
-  tier_1: 'Sole Proprietor',
-  small: 'Business',
-  tier_2: 'Enterprise',
-  solo: 'Sole Proprietor',
+  solo: 'Starter',
+  small: 'Pro',
   enterprise: 'Enterprise',
 };
-export const isSoloPlan = (tier) => tier === 'tier_1' || tier === 'solo';
-export const isEnterprisePlan = (tier) => tier === 'tier_2' || tier === 'enterprise';
+
+/** Seat / workspace caps. null = unlimited. Aligns with marketing + DB plan_max_users(). */
+export const PLAN_LIMITS = {
+  solo: { workspaces: 1, users: 2 },
+  small: { workspaces: null, users: 5 },
+  enterprise: { workspaces: null, users: null },
+};
+
+/** Rank for upgrade/downgrade comparisons (display labels differ; IDs stay solo/small/enterprise). */
+export const PLAN_TIER_RANK = { solo: 0, small: 1, enterprise: 2 };
+
+export function planTierRank(tier) {
+  return PLAN_TIER_RANK[tier] ?? 0;
+}
+
+/** Reports free on every paid/trialing plan including Starter (solo). */
+export const FREE_REPORT_KEYS = new Set(['requirements', 'cia', 'schedule']);
+
+/** Reports that require Pro (small) or Enterprise when not on trial. */
+export function isPaidReport(key) {
+  return !FREE_REPORT_KEYS.has(key);
+}
+
+export function formatPlanLimit(used, limit) {
+  const usedN = Number(used) || 0;
+  if (limit == null) return `${usedN} of unlimited`;
+  return `${usedN} of ${limit}`;
+}
+
+/** UI gate only — API still enforces PLATFORM_ADMIN_EMAIL / default. */
+export const PLATFORM_ADMIN_EMAIL = String(
+  import.meta.env.VITE_PLATFORM_ADMIN_EMAIL || 'clintonhazeljr@gmail.com',
+).trim().toLowerCase();
+
+export const PLATFORM_RESET_CONFIRM = 'RESET ALL EXCEPT ME';
+
+export const isPlatformAdminEmail = (email) =>
+  String(email || '').trim().toLowerCase() === PLATFORM_ADMIN_EMAIL;
+
+export const isSoloPlan = (tier) => tier === 'solo';
+export const isEnterprisePlan = (tier) => tier === 'enterprise';
 export const isSmallPlan = (tier) => tier === 'small';
 
 export function isTrialExpired(subscription) {
@@ -66,6 +125,12 @@ export function isTrialExpired(subscription) {
 
 export function isTrialingActive(subscription) {
   return subscription?.status === 'trialing' && !isTrialExpired(subscription);
+}
+
+/** Trial unlocks Enterprise-level capacity for the duration of the trial. */
+export function effectivePlanLimits(tier, subscription = null) {
+  if (isTrialingActive(subscription)) return PLAN_LIMITS.enterprise;
+  return PLAN_LIMITS[tier] || PLAN_LIMITS.solo;
 }
 
 export function isPastDue(subscription) {
@@ -87,7 +152,7 @@ export function trialDaysLeft(subscription) {
 }
 
 /**
- * Tasks, Schedule, multi-user — locked on Sole Proprietor when paid.
+ * Tasks, Schedule, paid reports — locked on Starter when paid (seat invites still allowed up to plan_max_users).
  * Stripe `trialing` unlocks full Enterprise-level access regardless of selected tier.
  */
 export const hasPaidPlanFeatures = (tier, subscription = null) => {
@@ -116,46 +181,36 @@ export function formatReference(num) {
 
 export function parseDbError(err) {
   const msg = err?.message || err?.error_description || 'Something went wrong';
-  if (msg.includes('Tier 1 accounts are limited')) {
-    return 'Sole Proprietor plans are limited to a single Workspace. Upgrade to Enterprise to add more.';
+  if (msg.includes('Tier 1 accounts are limited') || msg.includes('Sole Proprietor plans are limited') || msg.includes('solo accounts are limited') || msg.includes('Starter plans are limited')) {
+    return 'Starter plans are limited to a single Workspace. Upgrade to Pro or Enterprise to add more.';
+  }
+  if (msg.includes('plan_max_users') || msg.includes('user limit') || msg.includes('seat limit') || msg.includes('maximum number of users')) {
+    return 'This plan’s user limit is reached. Starter allows 2 users; upgrade to Pro (5) or contact us for Enterprise.';
   }
   return msg;
 }
 
-/** Store owner/PM names in description until schema has text fields (FK is users, not people). */
-export function packInitiativeMeta(description, {
-  changeOwner, productOwner, businessOwner, projectManager,
-}) {
-  const cleaned = (description || '').replace(/\n?\[cv-meta:[^\]]+\]\s*$/, '').trim();
-  if (!changeOwner && !productOwner && !businessOwner && !projectManager) return cleaned;
-  return `${cleaned}\n[cv-meta:${JSON.stringify({
-    changeOwner: changeOwner || '',
-    productOwner: productOwner || '',
-    businessOwner: businessOwner || '',
-    projectManager: projectManager || '',
-  })}]`;
+/** Soft-active flag: missing column / null treated as active. */
+export function isActiveRecord(row) {
+  return row?.is_active !== false;
 }
 
-export function parseInitiativeMeta(description) {
-  const raw = description || '';
-  const match = raw.match(/\[cv-meta:({.*?})\]\s*$/);
-  if (!match) {
-    return {
-      description: raw, changeOwner: '', productOwner: '', businessOwner: '', projectManager: '',
-    };
-  }
-  try {
-    const meta = JSON.parse(match[1]);
-    return {
-      description: raw.replace(/\n?\[cv-meta:[^\]]+\]\s*$/, '').trim(),
-      changeOwner: meta.changeOwner || '',
-      productOwner: meta.productOwner || '',
-      businessOwner: meta.businessOwner || '',
-      projectManager: meta.projectManager || '',
-    };
-  } catch {
-    return {
-      description: raw, changeOwner: '', productOwner: '', businessOwner: '', projectManager: '',
-    };
-  }
+/** Soft-archive flag. */
+export function isArchivedRecord(row) {
+  return Boolean(row?.archived_at);
+}
+
+/** Active rows for new assignments; keep currentId even if deactivated. */
+export function assignableOptions(rows, currentId) {
+  return (rows || []).filter((r) => isActiveRecord(r) || (currentId && r.id === currentId));
+}
+
+/** Non-archived rows for pickers/lists; keep currentId even if archived. */
+export function unarchivedOptions(rows, currentId) {
+  return (rows || []).filter((r) => !isArchivedRecord(r) || (currentId && r.id === currentId));
+}
+
+/** Strip legacy [cv-meta:{...}] tags once stuffed into initiative descriptions. */
+export function stripInitiativeMeta(description) {
+  return (description || '').replace(/\n?\[cv-meta:[^\]]+\]\s*$/, '').trim();
 }

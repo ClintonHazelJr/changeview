@@ -1,13 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, FileText, AlertTriangle, Users, GraduationCap, MessageSquare,
-  CircleDot, Rocket, HeartPulse, CheckCircle2,
+  CircleDot, Rocket, HeartPulse, CheckCircle2, Archive, ArchiveRestore, Trash2,
 } from 'lucide-react';
-import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, STATUS_COLOR, isRatedSeverity, parseInitiativeMeta } from '../../lib/constants';
+import { C, HEAD, BODY, tint, initials, SEVERITY_COLOR, STATUS_COLOR, isRatedSeverity, stripInitiativeMeta, parseDbError, isArchivedRecord } from '../../lib/constants';
+import { countInitiativeDeleteImpact } from '../../lib/deleteImpactCounts';
+import { supabase } from '../../lib/supabase';
 import { useInitiatives, useInitiativeDetail } from '../../hooks/useInitiatives';
 import { useAdminData } from '../../hooks/useAdminData';
+import { useAuth } from '../../contexts/AuthContext';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { TabSection } from '../ui/shared';
 import Modal from '../ui/Modal';
+import CascadingDeleteModal from '../ui/CascadingDeleteModal';
+import CardActionsMenu from '../ui/CardActionsMenu';
+import CsvImportModal from '../ui/CsvImportModal';
+import ShowInactiveToggle from '../ui/ShowInactiveToggle';
+import { findPerson, parseYesNo } from '../../lib/csvImport';
 import {
   FormInitiative, FormImpact, FormStakeholder, FormLearningNeed, FormComms, FormHypercare,
 } from '../forms/AdminForms';
@@ -30,15 +39,29 @@ function formatDate(value) {
   return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function InitiativesPanel({ initialSelectedId = null, onSelectedConsumed }) {
-  const { initiatives, programs, addInitiative, reload: reloadInitiatives } = useInitiatives();
+export default function InitiativesPanel({
+  initialSelectedId = null,
+  initialTab = null,
+  onSelectedConsumed,
+}) {
+  const { initiatives, programs, addInitiative, updateInitiative, setInitiativeArchived, deleteInitiative, reload: reloadInitiatives } = useInitiatives();
   const { departments, people } = useAdminData();
+  const { profile } = useAuth();
+  const { activeWorkspaceId } = useWorkspace();
   const [selectedInitId, setSelectedInitId] = useState(initialSelectedId);
-  const [initTab, setInitTab] = useState('details');
+  const [initTab, setInitTab] = useState(initialTab || 'details');
   const [modal, setModal] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [viewMode, setViewMode] = useState('tiles');
+  const [bulkStakeholders, setBulkStakeholders] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [busyArchiveId, setBusyArchiveId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteCounts, setDeleteCounts] = useState([]);
+  const [deleteCountsLoading, setDeleteCountsLoading] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const openCreate = (type) => {
     setEditingRecord(null);
@@ -56,26 +79,76 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
   useEffect(() => {
     if (initialSelectedId) {
       setSelectedInitId(initialSelectedId);
-      setInitTab('details');
+      setInitTab(initialTab || 'details');
+      const match = initiatives.find((i) => i.id === initialSelectedId);
+      if (match && isArchivedRecord(match)) setShowArchived(true);
       onSelectedConsumed?.();
     }
-  }, [initialSelectedId, onSelectedConsumed]);
+  }, [initialSelectedId, initialTab, onSelectedConsumed, initiatives]);
 
   const detail = useInitiativeDetail(selectedInitId);
   const selectedInit = detail.initiative;
   const programName = (id) => programs.find((p) => p.id === id)?.name || 'No Program';
+  const activePrograms = programs.filter((p) => !isArchivedRecord(p));
 
   const deptName = (id) => departments.find((d) => d.id === id)?.name || '—';
   const personName = (id) => people.find((p) => p.id === id)?.name || '—';
+  const personLabel = (id) => people.find((p) => p.id === id)?.name || '';
   const impactLabel = (id) => {
     const i = detail.impacts.find((x) => x.id === id);
     return i ? `${deptName(i.department_id)} impact` : '—';
+  };
+
+  const toggleArchive = async (i) => {
+    const archived = isArchivedRecord(i);
+    if (!archived && !window.confirm(`Archive ${i.name}?`)) return;
+    setBusyArchiveId(i.id);
+    try {
+      await setInitiativeArchived(i.id, !archived);
+      await detail.reload();
+    } catch (err) {
+      alert(err.message || 'Could not update initiative');
+    } finally {
+      setBusyArchiveId(null);
+    }
+  };
+
+  const openDelete = async (i) => {
+    setDeleteError('');
+    setDeleteTarget(i);
+    setDeleteCounts([]);
+    setDeleteCountsLoading(true);
+    try {
+      setDeleteCounts(await countInitiativeDeleteImpact(i.id));
+    } catch (err) {
+      setDeleteError(err.message || 'Could not load related records');
+    } finally {
+      setDeleteCountsLoading(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    setDeleteError('');
+    try {
+      const id = deleteTarget.id;
+      await deleteInitiative(id);
+      setDeleteTarget(null);
+      closeModal();
+      if (selectedInitId === id) setSelectedInitId(null);
+    } catch (err) {
+      setDeleteError(err.message || 'Could not delete initiative');
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   const initData = {
     impacts: detail.impacts,
     stakeholders: detail.stakeholders,
     learningNeeds: detail.learningNeeds,
+    tasks: detail.tasks,
     comms: detail.comms,
     hypercare: detail.hypercare,
   };
@@ -96,10 +169,15 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
   ];
 
   const getStatus = (i) => i.status || 'planning';
-  const counts = countByStatus(initiatives, getStatus, INIT_STATUSES.map((s) => s.key));
+  const archivedCount = initiatives.filter(isArchivedRecord).length;
+  const visibleInitiatives = useMemo(
+    () => (showArchived ? initiatives : initiatives.filter((i) => !isArchivedRecord(i))),
+    [initiatives, showArchived],
+  );
+  const counts = countByStatus(visibleInitiatives, getStatus, INIT_STATUSES.map((s) => s.key));
   const filtered = useMemo(
-    () => (statusFilter ? initiatives.filter((i) => getStatus(i) === statusFilter) : initiatives),
-    [initiatives, statusFilter],
+    () => (statusFilter ? visibleInitiatives.filter((i) => getStatus(i) === statusFilter) : visibleInitiatives),
+    [visibleInitiatives, statusFilter],
   );
   const groups = useMemo(() => {
     const map = new Map();
@@ -128,7 +206,12 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
         label: 'Status',
         sortable: true,
         sortValue: (i) => getStatus(i),
-        render: (i) => <StatusPill label={getStatus(i)} color={statusColor(getStatus(i))} />,
+        render: (i) => (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <StatusPill label={getStatus(i)} color={statusColor(getStatus(i))} />
+            {isArchivedRecord(i) && <StatusPill label="Archived" color={C.sub} />}
+          </div>
+        ),
       },
       {
         key: 'program',
@@ -143,6 +226,45 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
         sortable: true,
         render: (i) => formatDate(i.proposed_go_live_date) || '—',
       },
+      {
+        key: 'actions',
+        label: '',
+        render: (i) => {
+          const archived = isArchivedRecord(i);
+          const busy = busyArchiveId === i.id;
+          return (
+            <div className="flex items-center gap-1.5 justify-end">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleArchive(i);
+                }}
+                className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full disabled:opacity-50"
+                style={{
+                  background: archived ? tint(C.green, '18') : tint(C.coral, '18'),
+                  color: archived ? C.green : C.coral,
+                }}
+              >
+                {archived ? <ArchiveRestore size={12} /> : <Archive size={12} />}
+                {busy ? '…' : archived ? 'Unarchive' : 'Archive'}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openDelete(i);
+                }}
+                className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
+                style={{ background: tint(C.coral, '18'), color: C.coral }}
+              >
+                <Trash2 size={12} /> Delete
+              </button>
+            </div>
+          );
+        },
+      },
     ];
 
     return (
@@ -150,21 +272,36 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
         <ListTopBar
           title="Initiatives"
           addLabel="Add Initiative"
+          addTourId="add-initiative"
           onAdd={() => setModal('initiative')}
-          addDisabled={programs.length === 0}
+          addDisabled={activePrograms.length === 0}
           viewMode={viewMode}
           onViewChange={setViewMode}
         />
+        <div className="flex justify-end px-1 mb-2">
+          <ShowInactiveToggle
+            show={showArchived}
+            onChange={setShowArchived}
+            inactiveCount={archivedCount}
+            entityLabel="archived"
+          />
+        </div>
         <StatusFilterRow
           statuses={INIT_STATUSES}
           counts={counts}
           active={statusFilter}
           onSelect={setStatusFilter}
-          onAddStatus={programs.length ? () => setModal('initiative') : undefined}
+          onAddStatus={activePrograms.length ? () => setModal('initiative') : undefined}
         />
         <ListBody
           empty={filtered.length === 0}
-          emptyText={programs.length === 0 ? 'Create a Program first, then add Initiatives.' : 'No initiatives yet.'}
+          emptyText={
+            activePrograms.length === 0 && programs.length === 0
+              ? 'Create a Program first, then add Initiatives.'
+              : archivedCount > 0 && !showArchived
+                ? 'No active initiatives. Turn on Show archived to find one.'
+                : 'No initiatives yet.'
+          }
         >
           {viewMode === 'list' ? (
             <ListTable
@@ -181,19 +318,40 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                 items={g.items}
                 getStatus={getStatus}
                 addLabel="Add Initiative"
-                onAdd={programs.length ? () => setModal('initiative') : undefined}
+                onAdd={activePrograms.length ? () => setModal('initiative') : undefined}
               >
                 {g.items.map((i) => {
-                  const meta = parseInitiativeMeta(i.description);
+                  const archived = isArchivedRecord(i);
+                  const busy = busyArchiveId === i.id;
                   return (
-                    <CompactListCard
-                      key={i.id}
-                      title={i.name}
-                      subtitle={formatDate(i.proposed_go_live_date) ? `Go live ${formatDate(i.proposed_go_live_date)}` : 'No go-live date'}
-                      tags={[{ label: getStatus(i), color: statusColor(getStatus(i)) }]}
-                      avatars={[meta.changeOwner, meta.productOwner, meta.businessOwner, meta.projectManager].filter(Boolean)}
-                      onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
-                    />
+                    <div key={i.id} className="relative" style={{ opacity: archived ? 0.72 : 1 }}>
+                      <CompactListCard
+                        title={i.name}
+                        subtitle={formatDate(i.proposed_go_live_date) ? `Go live ${formatDate(i.proposed_go_live_date)}` : 'No go-live date'}
+                        tags={[
+                          { label: getStatus(i), color: statusColor(getStatus(i)) },
+                          ...(archived ? [{ label: 'Archived', color: C.sub }] : []),
+                        ]}
+                        avatars={[
+                          personLabel(i.change_owner_id),
+                          personLabel(i.product_owner_id),
+                          personLabel(i.business_owner_id),
+                          personLabel(i.project_manager_id),
+                        ].filter(Boolean)}
+                        onClick={() => { setSelectedInitId(i.id); setInitTab('details'); }}
+                      />
+                      <CardActionsMenu
+                        archived={archived}
+                        busy={busy}
+                        onEdit={() => {
+                          openEdit('initiative', i);
+                          setSelectedInitId(i.id);
+                          setInitTab('details');
+                        }}
+                        onArchive={() => toggleArchive(i)}
+                        onDelete={() => openDelete(i)}
+                      />
+                    </div>
                   );
                 })}
               </GroupSection>
@@ -211,6 +369,18 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
               }}
             />
           </Modal>
+        )}
+        {deleteTarget && (
+          <CascadingDeleteModal
+            entityLabel="Initiative"
+            recordName={deleteTarget.name}
+            counts={deleteCounts}
+            countsLoading={deleteCountsLoading}
+            busy={deleteBusy}
+            error={deleteError}
+            onClose={() => { if (!deleteBusy) setDeleteTarget(null); }}
+            onConfirm={confirmDelete}
+          />
         )}
       </ListPageShell>
     );
@@ -255,22 +425,59 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
       </div>
 
       <div className="flex-1 p-8 max-w-4xl overflow-y-auto">
-        {initTab === 'details' && selectedInit && (() => {
-          const meta = parseInitiativeMeta(selectedInit.description);
-          return (
+        {initTab === 'details' && selectedInit && (
           <div>
-            <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>{selectedInit.name}</h2>
-            <p className="text-sm mb-6" style={{ color: C.sub }}>{meta.description || '—'}</p>
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <h2 className="text-xl font-extrabold" style={{ ...HEAD, color: C.ink }}>{selectedInit.name}</h2>
+                {isArchivedRecord(selectedInit) && <StatusPill label="Archived" color={C.sub} />}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={busyArchiveId === selectedInit.id}
+                  onClick={() => toggleArchive(selectedInit)}
+                  className="text-xs font-bold px-3 py-1.5 rounded-full"
+                  style={{
+                    background: isArchivedRecord(selectedInit) ? tint(C.green, '18') : tint(C.coral, '18'),
+                    color: isArchivedRecord(selectedInit) ? C.green : C.coral,
+                  }}
+                >
+                  {busyArchiveId === selectedInit.id
+                    ? '…'
+                    : isArchivedRecord(selectedInit) ? 'Unarchive' : 'Archive'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openDelete(selectedInit)}
+                  className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full"
+                  style={{ background: tint(C.coral, '18'), color: C.coral }}
+                >
+                  <Trash2 size={12} /> Delete
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openEdit('initiative', selectedInit)}
+                  className="text-xs font-bold px-3 py-1.5 rounded-full"
+                  style={{ background: tint(C.coral, '18'), color: C.coral }}
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+            <p className="text-sm mb-6" style={{ color: C.sub }}>
+              {stripInitiativeMeta(selectedInit.description) || '—'}
+            </p>
             <div className="grid grid-cols-2 gap-3 mb-6">
               {[
                 ['Status', selectedInit.status],
                 ['Program', programName(selectedInit.program_id)],
                 ['Go Live Date', selectedInit.proposed_go_live_date || '—'],
                 ['Budget', selectedInit.budget ? `$${Number(selectedInit.budget).toLocaleString()}` : '—'],
-                ['Change Owner', meta.changeOwner || '—'],
-                ['Product Owner', meta.productOwner || '—'],
-                ['Business Owner', meta.businessOwner || '—'],
-                ['Project Manager', meta.projectManager || '—'],
+                ['Change Owner', personName(selectedInit.change_owner_id)],
+                ['Product Owner', personName(selectedInit.product_owner_id)],
+                ['Business Owner', personName(selectedInit.business_owner_id)],
+                ['Project Manager', personName(selectedInit.project_manager_id)],
               ].map(([label, val]) => (
                 <div key={label} className="bg-white rounded-2xl p-4 shadow-sm border" style={{ borderColor: C.border }}>
                   <div className="text-[11px] font-semibold uppercase mb-1" style={{ color: C.sub }}>{label}</div>
@@ -287,8 +494,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
               <div className="text-sm" style={{ color: C.ink }}>{selectedInit.expected_benefits || '—'}</div>
             </div>
           </div>
-          );
-        })()}
+        )}
 
         {initTab === 'impacts' && (
           <TabSection title="Impacts" subtitle="Scope who and what is affected by this change." onAdd={() => openCreate('impact')} addLabel="Add Impact" color={C.coral} empty={initData.impacts.length === 0} emptyText="No impacts recorded yet." emptyIcon={AlertTriangle}>
@@ -334,7 +540,19 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
         )}
 
         {initTab === 'stakeholders' && (
-          <TabSection title="Stakeholders" subtitle="Who's involved, and their RACI role on this Initiative." onAdd={() => openCreate('stakeholder')} addLabel="Add Stakeholder" color={C.teal} disabled={people.length === 0} disabledText="Add People in Settings first." empty={initData.stakeholders.length === 0} emptyText="No stakeholders added yet." emptyIcon={Users}>
+          <TabSection
+            title="Stakeholders"
+            subtitle="Who's involved, and their RACI role on this Initiative."
+            onAdd={() => openCreate('stakeholder')}
+            addLabel="Add Stakeholder"
+            onBulkUpload={() => setBulkStakeholders(true)}
+            color={C.teal}
+            disabled={people.length === 0}
+            disabledText="Add People in Settings first."
+            empty={initData.stakeholders.length === 0}
+            emptyText="No stakeholders added yet."
+            emptyIcon={Users}
+          >
             <div className="grid grid-cols-2 gap-3">
               {initData.stakeholders.map((s) => {
                 const raci = { r: s.raci_responsible, a: s.raci_accountable, c: s.raci_consulted, i: s.raci_informed };
@@ -399,7 +617,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
           <div>
             <h2 className="text-xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Hypercare</h2>
             <p className="text-sm mb-5" style={{ color: C.sub }}>
-              One hypercare plan per Initiative — pilot criteria, assumptions, and go-live timing.
+              One hypercare plan per Initiative — dates for the Schedule, plus pilot criteria and assumptions.
             </p>
             <div className="bg-white rounded-3xl border shadow-sm p-5 max-w-xl" style={{ borderColor: C.border }}>
               <FormHypercare
@@ -427,7 +645,7 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-bold" style={{ color: C.ink }}>{c.key_message || 'Untitled'}</span>
-                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full capitalize" style={{ background: tint(C.green, '18'), color: '#1a8a5f' }}>{c.tone}</span>
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full capitalize" style={{ background: tint(C.navy, '18'), color: C.navy }}>{c.tone}</span>
                   </div>
                   <p className="text-xs mb-2" style={{ color: C.sub }}>
                     {c.impact_id ? impactLabel(c.impact_id) : 'Initiative-wide'} · {(c.channel || []).join(', ') || '—'}
@@ -470,11 +688,60 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
           />
         </Modal>
       )}
+      {bulkStakeholders && selectedInitId && (
+        <CsvImportModal
+          title="Bulk Upload Stakeholders"
+          headers={['Person', 'Project Role', 'Responsible', 'Accountable', 'Consulted', 'Informed']}
+          exampleRow={{
+            Person: 'Alex Rivera',
+            'Project Role': 'Sponsor',
+            Responsible: 'N',
+            Accountable: 'Y',
+            Consulted: 'Y',
+            Informed: 'N',
+          }}
+          templateFilename="stakeholders-template.csv"
+          onClose={() => setBulkStakeholders(false)}
+          onComplete={async () => { await detail.reload(); }}
+          mapRow={(row) => {
+            const personVal = row.Person;
+            if (!personVal) throw new Error('Person is required');
+            const person = findPerson(people, personVal);
+            if (!person) throw new Error(`Person '${personVal}' not found`);
+            if (person.ambiguous) throw new Error(person.reason || `Multiple people match '${personVal}'`);
+            return {
+              personId: person.id,
+              role: row['Project Role'] || null,
+              raci: {
+                r: parseYesNo(row.Responsible),
+                a: parseYesNo(row.Accountable),
+                c: parseYesNo(row.Consulted),
+                i: parseYesNo(row.Informed),
+              },
+            };
+          }}
+          importRow={async (vals) => {
+            const { error } = await supabase.from('stakeholders').insert({
+              account_id: profile.account_id,
+              workspace_id: activeWorkspaceId,
+              initiative_id: selectedInitId,
+              person_id: vals.personId,
+              project_role: vals.role,
+              raci_responsible: vals.raci.r,
+              raci_accountable: vals.raci.a,
+              raci_consulted: vals.raci.c,
+              raci_informed: vals.raci.i,
+            });
+            if (error) throw new Error(parseDbError(error));
+          }}
+        />
+      )}
       {modal === 'learning' && (
         <Modal title={editingRecord ? 'Edit Learning Need' : 'Add Learning Need'} onClose={closeModal}>
           <FormLearningNeed
             impacts={initData.impacts}
             deptName={deptName}
+            tasks={initData.tasks || []}
             initial={editingRecord}
             onSave={async (v) => (
               editingRecord
@@ -484,6 +751,35 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
             onComplete={closeModal}
             onDelete={editingRecord ? async () => { await detail.deleteLearningNeed(editingRecord.id); closeModal(); } : undefined}
           />
+        </Modal>
+      )}
+      {modal === 'initiative' && (
+        <Modal title={editingRecord ? 'Edit Initiative' : 'Add Initiative'} onClose={closeModal} wide>
+          <FormInitiative
+            initial={editingRecord}
+            onSave={async (vals) => {
+              if (editingRecord) {
+                await updateInitiative(editingRecord.id, vals);
+                await detail.reload();
+                await reloadInitiatives();
+              } else {
+                await addInitiative(vals);
+              }
+              closeModal();
+            }}
+          />
+          {editingRecord && (
+            <div className="mt-4 pt-4 border-t flex justify-end" style={{ borderColor: C.border }}>
+              <button
+                type="button"
+                onClick={() => openDelete(editingRecord)}
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-full"
+                style={{ background: tint(C.coral, '18'), color: C.coral }}
+              >
+                <Trash2 size={13} /> Delete initiative
+              </button>
+            </div>
+          )}
         </Modal>
       )}
       {modal === 'comms' && selectedInit && (
@@ -501,6 +797,18 @@ export default function InitiativesPanel({ initialSelectedId = null, onSelectedC
             onDelete={editingRecord ? async () => { await detail.deleteComms(editingRecord.id); closeModal(); } : undefined}
           />
         </Modal>
+      )}
+      {deleteTarget && (
+        <CascadingDeleteModal
+          entityLabel="Initiative"
+          recordName={deleteTarget.name}
+          counts={deleteCounts}
+          countsLoading={deleteCountsLoading}
+          busy={deleteBusy}
+          error={deleteError}
+          onClose={() => { if (!deleteBusy) setDeleteTarget(null); }}
+          onConfirm={confirmDelete}
+        />
       )}
     </div>
   );
