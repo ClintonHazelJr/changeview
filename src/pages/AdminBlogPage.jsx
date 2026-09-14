@@ -8,6 +8,7 @@ const emptyForm = {
   content: '',
   header_image_url: '',
   published: false,
+  featured: false,
   display_order: '',
   slugLocked: false,
 };
@@ -135,6 +136,26 @@ export default function AdminBlogPage() {
     }
   };
 
+  const toggleFeatured = async (post) => {
+    setBusyId(post.id);
+    setListError('');
+    try {
+      const res = await fetch('/api/admin/blog/posts', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: post.id, featured: !post.featured }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not update.');
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? data.post : p)));
+    } catch (err) {
+      setListError(err.message || 'Could not update.');
+    } finally {
+      setBusyId('');
+    }
+  };
+
   const removePost = async (post) => {
     const ok = window.confirm(
       `Permanently delete “${post.title}”? This cannot be undone.`,
@@ -174,6 +195,7 @@ export default function AdminBlogPage() {
           content: form.content,
           header_image_url: form.header_image_url,
           published: form.published,
+          featured: form.featured,
           display_order: form.display_order === '' ? null : Number(form.display_order),
         }),
       });
@@ -295,6 +317,15 @@ export default function AdminBlogPage() {
                         />
                         <span>{post.published ? 'Published' : 'Unpublished'}</span>
                       </label>
+                      <label className="blog-admin-toggle">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(post.featured)}
+                          disabled={busyId === post.id}
+                          onChange={() => toggleFeatured(post)}
+                        />
+                        <span>{post.featured ? 'Featured' : 'Not featured'}</span>
+                      </label>
                       <button
                         type="button"
                         className="btn btn-outline blog-admin-remove"
@@ -375,6 +406,14 @@ export default function AdminBlogPage() {
                   onChange={(e) => setForm((f) => ({ ...f, published: e.target.checked }))}
                 />
                 <span>Published</span>
+              </label>
+              <label className="blog-admin-toggle">
+                <input
+                  type="checkbox"
+                  checked={form.featured}
+                  onChange={(e) => setForm((f) => ({ ...f, featured: e.target.checked }))}
+                />
+                <span>Featured</span>
               </label>
               {formError ? <p className="blog-comments-error">{formError}</p> : null}
               <button type="submit" className="btn btn-red" disabled={saving}>

@@ -21,6 +21,8 @@ export default async function handler(req, res) {
   const rows = BLOG_SEED_POSTS.map((p) => ({
     ...p,
     published: false,
+    featured: false,
+    published_at: null,
     updated_at: now,
   }));
 

@@ -33,8 +33,8 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { data, error } = await admin
       .from('blog_posts')
-      .select('id, slug, title, excerpt, content, header_image_url, published, display_order, created_at, updated_at')
-      .order('display_order', { ascending: true, nullsFirst: false })
+      .select('id, slug, title, excerpt, content, header_image_url, published, featured, published_at, display_order, created_at, updated_at')
+      .order('published_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -52,6 +52,7 @@ export default async function handler(req, res) {
     const content = String(body.content || '').trim();
     const headerImageUrl = String(body.header_image_url || body.headerImageUrl || '').trim() || null;
     const published = Boolean(body.published);
+    const featured = Boolean(body.featured);
     const displayOrder = body.display_order == null && body.displayOrder == null
       ? null
       : Number(body.display_order ?? body.displayOrder);
@@ -72,6 +73,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Header image URL is too long.' });
     }
 
+    const now = new Date().toISOString();
     const row = {
       slug,
       title,
@@ -79,8 +81,10 @@ export default async function handler(req, res) {
       content,
       header_image_url: headerImageUrl,
       published,
+      featured,
+      published_at: published ? now : null,
       display_order: Number.isFinite(displayOrder) ? displayOrder : null,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     };
 
     const { data, error } = await admin.from('blog_posts').insert(row).select('*').single();
@@ -99,10 +103,29 @@ export default async function handler(req, res) {
     const id = String(body.id || '').trim();
     if (!id) return res.status(400).json({ error: 'Missing post id.' });
 
+    const { data: existing, error: existingErr } = await admin
+      .from('blog_posts')
+      .select('id, published')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (existingErr) {
+      console.error('[admin/blog/posts] lookup failed', existingErr.message);
+      return res.status(500).json({ error: 'Could not update post.' });
+    }
+    if (!existing) return res.status(404).json({ error: 'Post not found.' });
+
     const patch = { updated_at: new Date().toISOString() };
 
     if (Object.prototype.hasOwnProperty.call(body, 'published')) {
-      patch.published = Boolean(body.published);
+      const nextPublished = Boolean(body.published);
+      patch.published = nextPublished;
+      if (nextPublished && !existing.published) {
+        patch.published_at = new Date().toISOString();
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'featured')) {
+      patch.featured = Boolean(body.featured);
     }
     if (Object.prototype.hasOwnProperty.call(body, 'title')) {
       const title = String(body.title || '').trim();

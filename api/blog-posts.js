@@ -10,6 +10,22 @@ function normalizeSlug(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function publishedAtMs(post) {
+  if (!post?.published_at) return 0;
+  const t = new Date(post.published_at).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+/** Featured first (by published_at), then non-featured by published_at desc. */
+export function sortPublicPosts(posts) {
+  return (posts || []).slice().sort((a, b) => {
+    const af = Boolean(a.featured);
+    const bf = Boolean(b.featured);
+    if (af !== bf) return af ? -1 : 1;
+    return publishedAtMs(b) - publishedAtMs(a);
+  });
+}
+
 /**
  * Public blog posts.
  * GET /api/blog-posts — published list
@@ -30,7 +46,7 @@ export default async function handler(req, res) {
   if (slug) {
     const { data, error } = await admin
       .from('blog_posts')
-      .select('id, slug, title, excerpt, content, header_image_url, published, display_order, created_at')
+      .select('id, slug, title, excerpt, content, header_image_url, published, featured, published_at, created_at')
       .eq('slug', slug)
       .eq('published', true)
       .maybeSingle();
@@ -45,26 +61,13 @@ export default async function handler(req, res) {
 
   const { data, error } = await admin
     .from('blog_posts')
-    .select('id, slug, title, excerpt, header_image_url, display_order, created_at')
-    .eq('published', true)
-    .order('display_order', { ascending: true, nullsFirst: false })
-    .order('created_at', { ascending: false });
+    .select('id, slug, title, excerpt, header_image_url, featured, published_at, created_at')
+    .eq('published', true);
 
   if (error) {
     console.error('[blog-posts] list failed', error.message);
     return res.status(500).json({ error: 'Could not load posts.' });
   }
 
-  const posts = (data || []).slice().sort((a, b) => {
-    const ao = a.display_order;
-    const bo = b.display_order;
-    const aHas = ao != null;
-    const bHas = bo != null;
-    if (aHas && bHas && ao !== bo) return ao - bo;
-    if (aHas && !bHas) return -1;
-    if (!aHas && bHas) return 1;
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-
-  return res.status(200).json({ posts });
+  return res.status(200).json({ posts: sortPublicPosts(data) });
 }

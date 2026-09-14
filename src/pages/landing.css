@@ -624,6 +624,14 @@
   gap: 0;
 }
 
+.cv-landing .post-list-featured {
+  margin-bottom: 8px;
+}
+
+.cv-landing .post-list-rest {
+  margin-top: 8px;
+}
+
 .cv-landing .post-list li,
 .cv-landing .post-card {
   padding: 28px 0;
@@ -640,6 +648,30 @@
   grid-template-columns: 200px 1fr;
   gap: 22px;
   align-items: start;
+}
+
+.cv-landing .post-card-featured {
+  grid-template-columns: 1fr;
+  gap: 18px;
+  padding: 32px 0;
+}
+
+.cv-landing .post-card-featured .post-card-media {
+  aspect-ratio: 16 / 9;
+  max-height: 320px;
+}
+
+.cv-landing .post-card-featured h2 {
+  font-size: 28px;
+}
+
+.cv-landing .post-featured-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--red);
+  margin: 0 0 8px;
 }
 
 .cv-landing .post-card-media {
