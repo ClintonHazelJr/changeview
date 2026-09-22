@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, ClipboardList, FileText, Grid3X3, CalendarRange, Download, Loader2,
-  GraduationCap, CheckSquare, ListChecks, Activity, Lock,
+  GraduationCap, CheckSquare, ListChecks, Activity, Lock, Flag,
 } from 'lucide-react';
 import { C, HEAD, BODY, SEVERITY_COLOR, STATUS_COLOR, tint, isRatedSeverity, stripInitiativeMeta, isPaidReport, PLAN_LABELS } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
@@ -12,6 +12,7 @@ import {
   RequirementsCompletionReport,
   TaskCompletionReport,
 } from './CompletionReports';
+import CloseOutReport from './CloseOutReport';
 import StatusReportPanel from './StatusReport';
 import UpgradePrompt from '../ui/UpgradePrompt';
 
@@ -88,6 +89,14 @@ const REPORTS = [
     icon: CalendarRange,
     color: C.royal,
     file: 'schedule-report.pdf',
+  },
+  {
+    key: 'closeout',
+    title: 'Project Close Out Report',
+    desc: 'Engagement wrap-up for an initiative or program — scope delivered, completion, stakeholders, and closing notes.',
+    icon: Flag,
+    color: C.ink,
+    file: 'project-close-out.pdf',
   },
 ];
 
@@ -927,7 +936,7 @@ export default function ReportsPanel({ onUpgrade }) {
             <>
               {PLAN_LABELS.small} unlocks Schedule, Tasks, and 5 more reports — Heat Map, Change Readiness,
               Requirements Completion, Task Completion, and Change Status Report.
-              Requirements list, Change Impact Assessment, and Schedule Report stay free on every plan.
+              Requirements list, Change Impact Assessment, Schedule Report, and Project Close Out stay free on every plan.
             </>
           )}
           onUpgrade={onUpgrade}
@@ -1011,6 +1020,9 @@ export default function ReportsPanel({ onUpgrade }) {
               workspaceName={activeWorkspace?.name}
               exportRef={exportRef}
             />
+          )}
+          {active === 'closeout' && (
+            <CloseOutReport workspaceId={activeWorkspaceId} exportRef={exportRef} />
           )}
         </>
       )}

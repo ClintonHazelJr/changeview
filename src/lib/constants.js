@@ -90,7 +90,7 @@ export function planTierRank(tier) {
 }
 
 /** Reports free on every paid/trialing plan including Starter (solo). */
-export const FREE_REPORT_KEYS = new Set(['requirements', 'cia', 'schedule']);
+export const FREE_REPORT_KEYS = new Set(['requirements', 'cia', 'schedule', 'closeout']);
 
 /** Reports that require Pro (small) or Enterprise when not on trial. */
 export function isPaidReport(key) {

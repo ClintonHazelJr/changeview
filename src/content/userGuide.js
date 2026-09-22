@@ -57,6 +57,8 @@ Every draft is editable before you save it. Comms in ChangeView are copy-paste, 
 
 - **Requirements list** — every requirement across an Initiative, filterable by status
 - **Change Impact Assessment** — a full, readable writeup of an Initiative's impact, or the same rolled up across an entire Program
+- **Schedule Report** — dated Program → Initiative → Task / Hypercare timeline
+- **Project Close Out Report** — engagement wrap-up for an Initiative or Program: scope delivered, requirements and tasks at close, learning needs, stakeholders, readiness, and your closing notes
 - **Heat map** — at a glance, which departments are carrying the most severe impact, across all five categories
 - Every report exports to PDF, ready to share.
 
@@ -64,7 +66,7 @@ Every draft is editable before you save it. Comms in ChangeView are copy-paste, 
 
 - **Archiving** a Program or Initiative hides it from your default view without deleting anything, fully reversible. **Deleting** is permanent and takes everything under it with it, ChangeView asks you to confirm twice before letting that happen.
 - **Deactivating** a Person or Department removes them from future assignment pickers without touching anything they're already tied to historically.
-- If you're on **Starter**, Schedule, Tasks, and several reports aren't included — Requirements list, Change Impact Assessment, and Schedule Report stay free. Upgrade any time from Profile → Upgrade Plan.
+- If you're on **Starter**, Schedule, Tasks, and several reports aren't included — Requirements list, Change Impact Assessment, Schedule Report, and Project Close Out stay free. Upgrade any time from Profile → Upgrade Plan.
 
 That's the whole loop: scope the impact, plan the comms and training, track it through launch, report on it afterward. Start wherever your current project actually is, you don't need to run the whole sequence from day one to get value out of any single part of it.
 `;

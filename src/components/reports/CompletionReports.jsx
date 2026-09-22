@@ -22,7 +22,7 @@ function pct(completed, total) {
   return Math.round((completed / total) * 100);
 }
 
-function CompletionHeadline({ completed, total, unitLabel, caption }) {
+export function CompletionHeadline({ completed, total, unitLabel, caption }) {
   const percent = pct(completed, total);
   return (
     <div className="rounded-3xl p-6 mb-5 border" style={{ borderColor: C.border, background: tint(C.navy, '08') }}>
@@ -104,7 +104,7 @@ function StatusPill({ status }) {
   );
 }
 
-function ScopeControls({
+export function ScopeControls({
   scope, setScope, initiatives, initiativeId, setInitiativeId,
   programs, programId, setProgramId, accent = C.navy,
 }) {
@@ -161,7 +161,7 @@ function ScopeControls({
   );
 }
 
-function useInitiativeOrProgramScope(workspaceId) {
+export function useInitiativeOrProgramScope(workspaceId) {
   const [scope, setScope] = useState('initiative');
   const [programs, setPrograms] = useState([]);
   const [programId, setProgramId] = useState('');
