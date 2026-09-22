@@ -184,10 +184,13 @@ export default function LandingPage() {
           <div className="head">
             <span className="kicker">Pricing</span>
             <h2>Simple plans, real access.</h2>
+            <p style={{ marginTop: 12, fontSize: 15, lineHeight: 1.5, color: '#4b4a47' }}>
+              1-week free trial · Card required · Charged only when the trial ends
+            </p>
           </div>
           <div className="tiers">
             <div className="tier">
-              <h3>Starter</h3>
+              <h3>Single Project</h3>
               <div className="price">
                 <span className="amt">${formatUsdAmount(soloPrice)}</span>
                 <span className="per">/ mo</span>
@@ -197,7 +200,7 @@ export default function LandingPage() {
             </div>
             <div className="tier pop">
               <span className="badge">MOST POPULAR</span>
-              <h3>Pro</h3>
+              <h3>Multiple Projects</h3>
               <BillingCycleToggle value={billingCycle} onChange={setBillingCycle} />
               <div className="price">
                 <span className="amt">${formatUsdAmount(smallPrice)}</span>

@@ -17,7 +17,7 @@ You must provide accurate information when creating an account and are responsib
 
 ## 3. Subscriptions and billing
 
-- ChangeView offers a free trial period, details of which are shown at signup. A valid payment method is required to start a trial; you will not be charged until the trial ends unless you cancel first.
+- ChangeView offers a one-week free trial. A valid payment method is required to start a trial; you will not be charged until the trial ends unless you cancel first.
 - Subscriptions are billed in advance on a monthly or annual basis, depending on the plan selected, and automatically renew until cancelled.
 - You may cancel at any time from your account settings. Cancellation takes effect at the end of the current billing period; we do not provide partial refunds for unused time except where required by law.
 - We may change our pricing with advance notice. Continued use of the Service after a price change takes effect constitutes acceptance of the new pricing.

@@ -118,7 +118,7 @@ export default function CheckEmailPage() {
               <button
                 type="submit"
                 disabled={busy}
-                className="text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-50"
+                className="text-sm font-bold text-white px-4 py-2.5 rounded-[2px] disabled:opacity-50"
                 style={{ background: C.purple }}
               >
                 {busy ? 'Updating…' : 'Update email'}

@@ -12,7 +12,7 @@ import {
 
 /**
  * Billing gates:
- * - incomplete: finish Stripe Checkout (card for 7-day trial)
+ * - incomplete: finish Stripe Checkout (card for 1-week trial)
  * - past_due: update card via Stripe Customer Portal
  */
 export default function BillingGate({ mode = 'past_due' }) {
@@ -93,7 +93,7 @@ export default function BillingGate({ mode = 'past_due' }) {
             type="button"
             disabled={busy || (isIncomplete && (loading || !marketingTier))}
             onClick={isIncomplete ? openCheckout : openPortal}
-            className="w-full text-sm font-bold text-white py-3 rounded-full disabled:opacity-50"
+            className="w-full text-sm font-bold text-white py-3 rounded-[2px] disabled:opacity-50"
             style={{ background: C.purple }}
           >
             {busy

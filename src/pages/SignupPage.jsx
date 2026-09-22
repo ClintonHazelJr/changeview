@@ -143,7 +143,7 @@ export default function SignupPage() {
           <label className="block text-xs font-semibold mb-1.5" style={{ color: C.sub }}>Password</label>
           <input type="password" required minLength={6} className={`${inputClass} mb-4`} style={inputStyle} value={password} onChange={(e) => setPassword(e.target.value)} />
           {error && <p className="text-xs mb-3" style={{ color: C.coral }}>{error}</p>}
-          <button type="submit" disabled={busy} className="w-full text-sm font-bold text-white py-3 rounded-full disabled:opacity-50" style={{ background: C.purple }}>
+          <button type="submit" disabled={busy} className="w-full text-sm font-bold text-white py-3 rounded-[2px] disabled:opacity-50" style={{ background: C.purple }}>
             Continue to checkout
           </button>
         </form>
