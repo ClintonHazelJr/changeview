@@ -1,24 +1,34 @@
 @import "tailwindcss";
 
 :root {
-  --purple: #7C6FF0;
-  --teal: #2DD4BF;
-  --coral: #FF8C82;
-  --green: #34D399;
-  --amber: #FBBF24;
-  --ink: #1E2140;
-  --sub: #8A8CA5;
-  --bg: #F8F8FC;
-  --border: #EFEFF6;
+  --ink: #17181c;
+  --paper: #f7f7f6;
+  --navy: #1c2f8f;
+  --royal: #3a54c4;
+  --blue3: #5f79df;
+  --blue4: #93a6ee;
+  --red: #ff1717;
+  --darknavy: #0f1633;
+  --trust: #eef0f7;
+  --sub: #575653;
+  --bg: #f7f7f6;
+  --border: #e6e5e2;
+
+  /* Legacy aliases (match C.* in constants.js) */
+  --purple: #1c2f8f;
+  --teal: #5f79df;
+  --coral: #ff1717;
+  --green: #1c2f8f;
+  --amber: #3a54c4;
 }
 
 body {
   margin: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Sora', sans-serif;
   background: var(--bg);
   color: var(--ink);
 }
 
 input:focus, select:focus, textarea:focus {
-  --tw-ring-color: #7C6FF044;
+  --tw-ring-color: #1c2f8f44;
 }
