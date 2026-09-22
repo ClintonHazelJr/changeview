@@ -51,7 +51,7 @@ export default function AppSidebar({ section, setSection }) {
               <span className="flex-1">{item.label}</span>
               {locked && (
                 <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: tint(C.purple, '14'), color: C.purple }}>
-                  Pro
+                  Upgrade
                 </span>
               )}
             </button>
@@ -73,7 +73,7 @@ export default function AppSidebar({ section, setSection }) {
           <span className="flex-1" style={HEAD}>Users</span>
           {!isOwner && (
             <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded" style={{ background: tint(C.purple, '14'), color: C.purple }}>
-              Owner
+              {!featuresUnlocked ? 'Upgrade' : 'Owner'}
             </span>
           )}
         </button>

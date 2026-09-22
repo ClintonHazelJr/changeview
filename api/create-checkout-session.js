@@ -83,7 +83,7 @@ export default async function handler(req, res) {
     });
   }
   if (tier === 'solo' && billingCycle !== 'monthly') {
-    return res.status(400).json({ error: 'Starter is billed monthly only' });
+    return res.status(400).json({ error: 'Single Project is billed monthly only' });
   }
 
   const binding = resolvePriceBinding(tier, billingCycle);
@@ -112,7 +112,7 @@ export default async function handler(req, res) {
         pricePrefix: String(priceId).slice(0, 12),
       });
       return res.status(500).json({
-        error: `Billing misconfiguration: ${binding.envName || priceEnvHint(tier, billingCycle)} points at the same Stripe Price as Starter (${soloBinding.envName}). Fix the Enterprise/Pro Price IDs in Vercel env.`,
+        error: `Billing misconfiguration: ${binding.envName || priceEnvHint(tier, billingCycle)} points at the same Stripe Price as Single Project (${soloBinding.envName}). Fix the Enterprise/Multiple Projects Price IDs in Vercel env.`,
       });
     }
   }

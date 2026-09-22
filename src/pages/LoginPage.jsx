@@ -113,7 +113,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={busy}
-            className="w-full text-sm font-bold text-white py-3 rounded-full disabled:opacity-50"
+            className="w-full text-sm font-bold text-white py-3 rounded-[2px] disabled:opacity-50"
             style={{ background: C.purple }}
           >
             {busy ? 'Please wait…' : mode === 'reset' ? 'Send reset link' : 'Log in'}

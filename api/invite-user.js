@@ -52,7 +52,7 @@ export default async function handler(req, res) {
     || ((sub?.plan_tier === 'solo' || sub?.plan_tier === 'small' || sub?.plan_tier === 'enterprise')
       && (sub?.status === 'active' || sub?.status === 'past_due'));
   if (!canInvite) {
-    return res.status(403).json({ error: 'Inviting users requires an active plan or trial. Starter allows 2 users.' });
+    return res.status(403).json({ error: 'Inviting users requires an active plan or trial. Single Project allows 2 users.' });
   }
 
   const email = String(req.body?.email || '').trim().toLowerCase();

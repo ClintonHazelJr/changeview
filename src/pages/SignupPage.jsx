@@ -130,7 +130,7 @@ export default function SignupPage() {
     <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ ...BODY, background: C.bg }}>
       {brandLink}
       <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md border" style={{ borderColor: C.border }}>
-        <h1 className="text-2xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Start your 7-day free trial</h1>
+        <h1 className="text-2xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Start your 1-week free trial</h1>
         <p className="text-sm mb-2" style={{ color: C.sub }}>
           Card required — you will not be charged until the trial ends. Full {PLAN_LABELS[planTier] || 'plan'} access during the trial.
         </p>
@@ -173,7 +173,7 @@ export default function SignupPage() {
             </span>
           </label>
           {error && <p className="text-xs mb-3" style={{ color: C.coral }}>{error}</p>}
-          <button type="submit" disabled={busy || !termsAccepted} className="w-full text-sm font-bold text-white py-3 rounded-full disabled:opacity-50" style={{ background: C.purple }}>
+          <button type="submit" disabled={busy || !termsAccepted} className="w-full text-sm font-bold text-white py-3 rounded-[2px] disabled:opacity-50" style={{ background: C.purple }}>
             Continue to checkout
           </button>
         </form>

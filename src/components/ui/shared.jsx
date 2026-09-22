@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Upload } from 'lucide-react';
-import { C } from '../../lib/constants';
+import { C, HEAD } from '../../lib/constants';
 import ViewToggle from './ViewToggle';
 
 export function Field({ label, children }) {
@@ -17,7 +17,7 @@ export function Pill({ active, color, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className="text-xs font-semibold px-3 py-1.5 rounded-full border mr-2 mb-2 transition-colors"
+      className="text-xs font-semibold px-3 py-1.5 rounded-[2px] border mr-2 mb-2 transition-colors"
       style={
         active
           ? { background: color, borderColor: color, color: '#fff' }
@@ -55,7 +55,7 @@ export function SaveRow({ label = 'Save', disabled, onDelete }) {
       <button
         type="submit"
         disabled={disabled}
-        className="text-sm font-bold text-white px-5 py-2.5 rounded-full shadow-sm disabled:opacity-60"
+        className="text-sm font-bold text-white px-5 py-2.5 rounded-[2px] shadow-sm disabled:opacity-60"
         style={{ background: C.purple }}
       >
         {label}
@@ -109,7 +109,7 @@ export function TabSection({
     <div>
       <div className="flex items-start justify-between mb-1 gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <h2 className="text-xl font-extrabold" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", color: C.ink }}>{title}</h2>
+          <h2 className="text-xl font-extrabold" style={{ ...HEAD, color: C.ink }}>{title}</h2>
           {typeof onViewChange === 'function' && !empty && (
             <ViewToggle value={viewMode || 'tiles'} onChange={onViewChange} modes={viewModes} />
           )}
@@ -120,7 +120,7 @@ export function TabSection({
               type="button"
               onClick={onBulkUpload}
               disabled={disabled}
-              className="flex items-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-full border disabled:opacity-40 shadow-sm"
+              className="flex items-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-[2px] border disabled:opacity-40 shadow-sm"
               style={{ borderColor: C.border, color: C.ink, background: '#fff' }}
             >
               <Upload size={15} /> {bulkLabel}
@@ -130,7 +130,7 @@ export function TabSection({
             type="button"
             onClick={onAdd}
             disabled={disabled}
-            className="flex items-center gap-1.5 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-40 shadow-sm"
+            className="flex items-center gap-1.5 text-sm font-bold text-white px-4 py-2.5 rounded-[2px] disabled:opacity-40 shadow-sm"
             style={{ background: color }}
           >
             <Plus size={15} /> {addLabel}

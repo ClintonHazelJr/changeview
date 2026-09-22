@@ -33,7 +33,7 @@ function AppShell() {
     reload,
   } = useWorkspace();
   const isOwner = profile?.role === 'owner';
-  // Trial unlocks Schedule/Tasks/Users/paid reports even on Starter tier.
+  // Trial must unlock Schedule/Tasks/Users even on Single Project tier.
   const featuresUnlocked = paid || trialActive;
   const [params, setParams] = useSearchParams();
   const [checkoutMsg, setCheckoutMsg] = useState('');

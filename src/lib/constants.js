@@ -68,11 +68,13 @@ export const STATUS_COLOR = {
 };
 export const TAG_OPTIONS = ['Training', 'Huddle', 'Email', 'Documentation'];
 
-/** Plan tier IDs match DB plan_tier: solo | small | enterprise. */
+/** Plan tier IDs match DB plan_tier: solo | small | enterprise. Display labels only. */
 export const PLAN_LABELS = {
-  solo: 'Starter',
-  small: 'Pro',
+  solo: 'Single Project',
+  small: 'Multiple Projects',
   enterprise: 'Enterprise',
+  tier_1: 'Single Project',
+  tier_2: 'Enterprise',
 };
 
 /** Seat / workspace caps. null = unlimited. Aligns with marketing + DB plan_max_users(). */
@@ -89,10 +91,10 @@ export function planTierRank(tier) {
   return PLAN_TIER_RANK[tier] ?? 0;
 }
 
-/** Reports free on every paid/trialing plan including Starter (solo). */
+/** Reports free on every paid/trialing plan including Single Project (solo). */
 export const FREE_REPORT_KEYS = new Set(['requirements', 'cia', 'schedule', 'closeout']);
 
-/** Reports that require Pro (small) or Enterprise when not on trial. */
+/** Reports that require Multiple Projects (small) or Enterprise when not on trial. */
 export function isPaidReport(key) {
   return !FREE_REPORT_KEYS.has(key);
 }
@@ -152,7 +154,7 @@ export function trialDaysLeft(subscription) {
 }
 
 /**
- * Tasks, Schedule, paid reports — locked on Starter when paid (seat invites still allowed up to plan_max_users).
+ * Tasks, Schedule, paid reports — locked on Single Project when paid (seat invites still allowed up to plan_max_users).
  * Stripe `trialing` unlocks full Enterprise-level access regardless of selected tier.
  */
 export const hasPaidPlanFeatures = (tier, subscription = null) => {
@@ -172,7 +174,7 @@ export const TASK_STATUSES = [
   { key: 'done', label: 'Done' },
 ];
 
-export const inputClass = 'w-full border rounded-2xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent';
+export const inputClass = 'w-full border rounded-[2px] px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent';
 export const inputStyle = { borderColor: C.border, color: C.ink };
 
 export function formatReference(num) {
@@ -181,11 +183,17 @@ export function formatReference(num) {
 
 export function parseDbError(err) {
   const msg = err?.message || err?.error_description || 'Something went wrong';
-  if (msg.includes('Tier 1 accounts are limited') || msg.includes('Sole Proprietor plans are limited') || msg.includes('solo accounts are limited') || msg.includes('Starter plans are limited')) {
-    return 'Starter plans are limited to a single Workspace. Upgrade to Pro or Enterprise to add more.';
+  if (
+    msg.includes('Tier 1 accounts are limited')
+    || msg.includes('Sole Proprietor plans are limited')
+    || msg.includes('solo accounts are limited')
+    || msg.includes('Starter plans are limited')
+    || msg.includes('Single Project plans are limited')
+  ) {
+    return 'Single Project plans are limited to a single Workspace. Upgrade to Multiple Projects or Enterprise to add more.';
   }
   if (msg.includes('plan_max_users') || msg.includes('user limit') || msg.includes('seat limit') || msg.includes('maximum number of users')) {
-    return 'This plan’s user limit is reached. Starter allows 2 users; upgrade to Pro (5) or contact us for Enterprise.';
+    return 'This plan’s user limit is reached. Single Project allows 2 users; upgrade to Multiple Projects (5) or contact us for Enterprise.';
   }
   return msg;
 }
@@ -213,4 +221,42 @@ export function unarchivedOptions(rows, currentId) {
 /** Strip legacy [cv-meta:{...}] tags once stuffed into initiative descriptions. */
 export function stripInitiativeMeta(description) {
   return (description || '').replace(/\n?\[cv-meta:[^\]]+\]\s*$/, '').trim();
+}
+
+/** Store owner/PM names in description until schema has text fields (FK is users, not people). */
+export function packInitiativeMeta(description, {
+  changeOwner, productOwner, businessOwner, projectManager,
+}) {
+  const cleaned = stripInitiativeMeta(description);
+  if (!changeOwner && !productOwner && !businessOwner && !projectManager) return cleaned;
+  return `${cleaned}\n[cv-meta:${JSON.stringify({
+    changeOwner: changeOwner || '',
+    productOwner: productOwner || '',
+    businessOwner: businessOwner || '',
+    projectManager: projectManager || '',
+  })}]`;
+}
+
+export function parseInitiativeMeta(description) {
+  const raw = description || '';
+  const match = raw.match(/\[cv-meta:({.*?})\]\s*$/);
+  if (!match) {
+    return {
+      description: raw, changeOwner: '', productOwner: '', businessOwner: '', projectManager: '',
+    };
+  }
+  try {
+    const meta = JSON.parse(match[1]);
+    return {
+      description: stripInitiativeMeta(raw),
+      changeOwner: meta.changeOwner || '',
+      productOwner: meta.productOwner || '',
+      businessOwner: meta.businessOwner || '',
+      projectManager: meta.projectManager || '',
+    };
+  } catch {
+    return {
+      description: raw, changeOwner: '', productOwner: '', businessOwner: '', projectManager: '',
+    };
+  }
 }

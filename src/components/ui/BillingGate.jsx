@@ -13,7 +13,7 @@ import { formatPlanPrice } from '../../../shared/planPrices.js';
 
 /**
  * Billing gates:
- * - incomplete: finish Stripe Checkout (card for 7-day trial)
+ * - incomplete: finish Stripe Checkout (card for 1-week trial)
  * - past_due: update card via Stripe Customer Portal
  */
 export default function BillingGate({ mode = 'past_due' }) {
@@ -77,7 +77,7 @@ export default function BillingGate({ mode = 'past_due' }) {
       <div className="max-w-lg mx-auto px-6 py-16">
         <div className="bg-white rounded-3xl border shadow-sm p-8 text-center" style={{ borderColor: C.border }}>
           <h1 className="text-2xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>
-            {isIncomplete ? 'Start your 7-day free trial' : 'Payment needs attention'}
+            {isIncomplete ? 'Start your 1-week free trial' : 'Payment needs attention'}
           </h1>
           <p className="text-sm mb-2" style={{ color: C.sub }}>
             {isIncomplete
@@ -94,7 +94,7 @@ export default function BillingGate({ mode = 'past_due' }) {
             type="button"
             disabled={busy || (isIncomplete && (loading || !marketingTier))}
             onClick={isIncomplete ? openCheckout : openPortal}
-            className="w-full text-sm font-bold text-white py-3 rounded-full disabled:opacity-50"
+            className="w-full text-sm font-bold text-white py-3 rounded-[2px] disabled:opacity-50"
             style={{ background: C.purple }}
           >
             {busy

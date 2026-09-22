@@ -137,7 +137,7 @@ export default function AcceptInvitePage() {
             <button
               type="submit"
               disabled={saving}
-              className="w-full text-sm font-bold text-white py-3 rounded-full disabled:opacity-60"
+              className="w-full text-sm font-bold text-white py-3 rounded-[2px] disabled:opacity-60"
               style={{ background: C.purple }}
             >
               {saving ? 'Saving…' : 'Set password & continue'}
