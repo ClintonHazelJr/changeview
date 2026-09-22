@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { packInitiativeMeta, parseDbError } from '../lib/constants';
+import { parseDbError, stripInitiativeMeta } from '../lib/constants';
 import { useWorkspace } from '../contexts/WorkspaceContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -28,7 +28,7 @@ export function useInitiatives() {
         .order('updated_at', { ascending: false }),
       supabase
         .from('programs')
-        .select('id, name, organization_id')
+        .select('*')
         .eq('workspace_id', ws)
         .order('name'),
     ]);
@@ -44,13 +44,6 @@ export function useInitiatives() {
       throw new Error('Select a Program, or create one under Program first.');
     }
 
-    const description = packInitiativeMeta(vals.description, {
-      changeOwner: vals.changeOwner || '',
-      productOwner: vals.productOwner || '',
-      businessOwner: vals.businessOwner || '',
-      projectManager: vals.projectManager || '',
-    });
-
     const { data, error } = await supabase
       .from('initiatives')
       .insert({
@@ -58,13 +51,17 @@ export function useInitiatives() {
         workspace_id: activeWorkspaceId,
         program_id: vals.programId,
         name: vals.name,
-        description,
-        status: 'planning',
+        description: stripInitiativeMeta(vals.description),
+        status: vals.status || 'planning',
         start_date: vals.startDate || null,
         proposed_go_live_date: vals.goLiveDate || null,
         budget: vals.budget ? Number(vals.budget) : null,
         use_case: vals.useCase,
         expected_benefits: vals.expectedBenefits,
+        change_owner_id: vals.changeOwnerId || null,
+        product_owner_id: vals.productOwnerId || null,
+        business_owner_id: vals.businessOwnerId || null,
+        project_manager_id: vals.projectManagerId || null,
       })
       .select()
       .single();
@@ -73,7 +70,54 @@ export function useInitiatives() {
     return data;
   };
 
-  return { initiatives, programs, loading, reload: load, addInitiative };
+  const updateInitiative = async (id, vals) => {
+    if (!vals.programId) {
+      throw new Error('Select a Program, or create one under Program first.');
+    }
+    const { data, error } = await supabase
+      .from('initiatives')
+      .update({
+        program_id: vals.programId,
+        name: vals.name,
+        description: stripInitiativeMeta(vals.description),
+        status: vals.status || 'planning',
+        start_date: vals.startDate || null,
+        proposed_go_live_date: vals.goLiveDate || null,
+        budget: vals.budget !== '' && vals.budget != null ? Number(vals.budget) : null,
+        use_case: vals.useCase,
+        expected_benefits: vals.expectedBenefits,
+        change_owner_id: vals.changeOwnerId || null,
+        product_owner_id: vals.productOwnerId || null,
+        business_owner_id: vals.businessOwnerId || null,
+        project_manager_id: vals.projectManagerId || null,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error(parseDbError(error));
+    await load();
+    return data;
+  };
+
+  const setInitiativeArchived = async (id, archived) => {
+    const { error } = await supabase
+      .from('initiatives')
+      .update({ archived_at: archived ? new Date().toISOString() : null })
+      .eq('id', id);
+    if (error) throw new Error(parseDbError(error));
+    await load();
+  };
+
+  const deleteInitiative = async (id) => {
+    const { error } = await supabase.from('initiatives').delete().eq('id', id);
+    if (error) throw new Error(parseDbError(error));
+    await load();
+  };
+
+  return {
+    initiatives, programs, loading, reload: load,
+    addInitiative, updateInitiative, setInitiativeArchived, deleteInitiative,
+  };
 }
 
 export function useInitiativeDetail(initiativeId) {
@@ -83,21 +127,30 @@ export function useInitiativeDetail(initiativeId) {
   const [impacts, setImpacts] = useState([]);
   const [stakeholders, setStakeholders] = useState([]);
   const [learningNeeds, setLearningNeeds] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [comms, setComms] = useState([]);
   const [hypercare, setHypercare] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!initiativeId || !activeWorkspaceId) {
+      setInitiative(null);
+      setImpacts([]);
+      setStakeholders([]);
+      setLearningNeeds([]);
+      setTasks([]);
+      setComms([]);
+      setHypercare(null);
       setLoading(false);
       return;
     }
     setLoading(true);
-    const [init, imp, stk, ln, cm, hc] = await Promise.all([
+    const [init, imp, stk, ln, tk, cm, hc] = await Promise.all([
       supabase.from('initiatives').select('*').eq('id', initiativeId).single(),
       supabase.from('impacts').select('*').eq('initiative_id', initiativeId).order('created_at'),
       supabase.from('stakeholders').select('*').eq('initiative_id', initiativeId).order('created_at'),
-      supabase.from('learning_needs').select('*').eq('workspace_id', activeWorkspaceId).order('created_at'),
+      supabase.from('learning_needs').select('*, task_learning_needs(task_id)').eq('workspace_id', activeWorkspaceId).order('created_at'),
+      supabase.from('tasks').select('id, name, initiative_id, status').eq('initiative_id', initiativeId).order('name'),
       supabase.from('comms').select('*').eq('initiative_id', initiativeId).order('created_at'),
       supabase.from('hypercare').select('*').eq('initiative_id', initiativeId).maybeSingle(),
     ]);
@@ -105,7 +158,11 @@ export function useInitiativeDetail(initiativeId) {
     setImpacts(imp.data || []);
     setStakeholders(stk.data || []);
     const impactIds = new Set((imp.data || []).map((x) => x.id));
-    setLearningNeeds((ln.data || []).filter((x) => impactIds.has(x.impact_id)));
+    setLearningNeeds((ln.data || []).filter((x) => impactIds.has(x.impact_id)).map((row) => ({
+      ...row,
+      taskIds: (row.task_learning_needs || []).map((x) => x.task_id),
+    })));
+    setTasks(tk.data || []);
     setComms(cm.data || []);
     setHypercare(hc.data || null);
     setLoading(false);
@@ -208,6 +265,18 @@ export function useInitiativeDetail(initiativeId) {
       ...learningPayload(vals),
     }).select().single();
     if (error) throw new Error(parseDbError(error));
+    const taskIds = vals.taskIds || [];
+    if (taskIds.length) {
+      const { error: linkError } = await supabase.from('task_learning_needs').insert(
+        taskIds.map((taskId) => ({
+          account_id: accountId,
+          workspace_id: workspaceId,
+          task_id: taskId,
+          learning_need_id: data.id,
+        })),
+      );
+      if (linkError) throw new Error(parseDbError(linkError));
+    }
     await load();
     return data;
   };
@@ -215,6 +284,19 @@ export function useInitiativeDetail(initiativeId) {
   const updateLearningNeed = async (id, vals) => {
     const { data, error } = await supabase.from('learning_needs').update(learningPayload(vals)).eq('id', id).select().single();
     if (error) throw new Error(parseDbError(error));
+    await supabase.from('task_learning_needs').delete().eq('learning_need_id', id);
+    const taskIds = vals.taskIds || [];
+    if (taskIds.length) {
+      const { error: linkError } = await supabase.from('task_learning_needs').insert(
+        taskIds.map((taskId) => ({
+          account_id: accountId,
+          workspace_id: workspaceId,
+          task_id: taskId,
+          learning_need_id: id,
+        })),
+      );
+      if (linkError) throw new Error(parseDbError(linkError));
+    }
     await load();
     return data;
   };
@@ -227,6 +309,7 @@ export function useInitiativeDetail(initiativeId) {
 
   const commsPayload = (vals) => ({
     impact_id: vals.impactId || null,
+    delivery_date: vals.deliveryDate || null,
     key_message: vals.keyMessage,
     audience: vals.audience.map((a) => a.toLowerCase()),
     tone: vals.tone,
@@ -269,6 +352,8 @@ export function useInitiativeDetail(initiativeId) {
       pilot_success_criteria: vals.pilotSuccessCriteria || null,
       assumptions: vals.assumptions || null,
       duration: vals.duration || null,
+      start_date: vals.startDate || null,
+      end_date: vals.endDate || null,
     };
     let error;
     if (hypercare?.id) {
@@ -288,7 +373,7 @@ export function useInitiativeDetail(initiativeId) {
   };
 
   return {
-    initiative, impacts, stakeholders, learningNeeds, comms, hypercare, loading, reload: load,
+    initiative, impacts, stakeholders, learningNeeds, tasks, comms, hypercare, loading, reload: load,
     addImpact, updateImpact, deleteImpact,
     addStakeholder, updateStakeholder, deleteStakeholder,
     addLearningNeed, updateLearningNeed, deleteLearningNeed,

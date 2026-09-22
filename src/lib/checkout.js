@@ -1,20 +1,20 @@
-﻿/** Remember which marketing tier the user picked (pricing → signup → checkout).
+﻿/** Remember which plan the user picked (pricing → signup → checkout).
  * Uses localStorage so the choice survives email confirmation in the same browser.
  */
 const CHECKOUT_INTENT_KEY = 'cv_checkout_intent';
 
-const VALID_TIERS = new Set(['solo', 'small', 'enterprise', 'tier_1', 'tier_2']);
+const VALID_TIERS = new Set(['solo', 'small', 'enterprise']);
 
-export function normalizeMarketingTier(tier) {
+export function normalizePlanTier(tier) {
   const t = String(tier || '').toLowerCase();
-  if (t === 'tier_1') return 'solo';
-  if (t === 'tier_2') return 'enterprise';
-  if (t === 'solo' || t === 'small' || t === 'enterprise') return t;
-  return null;
+  return VALID_TIERS.has(t) ? t : null;
 }
 
+/** @deprecated Use normalizePlanTier — same canonical IDs everywhere. */
+export const normalizeMarketingTier = normalizePlanTier;
+
 export function rememberCheckoutIntent(tier, billingCycle = 'monthly') {
-  const normalized = normalizeMarketingTier(tier);
+  const normalized = normalizePlanTier(tier);
   if (!normalized) return;
   const payload = {
     tier: normalized,
@@ -39,7 +39,7 @@ export function readCheckoutIntent() {
       const raw = store.getItem(CHECKOUT_INTENT_KEY);
       if (!raw) continue;
       const parsed = JSON.parse(raw);
-      const tier = normalizeMarketingTier(parsed?.tier);
+      const tier = normalizePlanTier(parsed?.tier);
       if (!tier) continue;
       return {
         tier,
@@ -58,16 +58,29 @@ export function clearCheckoutIntent() {
   try { sessionStorage.removeItem(CHECKOUT_INTENT_KEY); } catch { /* ignore */ }
 }
 
-/** Start Stripe Checkout for a marketing tier (solo | small | enterprise). */
-export async function startCheckout(tier, billingCycle = 'monthly', { accessToken } = {}) {
-  const normalizedTier = normalizeMarketingTier(tier);
+/** Start Stripe Checkout for a plan tier (solo | small | enterprise). */
+export async function startCheckout(
+  tier,
+  billingCycle = 'monthly',
+  { accessToken, email, afterSignup = false } = {},
+) {
+  const normalizedTier = normalizePlanTier(tier);
   const normalizedCycle = billingCycle === 'annual' && normalizedTier !== 'solo' ? 'annual' : 'monthly';
-  if (!normalizedTier || !VALID_TIERS.has(normalizedTier)) {
+  if (!normalizedTier) {
     throw new Error(`Unknown checkout tier: ${tier}`);
+  }
+  if (normalizedTier === 'enterprise') {
+    throw new Error('Enterprise is sales-assisted. Use Contact Us — there is no self-serve checkout.');
   }
 
   rememberCheckoutIntent(normalizedTier, normalizedCycle);
-  console.log('[checkout] startCheckout', { tier: normalizedTier, billingCycle: normalizedCycle });
+  console.log('[checkout] startCheckout', {
+    tier: normalizedTier,
+    billingCycle: normalizedCycle,
+    afterSignup: Boolean(afterSignup),
+    hasEmail: Boolean(email),
+    hasToken: Boolean(accessToken),
+  });
 
   const headers = { 'Content-Type': 'application/json' };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
@@ -75,7 +88,12 @@ export async function startCheckout(tier, billingCycle = 'monthly', { accessToke
   const res = await fetch('/api/create-checkout-session', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ tier: normalizedTier, billingCycle: normalizedCycle }),
+    body: JSON.stringify({
+      tier: normalizedTier,
+      billingCycle: normalizedCycle,
+      email: email || undefined,
+      afterSignup: Boolean(afterSignup),
+    }),
   });
   const data = await res.json();
   if (!res.ok || !data.url) {
@@ -105,16 +123,35 @@ export async function startBillingPortal({ accessToken } = {}) {
   window.location.href = data.url;
 }
 
-export const MARKETING_TO_DB_TIER = {
-  solo: 'tier_1',
-  small: 'small',
-  enterprise: 'tier_2',
-  tier_1: 'tier_1',
-  tier_2: 'tier_2',
-};
+/** Update an existing Stripe subscription's plan (in place — no new Checkout). */
+export async function updateSubscriptionPlan(
+  tier,
+  billingCycle = 'monthly',
+  { accessToken } = {},
+) {
+  const normalizedTier = normalizePlanTier(tier);
+  const normalizedCycle = billingCycle === 'annual' && normalizedTier !== 'solo' ? 'annual' : 'monthly';
+  if (!normalizedTier) {
+    throw new Error(`Unknown plan tier: ${tier}`);
+  }
+  if (normalizedTier === 'enterprise') {
+    throw new Error('Enterprise is sales-assisted. Use Contact Us — there is no self-serve upgrade.');
+  }
 
-export const DB_TO_MARKETING_TIER = {
-  tier_1: 'solo',
-  small: 'small',
-  tier_2: 'enterprise',
-};
+  const headers = { 'Content-Type': 'application/json' };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  const res = await fetch('/api/update-subscription-plan', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      tier: normalizedTier,
+      billingCycle: normalizedCycle,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Could not update plan');
+  }
+  return data;
+}

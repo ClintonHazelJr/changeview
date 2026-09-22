@@ -16,7 +16,7 @@ export function WorkspaceProvider({ children }) {
   const { profile, refreshProfile } = useAuth();
   const [workspaces, setWorkspaces] = useState([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
-  const [planTier, setPlanTier] = useState('tier_1');
+  const [planTier, setPlanTier] = useState('solo');
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +25,7 @@ export function WorkspaceProvider({ children }) {
       setWorkspaces([]);
       setActiveWorkspaceId(null);
       setSubscription(null);
-      setPlanTier('tier_1');
+      setPlanTier('solo');
       setLoading(false);
       return;
     }
@@ -47,10 +47,10 @@ export function WorkspaceProvider({ children }) {
 
     if (sub) {
       setSubscription(sub);
-      setPlanTier(sub.plan_tier || 'tier_1');
+      setPlanTier(sub.plan_tier || 'solo');
     } else {
       setSubscription(null);
-      setPlanTier('tier_1');
+      setPlanTier('solo');
     }
 
     const wsId = profile.default_workspace_id || data?.[0]?.id;

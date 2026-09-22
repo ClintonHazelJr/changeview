@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { isPlatformAdminEmail, platformAdminEmail } from './_platformReset.js';
 
 export function adminClient() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
@@ -112,4 +113,43 @@ export async function unbanAuthUser(admin, userId) {
     console.error('[unbanAuthUser] failed', { userId, message: error.message });
   }
   return { data, error };
+}
+
+/**
+ * Verify Bearer token and require the signed-in user to be the platform admin email.
+ * Used for destructive platform-wide ops (e.g. reset-except).
+ */
+export async function requirePlatformAdmin(admin, req) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!token) return { error: { status: 401, message: 'Missing auth token' } };
+
+  const { data: authData, error: authErr } = await admin.auth.getUser(token);
+  if (authErr || !authData?.user) {
+    return { error: { status: 401, message: 'Invalid session' } };
+  }
+
+  const { data: caller, error: callerErr } = await admin
+    .from('users')
+    .select('id, account_id, role, email, full_name, is_active')
+    .eq('id', authData.user.id)
+    .single();
+
+  if (callerErr || !caller) {
+    return { error: { status: 403, message: 'Profile not found' } };
+  }
+  if (caller.is_active === false) {
+    return { error: { status: 403, message: 'Your account is deactivated' } };
+  }
+
+  if (!isPlatformAdminEmail(caller.email) && !isPlatformAdminEmail(authData.user.email)) {
+    return {
+      error: {
+        status: 403,
+        message: `Only the platform admin (${platformAdminEmail()}) can run this action`,
+      },
+    };
+  }
+
+  return { caller, authUser: authData.user };
 }

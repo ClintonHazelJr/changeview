@@ -73,6 +73,7 @@ export function AuthProvider({ children }) {
 
   const signUp = async ({
     email, password, fullName, accountName, planTier = 'solo', billingCycle = 'monthly',
+    termsAccepted = false,
   }) => {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -84,12 +85,22 @@ export function AuthProvider({ children }) {
           account_name: accountName || `${fullName}'s Account`,
           plan_tier: planTier,
           billing_cycle: billingCycle,
+          ...(termsAccepted ? { terms_accepted: 'true' } : {}),
         },
       },
     });
     if (error) throw error;
     if (data.session?.user) {
       await ensureProvisioned(data.session.user.id);
+      // Belt-and-suspenders if the trigger ran before metadata was readable.
+      if (termsAccepted) {
+        await supabase
+          .from('users')
+          .update({ terms_accepted_at: new Date().toISOString() })
+          .eq('id', data.session.user.id)
+          .is('terms_accepted_at', null);
+        await loadProfile(data.session.user.id);
+      }
     }
     return data;
   };
