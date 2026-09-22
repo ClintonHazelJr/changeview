@@ -222,3 +222,41 @@ export function unarchivedOptions(rows, currentId) {
 export function stripInitiativeMeta(description) {
   return (description || '').replace(/\n?\[cv-meta:[^\]]+\]\s*$/, '').trim();
 }
+
+/** Store owner/PM names in description until schema has text fields (FK is users, not people). */
+export function packInitiativeMeta(description, {
+  changeOwner, productOwner, businessOwner, projectManager,
+}) {
+  const cleaned = stripInitiativeMeta(description);
+  if (!changeOwner && !productOwner && !businessOwner && !projectManager) return cleaned;
+  return `${cleaned}\n[cv-meta:${JSON.stringify({
+    changeOwner: changeOwner || '',
+    productOwner: productOwner || '',
+    businessOwner: businessOwner || '',
+    projectManager: projectManager || '',
+  })}]`;
+}
+
+export function parseInitiativeMeta(description) {
+  const raw = description || '';
+  const match = raw.match(/\[cv-meta:({.*?})\]\s*$/);
+  if (!match) {
+    return {
+      description: raw, changeOwner: '', productOwner: '', businessOwner: '', projectManager: '',
+    };
+  }
+  try {
+    const meta = JSON.parse(match[1]);
+    return {
+      description: stripInitiativeMeta(raw),
+      changeOwner: meta.changeOwner || '',
+      productOwner: meta.productOwner || '',
+      businessOwner: meta.businessOwner || '',
+      projectManager: meta.projectManager || '',
+    };
+  } catch {
+    return {
+      description: raw, changeOwner: '', productOwner: '', businessOwner: '', projectManager: '',
+    };
+  }
+}
