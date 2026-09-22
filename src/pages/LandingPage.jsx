@@ -4,7 +4,7 @@ import {
   ArrowRight, Target, MessageSquare, TrendingUp, Check, GraduationCap,
   RefreshCw, Building2, Sparkles, Network, X,
 } from 'lucide-react';
-import { C, HEAD, BODY, tint } from '../lib/constants';
+import { C, HEAD, BODY, tint, PLAN_LABELS } from '../lib/constants';
 import { hasAuthRedirectParams } from '../lib/authUrls';
 import { rememberCheckoutIntent } from '../lib/checkout';
 
@@ -250,13 +250,13 @@ export default function LandingPage() {
           <h2 className="text-2xl md:text-3xl font-extrabold text-center mb-3" style={{ ...HEAD, color: C.ink }}>Simple pricing</h2>
           <p className="text-sm text-center mb-2" style={{ color: C.sub }}>Start alone. Scale to your whole change practice.</p>
           <p className="text-xs text-center font-semibold mb-10" style={{ color: C.purple }}>
-            7-day free trial · Card required · Charged only when the trial ends
+            1-week free trial · Card required · Charged only when the trial ends
           </p>
 
           <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-6 items-start">
             {/* Sole Proprietor — monthly only, no billing toggle */}
             <div className="bg-white rounded-3xl p-8 border shadow-sm flex flex-col h-full" style={{ borderColor: C.border }}>
-              <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>Sole Proprietor</div>
+              <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>{PLAN_LABELS.solo}</div>
               <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
                 {formatUsd(PRICING.solo.monthly)}
                 <span className="text-base font-medium" style={{ color: C.sub }}>/mo</span>
@@ -290,7 +290,7 @@ export default function LandingPage() {
                 className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                 style={{ background: C.purple }}
               >
-                Start your 7-day free trial
+                Start your 1-week free trial
               </Link>
               <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>Card required · $0 today</p>
             </div>
@@ -339,7 +339,7 @@ export default function LandingPage() {
                   >
                     Most popular
                   </div>
-                  <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.purple }}>Business</div>
+                  <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.purple }}>{PLAN_LABELS.small}</div>
                   <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
                     {formatUsd(annual ? PRICING.small.annual : PRICING.small.monthly)}
                     <span className="text-base font-medium" style={{ color: C.sub }}>
@@ -363,7 +363,7 @@ export default function LandingPage() {
                       'Up to 5 Users',
                       'Reports',
                       'Tasks & Schedule',
-                      'Everything in Sole Proprietor',
+                      `Everything in ${PLAN_LABELS.solo}`,
                     ].map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>
                         <Check size={14} style={{ color: C.green }} /> {f}
@@ -380,13 +380,13 @@ export default function LandingPage() {
                     className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                     style={{ background: C.purple }}
                   >
-                    Start your 7-day free trial
+                    Start your 1-week free trial
                   </Link>
                   <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>Card required · $0 today</p>
                 </div>
 
                 <div className="bg-white rounded-3xl p-8 border shadow-sm flex flex-col" style={{ borderColor: C.border }}>
-                  <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>Enterprise</div>
+                  <div className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: C.sub }}>{PLAN_LABELS.enterprise}</div>
                   <div className="text-3xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>
                     {formatUsd(annual ? PRICING.enterprise.annual : PRICING.enterprise.monthly)}
                     <span className="text-base font-medium" style={{ color: C.sub }}>
@@ -410,7 +410,7 @@ export default function LandingPage() {
                       'Unlimited Users',
                       'Reports',
                       'Tasks & Schedule',
-                      'Everything in Business',
+                      `Everything in ${PLAN_LABELS.small}`,
                       'Priority support',
                     ].map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>
@@ -428,7 +428,7 @@ export default function LandingPage() {
                     className="w-full text-sm font-bold text-white py-3 rounded-full text-center no-underline"
                     style={{ background: C.ink }}
                   >
-                    Start your 7-day free trial
+                    Start your 1-week free trial
                   </Link>
                   <p className="text-[11px] text-center mt-2" style={{ color: C.sub }}>Card required · $0 today</p>
                 </div>

@@ -48,10 +48,10 @@ export const TAG_OPTIONS = ['Training', 'Huddle', 'Email', 'Documentation'];
 
 /** DB: tier_1 / small / tier_2. Display labels only — IDs stay solo/small/enterprise. */
 export const PLAN_LABELS = {
-  tier_1: 'Sole Proprietor',
-  small: 'Business',
+  tier_1: 'Single Project',
+  small: 'Multiple Projects',
   tier_2: 'Enterprise',
-  solo: 'Sole Proprietor',
+  solo: 'Single Project',
   enterprise: 'Enterprise',
 };
 export const isSoloPlan = (tier) => tier === 'tier_1' || tier === 'solo';
@@ -117,7 +117,7 @@ export function formatReference(num) {
 export function parseDbError(err) {
   const msg = err?.message || err?.error_description || 'Something went wrong';
   if (msg.includes('Tier 1 accounts are limited')) {
-    return 'Sole Proprietor plans are limited to a single Workspace. Upgrade to Enterprise to add more.';
+    return 'Single Project plans are limited to a single Workspace. Upgrade to Multiple Projects or Enterprise to add more.';
   }
   return msg;
 }

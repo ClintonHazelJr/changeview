@@ -77,7 +77,7 @@ export default function BillingGate({ mode = 'past_due' }) {
       <div className="max-w-lg mx-auto px-6 py-16">
         <div className="bg-white rounded-3xl border shadow-sm p-8 text-center" style={{ borderColor: C.border }}>
           <h1 className="text-2xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>
-            {isIncomplete ? 'Start your 7-day free trial' : 'Payment needs attention'}
+            {isIncomplete ? 'Start your 1-week free trial' : 'Payment needs attention'}
           </h1>
           <p className="text-sm mb-2" style={{ color: C.sub }}>
             {isIncomplete

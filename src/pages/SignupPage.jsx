@@ -92,7 +92,7 @@ export default function SignupPage() {
         <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md border text-center" style={{ borderColor: C.border }}>
           <h1 className="text-xl font-extrabold mb-2" style={{ ...HEAD, color: C.ink }}>Check your email</h1>
           <p className="text-sm mb-4" style={{ color: C.sub }}>
-            We sent a confirmation link to {email}. After you confirm, log in and add a card to start your 7-day trial (you will not be charged until it ends).
+            We sent a confirmation link to {email}. After you confirm, log in and add a card to start your one-week trial (you will not be charged until it ends).
           </p>
           <Link to="/login" className="text-sm font-bold" style={{ color: C.purple }}>Go to login</Link>
         </div>
@@ -125,7 +125,7 @@ export default function SignupPage() {
     <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ ...BODY, background: C.bg }}>
       {brandLink}
       <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md border" style={{ borderColor: C.border }}>
-        <h1 className="text-2xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Start your 7-day free trial</h1>
+        <h1 className="text-2xl font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Start your 1-week free trial</h1>
         <p className="text-sm mb-2" style={{ color: C.sub }}>
           Card required — you will not be charged until the trial ends. Full Enterprise access during the trial.
         </p>
