@@ -196,7 +196,7 @@ export default function LandingPage() {
                 <span className="per">/ mo</span>
               </div>
               <p>2 users, 1 workspace. For a consultant (and one collaborator) running a single client rollout. Monthly billing only.</p>
-              <PlanCta tier="solo" className="btn btn-ghost-navy">Start free trial</PlanCta>
+              <PlanCta tier="solo" className="btn btn-ghost-navy">Start your 1-week free trial</PlanCta>
             </div>
             <div className="tier pop">
               <span className="badge">MOST POPULAR</span>
@@ -211,7 +211,7 @@ export default function LandingPage() {
               ) : null}
               <p>5 users, unlimited workspaces. For teams running change across multiple clients or departments.</p>
               <PlanCta tier="small" billingCycle={billingCycle} className="btn btn-red pay">
-                Start free trial
+                Start your 1-week free trial
               </PlanCta>
             </div>
             <div className="tier">
@@ -220,7 +220,7 @@ export default function LandingPage() {
                 <span className="amt">Custom</span>
               </div>
               <p>Unlimited users, unlimited workspaces. Sales-assisted onboarding — we set you up manually.</p>
-              <Link className="btn btn-ghost-navy" to="/contact">Contact Us</Link>
+              <PlanCta tier="enterprise" className="btn btn-ghost-navy">Start your 1-week free trial</PlanCta>
             </div>
           </div>
         </div>
