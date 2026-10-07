@@ -1160,7 +1160,54 @@
 
 .cv-landing .unsplash-picker-selected-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.cv-landing .blog-admin-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.cv-landing .unsplash-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(15, 22, 51, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px;
+  overflow-y: auto;
+}
+
+.cv-landing .unsplash-modal {
+  width: min(720px, 100%);
+  background: #fff;
+  border-radius: 2px;
+  border: 1px solid var(--line);
+  box-shadow: 0 16px 48px rgba(15, 22, 51, 0.18);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cv-landing .unsplash-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cv-landing .unsplash-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
 @media (max-width: 900px) {

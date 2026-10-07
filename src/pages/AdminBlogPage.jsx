@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import UnsplashPicker from '../components/landing/UnsplashPicker';
+import HeaderImageField from '../components/landing/HeaderImageField';
 import './landing.css';
 
 const emptyForm = {
+  id: '',
   title: '',
   slug: '',
   excerpt: '',
@@ -15,6 +16,23 @@ const emptyForm = {
   display_order: '',
   slugLocked: false,
 };
+
+function formFromPost(post) {
+  return {
+    id: post.id || '',
+    title: post.title || '',
+    slug: post.slug || '',
+    excerpt: post.excerpt || '',
+    content: post.content || '',
+    header_image_url: post.header_image_url || '',
+    image_credit_name: post.image_credit_name || '',
+    image_credit_url: post.image_credit_url || '',
+    published: Boolean(post.published),
+    featured: Boolean(post.featured),
+    display_order: post.display_order == null ? '' : String(post.display_order),
+    slugLocked: true,
+  };
+}
 
 function slugify(title) {
   return String(title || '')
@@ -181,33 +199,50 @@ export default function AdminBlogPage() {
     }
   };
 
-  const handleCreate = async (e) => {
+  const startEdit = (post) => {
+    setForm(formFromPost(post));
+    setFormError('');
+    setFormOk('');
+    requestAnimationFrame(() => {
+      document.getElementById('blog-admin-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const cancelEdit = () => {
+    setForm(emptyForm);
+    setFormError('');
+    setFormOk('');
+  };
+
+  const handleSave = async (e) => {
     e.preventDefault();
     setFormError('');
     setFormOk('');
     setSaving(true);
+    const payload = {
+      title: form.title,
+      slug: form.slug || slugify(form.title),
+      excerpt: form.excerpt,
+      content: form.content,
+      header_image_url: form.header_image_url || null,
+      image_credit_name: form.image_credit_name || null,
+      image_credit_url: form.image_credit_url || null,
+      published: form.published,
+      featured: form.featured,
+      display_order: form.display_order === '' ? null : Number(form.display_order),
+    };
     try {
+      const editing = Boolean(form.id);
       const res = await fetch('/api/admin/blog/posts', {
-        method: 'POST',
+        method: editing ? 'PATCH' : 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: form.title,
-          slug: form.slug || slugify(form.title),
-          excerpt: form.excerpt,
-          content: form.content,
-          header_image_url: form.header_image_url,
-          image_credit_name: form.image_credit_name || null,
-          image_credit_url: form.image_credit_url || null,
-          published: form.published,
-          featured: form.featured,
-          display_order: form.display_order === '' ? null : Number(form.display_order),
-        }),
+        body: JSON.stringify(editing ? { id: form.id, ...payload } : payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not save.');
       setForm(emptyForm);
-      setFormOk('Post saved.');
+      setFormOk(editing ? 'Post updated.' : 'Post saved.');
       await loadPosts();
     } catch (err) {
       setFormError(err.message || 'Could not save.');
@@ -333,11 +368,19 @@ export default function AdminBlogPage() {
                       </label>
                       <button
                         type="button"
+                        className="btn btn-outline"
+                        disabled={busyId === post.id}
+                        onClick={() => startEdit(post)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
                         className="btn btn-outline blog-admin-remove"
                         disabled={busyId === post.id}
                         onClick={() => removePost(post)}
                       >
-                        Remove
+                        Delete
                       </button>
                     </div>
                   </li>
@@ -346,9 +389,9 @@ export default function AdminBlogPage() {
             )}
           </section>
 
-          <section className="blog-admin-section">
-            <h2>Add new post</h2>
-            <form className="contact-form blog-admin-form" onSubmit={handleCreate}>
+          <section className="blog-admin-section" id="blog-admin-editor">
+            <h2>{form.id ? 'Edit post' : 'Add new post'}</h2>
+            <form className="contact-form blog-admin-form" onSubmit={handleSave}>
               <label>
                 <span>Title</span>
                 <input
@@ -379,43 +422,19 @@ export default function AdminBlogPage() {
                   onChange={(e) => setForm((f) => ({ ...f, excerpt: e.target.value }))}
                 />
               </label>
-              <div className="blog-admin-image-field">
-                <span className="blog-admin-field-label">Header image</span>
-                <UnsplashPicker
-                  imageUrl={form.header_image_url}
-                  creditName={form.image_credit_name}
-                  creditUrl={form.image_credit_url}
-                  onSelect={({ imageUrl, creditName, creditUrl }) => {
-                    setForm((f) => ({
-                      ...f,
-                      header_image_url: imageUrl,
-                      image_credit_name: creditName,
-                      image_credit_url: creditUrl,
-                    }));
-                  }}
-                  onClear={() => {
-                    setForm((f) => ({
-                      ...f,
-                      header_image_url: '',
-                      image_credit_name: '',
-                      image_credit_url: '',
-                    }));
-                  }}
-                />
-                <label className="blog-admin-url-fallback">
-                  <span>Or paste image URL</span>
-                  <input
-                    value={form.header_image_url}
-                    onChange={(e) => setForm((f) => ({
-                      ...f,
-                      header_image_url: e.target.value,
-                      image_credit_name: '',
-                      image_credit_url: '',
-                    }))}
-                    placeholder="/blog/example.jpg or https://…"
-                  />
-                </label>
-              </div>
+              <HeaderImageField
+                imageUrl={form.header_image_url}
+                creditName={form.image_credit_name}
+                creditUrl={form.image_credit_url}
+                onChange={({ imageUrl, creditName, creditUrl }) => {
+                  setForm((f) => ({
+                    ...f,
+                    header_image_url: imageUrl || '',
+                    image_credit_name: creditName || '',
+                    image_credit_url: creditUrl || '',
+                  }));
+                }}
+              />
               <label>
                 <span>Display order (optional)</span>
                 <input
@@ -450,9 +469,16 @@ export default function AdminBlogPage() {
                 <span>Featured</span>
               </label>
               {formError ? <p className="blog-comments-error">{formError}</p> : null}
-              <button type="submit" className="btn btn-red" disabled={saving}>
-                {saving ? 'Saving…' : 'Save post'}
-              </button>
+              <div className="blog-admin-form-actions">
+                <button type="submit" className="btn btn-red" disabled={saving}>
+                  {saving ? 'Saving…' : (form.id ? 'Update post' : 'Save post')}
+                </button>
+                {form.id ? (
+                  <button type="button" className="btn btn-outline" onClick={cancelEdit} disabled={saving}>
+                    Cancel edit
+                  </button>
+                ) : null}
+              </div>
             </form>
           </section>
         </div>
