@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { data, error } = await admin
       .from('blog_posts')
-      .select('id, slug, title, excerpt, content, header_image_url, published, featured, published_at, display_order, created_at, updated_at')
+      .select('id, slug, title, excerpt, content, header_image_url, image_credit_name, image_credit_url, published, featured, published_at, display_order, created_at, updated_at')
       .order('published_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
@@ -51,6 +51,8 @@ export default async function handler(req, res) {
     const excerpt = String(body.excerpt || '').trim();
     const content = String(body.content || '').trim();
     const headerImageUrl = String(body.header_image_url || body.headerImageUrl || '').trim() || null;
+    const imageCreditName = String(body.image_credit_name || body.imageCreditName || '').trim() || null;
+    const imageCreditUrl = String(body.image_credit_url || body.imageCreditUrl || '').trim() || null;
     const published = Boolean(body.published);
     const featured = Boolean(body.featured);
     const displayOrder = body.display_order == null && body.displayOrder == null
@@ -72,6 +74,12 @@ export default async function handler(req, res) {
     if (headerImageUrl && headerImageUrl.length > MAX_IMAGE) {
       return res.status(400).json({ error: 'Header image URL is too long.' });
     }
+    if (imageCreditName && imageCreditName.length > 200) {
+      return res.status(400).json({ error: 'Image credit name is too long.' });
+    }
+    if (imageCreditUrl && imageCreditUrl.length > MAX_IMAGE) {
+      return res.status(400).json({ error: 'Image credit URL is too long.' });
+    }
 
     const now = new Date().toISOString();
     const row = {
@@ -80,6 +88,8 @@ export default async function handler(req, res) {
       excerpt,
       content,
       header_image_url: headerImageUrl,
+      image_credit_name: imageCreditName,
+      image_credit_url: imageCreditUrl,
       published,
       featured,
       published_at: published ? now : null,
@@ -164,6 +174,26 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Header image URL is too long.' });
       }
       patch.header_image_url = headerImageUrl;
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(body, 'image_credit_name')
+      || Object.prototype.hasOwnProperty.call(body, 'imageCreditName')
+    ) {
+      const imageCreditName = String(body.image_credit_name ?? body.imageCreditName ?? '').trim() || null;
+      if (imageCreditName && imageCreditName.length > 200) {
+        return res.status(400).json({ error: 'Image credit name is too long.' });
+      }
+      patch.image_credit_name = imageCreditName;
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(body, 'image_credit_url')
+      || Object.prototype.hasOwnProperty.call(body, 'imageCreditUrl')
+    ) {
+      const imageCreditUrl = String(body.image_credit_url ?? body.imageCreditUrl ?? '').trim() || null;
+      if (imageCreditUrl && imageCreditUrl.length > MAX_IMAGE) {
+        return res.status(400).json({ error: 'Image credit URL is too long.' });
+      }
+      patch.image_credit_url = imageCreditUrl;
     }
     if (
       Object.prototype.hasOwnProperty.call(body, 'display_order')

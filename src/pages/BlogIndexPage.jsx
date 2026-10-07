@@ -1,17 +1,27 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import SiteShell from '../components/landing/SiteShell';
+import UnsplashCredit from '../components/landing/UnsplashCredit';
 
 function PostCard({ post, featured = false }) {
   return (
     <li className={featured ? 'post-card post-card-featured' : 'post-card'}>
-      <Link className="post-card-media" to={`/blog/${post.slug}`}>
-        {post.header_image_url ? (
-          <img src={post.header_image_url} alt="" loading="lazy" />
-        ) : (
-          <span className="post-card-media-fallback" />
-        )}
-      </Link>
+      <div className="post-card-media-wrap">
+        <Link className="post-card-media" to={`/blog/${post.slug}`}>
+          {post.header_image_url ? (
+            <img src={post.header_image_url} alt="" loading="lazy" />
+          ) : (
+            <span className="post-card-media-fallback" />
+          )}
+        </Link>
+        {post.image_credit_name ? (
+          <UnsplashCredit
+            name={post.image_credit_name}
+            profileUrl={post.image_credit_url}
+            className="post-card-credit"
+          />
+        ) : null}
+      </div>
       <div className="post-card-body">
         {featured ? <p className="post-featured-label">Featured</p> : null}
         <h2>

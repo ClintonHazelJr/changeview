@@ -744,6 +744,24 @@
   color: #8a8884;
 }
 
+.cv-landing .post-hero-credit a,
+.cv-landing .post-card-credit a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.cv-landing .post-card-media-wrap {
+  min-width: 0;
+}
+
+.cv-landing .post-card-credit {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #8a8884;
+  line-height: 1.35;
+}
+
 .cv-landing .blog-comments {
   margin-top: 56px;
   padding-top: 36px;
@@ -1050,6 +1068,99 @@
 .cv-landing .blog-admin-form .btn {
   padding: 10px 16px;
   font-size: 14px;
+}
+
+.cv-landing .blog-admin-image-field {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cv-landing .blog-admin-field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.cv-landing .blog-admin-url-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cv-landing .unsplash-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cv-landing .unsplash-picker-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cv-landing .unsplash-picker-search input {
+  flex: 1 1 220px;
+}
+
+.cv-landing .unsplash-picker-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.cv-landing .unsplash-picker-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 8px;
+}
+
+.cv-landing .unsplash-picker-card img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 2px;
+  display: block;
+}
+
+.cv-landing .unsplash-picker-credit {
+  margin: 0;
+  font-size: 11px;
+  color: #8a8884;
+  line-height: 1.35;
+}
+
+.cv-landing .unsplash-picker-card .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.cv-landing .unsplash-picker-selected {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cv-landing .unsplash-picker-preview {
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  border-radius: 2px;
+  display: block;
+  border: 1px solid var(--line);
+}
+
+.cv-landing .unsplash-picker-selected-actions {
+  display: flex;
+  gap: 8px;
 }
 
 @media (max-width: 900px) {

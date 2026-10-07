@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import UnsplashPicker from '../components/landing/UnsplashPicker';
 import './landing.css';
 
 const emptyForm = {
@@ -7,6 +8,8 @@ const emptyForm = {
   excerpt: '',
   content: '',
   header_image_url: '',
+  image_credit_name: '',
+  image_credit_url: '',
   published: false,
   featured: false,
   display_order: '',
@@ -194,6 +197,8 @@ export default function AdminBlogPage() {
           excerpt: form.excerpt,
           content: form.content,
           header_image_url: form.header_image_url,
+          image_credit_name: form.image_credit_name || null,
+          image_credit_url: form.image_credit_url || null,
           published: form.published,
           featured: form.featured,
           display_order: form.display_order === '' ? null : Number(form.display_order),
@@ -374,14 +379,43 @@ export default function AdminBlogPage() {
                   onChange={(e) => setForm((f) => ({ ...f, excerpt: e.target.value }))}
                 />
               </label>
-              <label>
-                <span>Header image URL</span>
-                <input
-                  value={form.header_image_url}
-                  onChange={(e) => setForm((f) => ({ ...f, header_image_url: e.target.value }))}
-                  placeholder="/blog/example.jpg"
+              <div className="blog-admin-image-field">
+                <span className="blog-admin-field-label">Header image</span>
+                <UnsplashPicker
+                  imageUrl={form.header_image_url}
+                  creditName={form.image_credit_name}
+                  creditUrl={form.image_credit_url}
+                  onSelect={({ imageUrl, creditName, creditUrl }) => {
+                    setForm((f) => ({
+                      ...f,
+                      header_image_url: imageUrl,
+                      image_credit_name: creditName,
+                      image_credit_url: creditUrl,
+                    }));
+                  }}
+                  onClear={() => {
+                    setForm((f) => ({
+                      ...f,
+                      header_image_url: '',
+                      image_credit_name: '',
+                      image_credit_url: '',
+                    }));
+                  }}
                 />
-              </label>
+                <label className="blog-admin-url-fallback">
+                  <span>Or paste image URL</span>
+                  <input
+                    value={form.header_image_url}
+                    onChange={(e) => setForm((f) => ({
+                      ...f,
+                      header_image_url: e.target.value,
+                      image_credit_name: '',
+                      image_credit_url: '',
+                    }))}
+                    placeholder="/blog/example.jpg or https://…"
+                  />
+                </label>
+              </div>
               <label>
                 <span>Display order (optional)</span>
                 <input

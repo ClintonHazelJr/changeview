@@ -46,7 +46,7 @@ export default async function handler(req, res) {
   if (slug) {
     const { data, error } = await admin
       .from('blog_posts')
-      .select('id, slug, title, excerpt, content, header_image_url, published, featured, published_at, created_at')
+      .select('id, slug, title, excerpt, content, header_image_url, image_credit_name, image_credit_url, published, featured, published_at, created_at')
       .eq('slug', slug)
       .eq('published', true)
       .maybeSingle();
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
 
   const { data, error } = await admin
     .from('blog_posts')
-    .select('id, slug, title, excerpt, header_image_url, featured, published_at, created_at')
+    .select('id, slug, title, excerpt, header_image_url, image_credit_name, image_credit_url, featured, published_at, created_at')
     .eq('published', true);
 
   if (error) {
