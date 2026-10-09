@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Bell, Plus, ChevronDown } from 'lucide-react';
+import { Bell, Plus, ChevronDown, Upload } from 'lucide-react';
 import { C, HEAD, BODY, tint, initials, STATUS_COLOR } from '../../lib/constants';
 import { useAuth } from '../../contexts/AuthContext';
 import ViewToggle from './ViewToggle';
@@ -13,8 +13,9 @@ export function statusColor(status) {
  * modes: which ViewToggle options to show (default tiles + list)
  */
 export function ListTopBar({
-  title, addLabel, onAdd, addDisabled,
+  title, addLabel, onAdd, addDisabled, addTourId,
   viewMode = 'tiles', onViewChange, viewModes = ['tiles', 'list'],
+  onBulkUpload, bulkLabel = 'Bulk Upload', bulkDisabled,
 }) {
   const { profile } = useAuth();
   return (
@@ -27,8 +28,20 @@ export function ListTopBar({
         <ViewToggle value={viewMode} onChange={onViewChange} modes={viewModes} />
       )}
       <div className="flex-1" />
+      {typeof onBulkUpload === 'function' && (
+        <button
+          type="button"
+          onClick={onBulkUpload}
+          disabled={bulkDisabled ?? addDisabled}
+          className="flex items-center gap-1.5 text-sm font-bold px-4 py-2 rounded-full border disabled:opacity-40 shadow-sm"
+          style={{ borderColor: C.border, color: C.ink, background: '#fff' }}
+        >
+          <Upload size={15} /> {bulkLabel}
+        </button>
+      )}
       <button
         type="button"
+        data-tour={addTourId || undefined}
         onClick={onAdd}
         disabled={addDisabled}
         className="flex items-center gap-1.5 text-sm font-bold text-white px-4 py-2 rounded-full disabled:opacity-40 shadow-sm"
@@ -186,7 +199,7 @@ export function CompactListCard({
       className="bg-white rounded-xl border p-3 text-left hover:shadow-sm transition-shadow w-full min-h-[88px] flex flex-col"
       style={{ borderColor: C.border }}
     >
-      <div className="text-sm font-bold leading-snug line-clamp-2 mb-0.5" style={{ color: C.ink }}>{title}</div>
+      <div className="text-sm font-bold leading-snug line-clamp-2 mb-0.5 pr-8" style={{ color: C.ink }}>{title}</div>
       {subtitle && (
         <div className="text-[11px] mb-2 line-clamp-1" style={{ color: C.sub }}>{subtitle}</div>
       )}

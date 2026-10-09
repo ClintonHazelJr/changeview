@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import SiteShell from '../components/landing/SiteShell';
 import MarkdownBody from '../components/landing/MarkdownBody';
 import BlogComments from '../components/landing/BlogComments';
+import UnsplashCredit from '../components/landing/UnsplashCredit';
 
 export default function BlogPostPage() {
   const { slug } = useParams();
@@ -51,6 +52,10 @@ export default function BlogPostPage() {
               {post.header_image_url ? (
                 <figure className="post-hero">
                   <img src={post.header_image_url} alt="" />
+                  <UnsplashCredit
+                    name={post.image_credit_name}
+                    profileUrl={post.image_credit_url}
+                  />
                 </figure>
               ) : null}
               <MarkdownBody source={post.content} />

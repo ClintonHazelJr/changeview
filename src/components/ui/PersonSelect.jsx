@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Search, X } from 'lucide-react';
-import { C, inputClass, inputStyle, tint } from '../../lib/constants';
+import { C, inputClass, inputStyle, tint, assignableOptions } from '../../lib/constants';
 import { Field } from './shared';
 
 function personSubtitle(person, departments = []) {
@@ -62,9 +62,14 @@ export default function PersonSelect({
     [people, value],
   );
 
+  const assignable = useMemo(
+    () => assignableOptions(people, value),
+    [people, value],
+  );
+
   const filtered = useMemo(
-    () => people.filter((p) => matchesQuery(p, query)),
-    [people, query],
+    () => assignable.filter((p) => matchesQuery(p, query)),
+    [assignable, query],
   );
 
   const options = useMemo(() => {

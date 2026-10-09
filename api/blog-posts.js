@@ -46,14 +46,19 @@ export default async function handler(req, res) {
   if (slug) {
     const { data, error } = await admin
       .from('blog_posts')
-      .select('id, slug, title, excerpt, content, header_image_url, published, featured, published_at, created_at')
+      .select('id, slug, title, excerpt, content, header_image_url, image_credit_name, image_credit_url, published, featured, published_at, created_at')
       .eq('slug', slug)
       .eq('published', true)
       .maybeSingle();
 
     if (error) {
       console.error('[blog-posts] get failed', error.message);
-      return res.status(500).json({ error: 'Could not load post.' });
+      if (/image_credit_/i.test(error.message || '')) {
+        return res.status(500).json({
+          error: 'Database missing image credit columns. Apply migration 028_blog_posts_image_credits.sql (image_credit_name, image_credit_url).',
+        });
+      }
+      return res.status(500).json({ error: error.message || 'Could not load post.' });
     }
     if (!data) return res.status(404).json({ error: 'Not found' });
     return res.status(200).json({ post: data });
@@ -61,12 +66,17 @@ export default async function handler(req, res) {
 
   const { data, error } = await admin
     .from('blog_posts')
-    .select('id, slug, title, excerpt, header_image_url, featured, published_at, created_at')
+    .select('id, slug, title, excerpt, header_image_url, image_credit_name, image_credit_url, featured, published_at, created_at')
     .eq('published', true);
 
   if (error) {
     console.error('[blog-posts] list failed', error.message);
-    return res.status(500).json({ error: 'Could not load posts.' });
+    if (/image_credit_/i.test(error.message || '')) {
+      return res.status(500).json({
+        error: 'Database missing image credit columns. Apply migration 028_blog_posts_image_credits.sql (image_credit_name, image_credit_url).',
+      });
+    }
+    return res.status(500).json({ error: error.message || 'Could not load posts.' });
   }
 
   return res.status(200).json({ posts: sortPublicPosts(data) });

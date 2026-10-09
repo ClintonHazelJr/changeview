@@ -40,36 +40,28 @@ export function priceEnvHint(tier, billingCycle) {
   return names?.[0] || 'the matching STRIPE_PRICE_* env var';
 }
 
-/** Marketing tier (solo|small|enterprise) → DB plan_tier */
-export const MARKETING_TO_DB = {
-  solo: 'tier_1',
-  small: 'small',
-  enterprise: 'tier_2',
-  tier_1: 'tier_1',
-  tier_2: 'tier_2',
-};
+/** Canonical plan_tier values written to the DB and used everywhere in the app. */
+export const PLAN_TIERS = new Set(['solo', 'small', 'enterprise']);
 
-export const DB_TO_MARKETING = {
-  tier_1: 'solo',
-  small: 'small',
-  tier_2: 'enterprise',
-};
+export function normalizePlanTier(tier) {
+  const t = String(tier || '').toLowerCase();
+  return PLAN_TIERS.has(t) ? t : null;
+}
 
-/** Reverse-lookup Price ID → { planTier, billingCycle, marketingTier }. */
+/** Reverse-lookup Price ID → { planTier, billingCycle }. */
 export function planFromPriceId(priceId) {
   if (!priceId) return null;
   const catalog = [
-    { envKeys: PRICE_ENV.solo_monthly, marketingTier: 'solo', planTier: 'tier_1', billingCycle: 'monthly' },
-    { envKeys: PRICE_ENV.small_monthly, marketingTier: 'small', planTier: 'small', billingCycle: 'monthly' },
-    { envKeys: PRICE_ENV.small_annual, marketingTier: 'small', planTier: 'small', billingCycle: 'annual' },
-    { envKeys: PRICE_ENV.enterprise_monthly, marketingTier: 'enterprise', planTier: 'tier_2', billingCycle: 'monthly' },
-    { envKeys: PRICE_ENV.enterprise_annual, marketingTier: 'enterprise', planTier: 'tier_2', billingCycle: 'annual' },
+    { envKeys: PRICE_ENV.solo_monthly, planTier: 'solo', billingCycle: 'monthly' },
+    { envKeys: PRICE_ENV.small_monthly, planTier: 'small', billingCycle: 'monthly' },
+    { envKeys: PRICE_ENV.small_annual, planTier: 'small', billingCycle: 'annual' },
+    { envKeys: PRICE_ENV.enterprise_monthly, planTier: 'enterprise', billingCycle: 'monthly' },
+    { envKeys: PRICE_ENV.enterprise_annual, planTier: 'enterprise', billingCycle: 'annual' },
   ];
   for (const row of catalog) {
     for (const key of row.envKeys) {
       if (process.env[key] && process.env[key] === priceId) {
         return {
-          marketingTier: row.marketingTier,
           planTier: row.planTier,
           billingCycle: row.billingCycle,
         };

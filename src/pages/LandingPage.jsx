@@ -4,10 +4,15 @@ import { hasAuthRedirectParams } from '../lib/authUrls';
 import { rememberCheckoutIntent } from '../lib/checkout';
 import Mark from '../components/landing/Mark';
 import SiteShell from '../components/landing/SiteShell';
+import LandingWhoStrip from '../components/landing/LandingWhoStrip';
+import LandingCompareSection from '../components/landing/LandingCompareSection';
+import LandingFaqSection from '../components/landing/LandingFaqSection';
+import LandingBlogPreview from '../components/landing/LandingBlogPreview';
 import { usePlanPrices } from '../hooks/usePlanPrices';
 import { formatUsdAmount, priceAmount, pricePeriodLabel } from '../../shared/planPrices.js';
 
-const PAGE_TITLE = 'ChangeView — Change that people actually adopt';
+const PAGE_TITLE = 'ChangeView | Change Management Software for Consultants and Small Teams';
+const PAGE_DESCRIPTION = 'Plan, launch and measure change in one place. Stakeholder maps, readiness tracking, adoption analytics and comms. Built for change managers who are done with spreadsheets. 1-week free trial.';
 
 function trialSignupPath(tier, billingCycle = 'monthly') {
   const cycle = tier === 'solo' ? 'monthly' : (billingCycle === 'annual' ? 'annual' : 'monthly');
@@ -76,6 +81,7 @@ export default function LandingPage() {
   return (
     <SiteShell
       title={PAGE_TITLE}
+      description={PAGE_DESCRIPTION}
       notice={accountDeleted ? (
         <div className="notice">
           Your account has been deleted. Billing is cancelled and all data was removed.
@@ -85,16 +91,19 @@ export default function LandingPage() {
       <header className="hero">
         <div className="wrap">
           <div className="stack">
-            <span className="eyebrow"><span className="dot" /> Organizational change, adopted</span>
+            <span className="eyebrow"><span className="dot" /> CHANGE MANAGEMENT SOFTWARE</span>
             <h1>
               Change that people <em>actually</em> adopt.
             </h1>
             <p className="lede">
-              changeview gives transformation leaders one place to plan, launch, and measure organizational change — so every rollout lands, and nothing stalls in the middle.
+              ChangeView gives change managers one place to plan, launch and measure change, so you can leave the spreadsheets behind and show clients real adoption.
             </p>
             <div className="cta-row">
-              <Link className="btn btn-red" to="/signup?plan=solo&billing=monthly">Start free</Link>
+              <Link className="btn btn-red" to="/signup?plan=solo&billing=monthly">Start your 1-week free trial</Link>
             </div>
+            <p className="lede-sm" style={{ marginTop: 10 }}>
+              Card required. Charged only when the trial ends.
+            </p>
           </div>
           <div className="shot">
             <img
@@ -107,52 +116,59 @@ export default function LandingPage() {
         </div>
       </header>
 
+      <LandingWhoStrip />
+
       <section className="section" id="features">
         <div className="wrap">
           <div className="head">
             <span className="kicker">The platform</span>
             <h2>Everything a rollout needs, in one view.</h2>
+            <p style={{ marginTop: 12, fontSize: 15, lineHeight: 1.5, color: '#4b4a47' }}>
+              Stakeholders, plans, comms, readiness and adoption, connected instead of scattered across files.
+            </p>
           </div>
           <div className="features">
             <div className="feature">
               <Mark className="ic" variant="mono" color="#1c2f8f" />
               <h3>Change plans</h3>
-              <p>Phased rollout plans with owners, milestones, and dependencies you can actually track.</p>
+              <p>Phased plans with owners, milestones and dependencies you can track.</p>
             </div>
             <div className="feature">
               <Mark className="ic" variant="mono" color="#3a54c4" />
               <h3>Stakeholder maps</h3>
-              <p>See who&apos;s impacted, who&apos;s resisting, and who&apos;s championing — before it becomes a problem.</p>
+              <p>See who is impacted, who is resisting and who is championing, before it becomes a problem.</p>
             </div>
             <div className="feature">
               <Mark className="ic" variant="mono" color="#5f79df" />
               <h3>Adoption analytics</h3>
-              <p>Track readiness, sentiment, and real usage in real time — not in a quarterly survey.</p>
+              <p>Track readiness, sentiment and real usage as it happens, not in a quarterly survey.</p>
             </div>
             <div className="feature">
               <Mark className="ic" variant="mono" color="#1c2f8f" />
               <h3>Comms hub</h3>
-              <p>The right message to the right team at the right moment, across every channel.</p>
+              <p>Plan the right message for the right team at the right time, and keep it all in one place.</p>
             </div>
             <div className="feature">
               <Mark className="ic" variant="mono" color="#3a54c4" />
               <h3>Change readiness</h3>
-              <p>See exactly how ready each department is, based on real training completion, not guesswork.</p>
+              <p>See how ready each department is, based on real training completion rather than guesswork.</p>
             </div>
             <div className="feature">
               <Mark className="ic" variant="mono" color="#5f79df" />
               <h3>Task tracking</h3>
-              <p>Track execution on a Kanban board, and watch requirements and training automatically mark complete as the real work gets done.</p>
+              <p>Run execution on a Kanban board. Requirements and training mark complete as the real work gets done.</p>
             </div>
           </div>
         </div>
       </section>
 
+      <LandingCompareSection />
+
       <section className="section how" id="how">
         <div className="wrap">
           <div className="head">
             <span className="kicker">How it works</span>
-            <h2>Four moves, one direction: forward.</h2>
+            <h2>Four steps, one direction: forward.</h2>
           </div>
           <div className="steps">
             <div className="step">
@@ -185,7 +201,7 @@ export default function LandingPage() {
             <span className="kicker">Pricing</span>
             <h2>Simple plans, real access.</h2>
             <p style={{ marginTop: 12, fontSize: 15, lineHeight: 1.5, color: '#4b4a47' }}>
-              1-week free trial · Card required · Charged only when the trial ends
+              1-week free trial.
             </p>
           </div>
           <div className="tiers">
@@ -196,7 +212,8 @@ export default function LandingPage() {
                 <span className="per">/ mo</span>
               </div>
               <p>2 users, 1 workspace. For a consultant (and one collaborator) running a single client rollout. Monthly billing only.</p>
-              <PlanCta tier="solo" className="btn btn-ghost-navy">Start free trial</PlanCta>
+              <PlanCta tier="solo" className="btn btn-ghost-navy">Start your 1-week free trial</PlanCta>
+              <p className="tier-trial-note">Card required. Charged only when the trial ends.</p>
             </div>
             <div className="tier pop">
               <span className="badge">MOST POPULAR</span>
@@ -211,30 +228,35 @@ export default function LandingPage() {
               ) : null}
               <p>5 users, unlimited workspaces. For teams running change across multiple clients or departments.</p>
               <PlanCta tier="small" billingCycle={billingCycle} className="btn btn-red pay">
-                Start free trial
+                Start your 1-week free trial
               </PlanCta>
+              <p className="tier-trial-note">Card required. Charged only when the trial ends.</p>
             </div>
             <div className="tier">
               <h3>Enterprise</h3>
               <div className="price">
                 <span className="amt">Custom</span>
               </div>
-              <p>Unlimited users, unlimited workspaces. Sales-assisted onboarding — we set you up manually.</p>
-              <Link className="btn btn-ghost-navy" to="/contact">Contact Us</Link>
+              <p>Unlimited users, unlimited workspaces. Sales-assisted onboarding. We set you up manually.</p>
+              <Link className="btn btn-ghost-navy" to="/contact">Talk to us</Link>
             </div>
           </div>
         </div>
       </section>
 
+      <LandingFaqSection />
+
       <section className="band">
         <div className="wrap row">
           <div>
             <h2>Make your next change the one that sticks.</h2>
-            <p>Start free today — bring your first rollout live this week.</p>
+            <p>Start your 1-week free trial and bring your first rollout live this week.</p>
           </div>
-          <Link className="btn btn-red" to="/signup?plan=solo&billing=monthly">Start free</Link>
+          <Link className="btn btn-red" to="/signup?plan=solo&billing=monthly">Start your 1-week free trial</Link>
         </div>
       </section>
+
+      <LandingBlogPreview />
     </SiteShell>
   );
 }
