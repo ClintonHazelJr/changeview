@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { data, error } = await admin
       .from('blog_posts')
-      .select('id, slug, title, excerpt, content, header_image_url, image_credit_name, image_credit_url, published, featured, published_at, display_order, created_at, updated_at')
+      .select('id, slug, title, excerpt, content, header_image_url, image_credit_name, image_credit_url, image_keywords, published, featured, published_at, display_order, created_at, updated_at')
       .order('published_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
@@ -42,6 +42,11 @@ export default async function handler(req, res) {
       if (/image_credit_/i.test(error.message || '')) {
         return res.status(500).json({
           error: 'Database missing image credit columns. Apply migration 028_blog_posts_image_credits.sql (image_credit_name, image_credit_url).',
+        });
+      }
+      if (/image_keywords/i.test(error.message || '')) {
+        return res.status(500).json({
+          error: 'Database missing image_keywords column. Apply migration 029_blog_posts_image_keywords.sql.',
         });
       }
       return res.status(500).json({ error: error.message || 'Could not load posts.' });
@@ -58,6 +63,7 @@ export default async function handler(req, res) {
     const headerImageUrl = String(body.header_image_url || body.headerImageUrl || '').trim() || null;
     const imageCreditName = String(body.image_credit_name || body.imageCreditName || '').trim() || null;
     const imageCreditUrl = String(body.image_credit_url || body.imageCreditUrl || '').trim() || null;
+    const imageKeywords = String(body.image_keywords || body.imageKeywords || '').trim() || null;
     const published = Boolean(body.published);
     const featured = Boolean(body.featured);
     const displayOrder = body.display_order == null && body.displayOrder == null
@@ -85,6 +91,9 @@ export default async function handler(req, res) {
     if (imageCreditUrl && imageCreditUrl.length > MAX_IMAGE) {
       return res.status(400).json({ error: 'Image credit URL is too long.' });
     }
+    if (imageKeywords && imageKeywords.length > 500) {
+      return res.status(400).json({ error: 'Image keywords are too long (max 500 characters).' });
+    }
 
     const now = new Date().toISOString();
     const row = {
@@ -95,6 +104,7 @@ export default async function handler(req, res) {
       header_image_url: headerImageUrl,
       image_credit_name: imageCreditName,
       image_credit_url: imageCreditUrl,
+      image_keywords: imageKeywords,
       published,
       featured,
       published_at: published ? now : null,
@@ -111,6 +121,11 @@ export default async function handler(req, res) {
       if (/image_credit_/i.test(error.message || '')) {
         return res.status(500).json({
           error: 'Database missing image credit columns. Apply migration 028_blog_posts_image_credits.sql (image_credit_name, image_credit_url).',
+        });
+      }
+      if (/image_keywords/i.test(error.message || '')) {
+        return res.status(500).json({
+          error: 'Database missing image_keywords column. Apply migration 029_blog_posts_image_keywords.sql.',
         });
       }
       return res.status(500).json({ error: error.message || 'Could not create post.' });
@@ -206,6 +221,16 @@ export default async function handler(req, res) {
       patch.image_credit_url = imageCreditUrl;
     }
     if (
+      Object.prototype.hasOwnProperty.call(body, 'image_keywords')
+      || Object.prototype.hasOwnProperty.call(body, 'imageKeywords')
+    ) {
+      const imageKeywords = String(body.image_keywords ?? body.imageKeywords ?? '').trim() || null;
+      if (imageKeywords && imageKeywords.length > 500) {
+        return res.status(400).json({ error: 'Image keywords are too long (max 500 characters).' });
+      }
+      patch.image_keywords = imageKeywords;
+    }
+    if (
       Object.prototype.hasOwnProperty.call(body, 'display_order')
       || Object.prototype.hasOwnProperty.call(body, 'displayOrder')
     ) {
@@ -233,6 +258,11 @@ export default async function handler(req, res) {
       if (/image_credit_/i.test(error.message || '')) {
         return res.status(500).json({
           error: 'Database missing image credit columns. Apply migration 028_blog_posts_image_credits.sql (image_credit_name, image_credit_url).',
+        });
+      }
+      if (/image_keywords/i.test(error.message || '')) {
+        return res.status(500).json({
+          error: 'Database missing image_keywords column. Apply migration 029_blog_posts_image_keywords.sql.',
         });
       }
       return res.status(500).json({ error: error.message || 'Could not update post.' });

@@ -28,10 +28,12 @@ export function unsplashAuthHeaders() {
   };
 }
 
-/** True only for Unsplash photo download tracking URLs (path ends with /download). */
+/** Download tracking URLs must be Unsplash photo download endpoints. */
 export function isValidUnsplashDownloadLocation(value) {
+  const raw = String(value || '').trim();
+  if (!raw.startsWith('https://api.unsplash.com/photos/')) return false;
   try {
-    const u = new URL(String(value || ''));
+    const u = new URL(raw);
     if (u.protocol !== 'https:') return false;
     if (u.hostname !== 'api.unsplash.com') return false;
     return /^\/photos\/[^/]+\/download\/?$/.test(u.pathname);
@@ -40,16 +42,21 @@ export function isValidUnsplashDownloadLocation(value) {
   }
 }
 
-export function mapUnsplashRateLimit(status) {
-  if (status === 403 || status === 429) {
-    return { status: 429, error: 'Unsplash rate limit reached. Try again later.' };
-  }
-  return null;
-}
-
 /** Safe error message for clients — strips anything that looks like a secret. */
 export function safeErrorMessage(err, fallback = 'Unexpected server error.') {
   const raw = String(err?.message || err || fallback);
   if (/Client-ID|UNSPLASH_ACCESS_KEY|sk-|secret/i.test(raw)) return fallback;
   return raw.slice(0, 400) || fallback;
+}
+
+/** Parse Unsplash error JSON into a short message. Never includes the access key. */
+export async function readUnsplashError(upstream) {
+  try {
+    const body = await upstream.json();
+    if (Array.isArray(body?.errors) && body.errors[0]) return String(body.errors[0]).slice(0, 200);
+    if (body?.error) return String(body.error).slice(0, 200);
+  } catch {
+    /* ignore */
+  }
+  return `Unsplash request failed (HTTP ${upstream.status}).`;
 }

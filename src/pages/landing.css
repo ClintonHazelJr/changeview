@@ -1073,74 +1073,55 @@
 .cv-landing .blog-admin-image-field {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
-.cv-landing .blog-admin-field-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
+.cv-landing .blog-admin-help {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #8a8884;
+  font-weight: 400;
 }
 
-.cv-landing .blog-admin-url-fallback {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.cv-landing .unsplash-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.cv-landing .unsplash-picker-search {
+.cv-landing .blog-admin-fetch-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.cv-landing .unsplash-picker-search input {
-  flex: 1 1 220px;
-}
-
-.cv-landing .unsplash-picker-grid {
+.cv-landing .unsplash-fetch-grid {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.cv-landing .unsplash-picker-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: #fff;
+.cv-landing .unsplash-fetch-thumb {
+  display: block;
+  width: 100%;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 2px;
-  padding: 8px;
+  overflow: hidden;
+  background: #fff;
+  cursor: pointer;
 }
 
-.cv-landing .unsplash-picker-card img {
+.cv-landing .unsplash-fetch-thumb:hover,
+.cv-landing .unsplash-fetch-thumb:focus-visible {
+  border-color: var(--navy, #1c2f8f);
+  outline: none;
+}
+
+.cv-landing .unsplash-fetch-thumb img {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  border-radius: 2px;
   display: block;
-}
-
-.cv-landing .unsplash-picker-credit {
-  margin: 0;
-  font-size: 11px;
-  color: #8a8884;
-  line-height: 1.35;
-}
-
-.cv-landing .unsplash-picker-card .btn {
-  width: 100%;
-  justify-content: center;
 }
 
 .cv-landing .unsplash-picker-selected {
@@ -1151,7 +1132,7 @@
 
 .cv-landing .unsplash-picker-preview {
   width: 100%;
-  max-height: 280px;
+  max-height: 320px;
   object-fit: cover;
   border-radius: 2px;
   display: block;
@@ -1169,45 +1150,6 @@
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-}
-
-.cv-landing .unsplash-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  background: rgba(15, 22, 51, 0.45);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 48px 16px;
-  overflow-y: auto;
-}
-
-.cv-landing .unsplash-modal {
-  width: min(720px, 100%);
-  background: #fff;
-  border-radius: 2px;
-  border: 1px solid var(--line);
-  box-shadow: 0 16px 48px rgba(15, 22, 51, 0.18);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.cv-landing .unsplash-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.cv-landing .unsplash-modal-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--ink);
 }
 
 @media (max-width: 900px) {

@@ -1,14 +1,15 @@
 import { requireBlogAdmin, setBlogAdminCors } from '../_blogAuth.js';
 import {
-  mapUnsplashRateLimit,
   missingUnsplashKeyResponse,
+  readUnsplashError,
   safeErrorMessage,
   unsplashAuthHeaders,
   unsplashConfigured,
 } from '../_unsplash.js';
 
 /**
- * GET /api/unsplash/search?query=...&page=1
+ * POST /api/unsplash/search
+ * Body: { query }
  * Blog-admin only. Proxies Unsplash search; never exposes the access key.
  */
 export default async function handler(req, res) {
@@ -16,23 +17,22 @@ export default async function handler(req, res) {
     setBlogAdminCors(res);
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (!requireBlogAdmin(req, res)) return;
-    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
     if (!unsplashConfigured()) {
       const missing = missingUnsplashKeyResponse();
       return res.status(missing.status).json(missing.body);
     }
 
-    const query = String(req.query?.query || '').trim();
-    const page = Math.max(1, Number(req.query?.page) || 1);
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const query = String(body.query || '').trim();
     if (!query) {
-      return res.status(400).json({ error: 'Enter a search query.' });
+      return res.status(400).json({ error: 'Enter image keywords to search.' });
     }
 
     const url = new URL('https://api.unsplash.com/search/photos');
     url.searchParams.set('query', query);
-    url.searchParams.set('page', String(page));
-    url.searchParams.set('per_page', '12');
+    url.searchParams.set('per_page', '6');
     url.searchParams.set('orientation', 'landscape');
 
     let upstream;
@@ -43,23 +43,10 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: `Could not reach Unsplash: ${safeErrorMessage(err)}` });
     }
 
-    const rate = mapUnsplashRateLimit(upstream.status);
-    if (rate) return res.status(rate.status).json({ error: rate.error });
-
     if (!upstream.ok) {
-      let detail = '';
-      try {
-        const errBody = await upstream.json();
-        detail = errBody?.errors?.[0] || errBody?.error || '';
-      } catch {
-        /* ignore */
-      }
-      console.error('[unsplash/search] upstream status', upstream.status, detail || '');
-      return res.status(502).json({
-        error: detail
-          ? `Unsplash search failed (${upstream.status}): ${String(detail).slice(0, 200)}`
-          : `Unsplash search failed (HTTP ${upstream.status}).`,
-      });
+      const message = await readUnsplashError(upstream);
+      console.error('[unsplash/search] upstream status', upstream.status);
+      return res.status(upstream.status).json({ error: message });
     }
 
     let data;
@@ -74,24 +61,14 @@ export default async function handler(req, res) {
     const results = Array.isArray(data.results) ? data.results : [];
     const photos = results.map((p) => ({
       id: p.id,
-      alt_description: p.alt_description || '',
-      urls: {
-        small: p.urls?.small || '',
-        regular: p.urls?.regular || '',
-      },
-      width: p.width,
-      height: p.height,
-      user: {
-        name: p.user?.name || 'Unknown',
-        links: { html: p.user?.links?.html || 'https://unsplash.com' },
-      },
-      links: {
-        download_location: p.links?.download_location || '',
-      },
+      thumb: p.urls?.small || '',
+      url: p.urls?.regular || '',
+      photographer_name: p.user?.name || 'Unknown',
+      photographer_url: p.user?.links?.html || 'https://unsplash.com',
+      download_location: p.links?.download_location || '',
     }));
 
-    const totalPages = Number(data.total_pages) || 0;
-    return res.status(200).json({ photos, total_pages: totalPages, page });
+    return res.status(200).json({ photos });
   } catch (err) {
     console.error('[unsplash/search] unhandled', safeErrorMessage(err));
     return res.status(500).json({ error: safeErrorMessage(err, 'Unsplash search failed unexpectedly.') });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import HeaderImageField from '../components/landing/HeaderImageField';
+import UnsplashCredit from '../components/landing/UnsplashCredit';
 import './landing.css';
 
 const emptyForm = {
@@ -11,6 +11,8 @@ const emptyForm = {
   header_image_url: '',
   image_credit_name: '',
   image_credit_url: '',
+  image_keywords: '',
+  pending_download_location: '',
   published: false,
   featured: false,
   display_order: '',
@@ -27,6 +29,8 @@ function formFromPost(post) {
     header_image_url: post.header_image_url || '',
     image_credit_name: post.image_credit_name || '',
     image_credit_url: post.image_credit_url || '',
+    image_keywords: post.image_keywords || '',
+    pending_download_location: '',
     published: Boolean(post.published),
     featured: Boolean(post.featured),
     display_order: post.display_order == null ? '' : String(post.display_order),
@@ -57,6 +61,9 @@ export default function AdminBlogPage() {
   const [formOk, setFormOk] = useState('');
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState('');
+  const [fetchResults, setFetchResults] = useState([]);
 
   useEffect(() => {
     const id = 'cv-sora-font';
@@ -203,6 +210,8 @@ export default function AdminBlogPage() {
     setForm(formFromPost(post));
     setFormError('');
     setFormOk('');
+    setFetchError('');
+    setFetchResults([]);
     requestAnimationFrame(() => {
       document.getElementById('blog-admin-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
@@ -212,6 +221,56 @@ export default function AdminBlogPage() {
     setForm(emptyForm);
     setFormError('');
     setFormOk('');
+    setFetchError('');
+    setFetchResults([]);
+  };
+
+  const handleFetchImages = async () => {
+    setFetchError('');
+    setFetchResults([]);
+    const query = form.image_keywords.trim();
+    if (!query) {
+      setFetchError('Enter image keywords to search.');
+      return;
+    }
+    setFetching(true);
+    try {
+      const res = await fetch('/api/unsplash/search', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Unsplash search failed (${res.status}).`);
+      setFetchResults(Array.isArray(data.photos) ? data.photos : []);
+      if (!data.photos?.length) setFetchError('No photos found. Try different keywords.');
+    } catch (err) {
+      setFetchError(err.message || 'Unsplash search failed.');
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const pickPhoto = (photo) => {
+    setForm((f) => ({
+      ...f,
+      header_image_url: photo.url || '',
+      image_credit_name: photo.photographer_name || '',
+      image_credit_url: photo.photographer_url || '',
+      pending_download_location: photo.download_location || '',
+    }));
+    setFetchError('');
+  };
+
+  const clearImage = () => {
+    setForm((f) => ({
+      ...f,
+      header_image_url: '',
+      image_credit_name: '',
+      image_credit_url: '',
+      pending_download_location: '',
+    }));
   };
 
   const handleSave = async (e) => {
@@ -219,19 +278,31 @@ export default function AdminBlogPage() {
     setFormError('');
     setFormOk('');
     setSaving(true);
-    const payload = {
-      title: form.title,
-      slug: form.slug || slugify(form.title),
-      excerpt: form.excerpt,
-      content: form.content,
-      header_image_url: form.header_image_url || null,
-      image_credit_name: form.image_credit_name || null,
-      image_credit_url: form.image_credit_url || null,
-      published: form.published,
-      featured: form.featured,
-      display_order: form.display_order === '' ? null : Number(form.display_order),
-    };
     try {
+      if (form.pending_download_location) {
+        const dlRes = await fetch('/api/unsplash/download', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ download_location: form.pending_download_location }),
+        });
+        const dlData = await dlRes.json().catch(() => ({}));
+        if (!dlRes.ok) throw new Error(dlData.error || 'Could not register Unsplash download.');
+      }
+
+      const payload = {
+        title: form.title,
+        slug: form.slug || slugify(form.title),
+        excerpt: form.excerpt,
+        content: form.content,
+        header_image_url: form.header_image_url || null,
+        image_credit_name: form.image_credit_name || null,
+        image_credit_url: form.image_credit_url || null,
+        image_keywords: form.image_keywords || null,
+        published: form.published,
+        featured: form.featured,
+        display_order: form.display_order === '' ? null : Number(form.display_order),
+      };
       const editing = Boolean(form.id);
       const res = await fetch('/api/admin/blog/posts', {
         method: editing ? 'PATCH' : 'POST',
@@ -242,6 +313,8 @@ export default function AdminBlogPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not save.');
       setForm(emptyForm);
+      setFetchResults([]);
+      setFetchError('');
       setFormOk(editing ? 'Post updated.' : 'Post saved.');
       await loadPosts();
     } catch (err) {
@@ -422,19 +495,6 @@ export default function AdminBlogPage() {
                   onChange={(e) => setForm((f) => ({ ...f, excerpt: e.target.value }))}
                 />
               </label>
-              <HeaderImageField
-                imageUrl={form.header_image_url}
-                creditName={form.image_credit_name}
-                creditUrl={form.image_credit_url}
-                onChange={({ imageUrl, creditName, creditUrl }) => {
-                  setForm((f) => ({
-                    ...f,
-                    header_image_url: imageUrl || '',
-                    image_credit_name: creditName || '',
-                    image_credit_url: creditUrl || '',
-                  }));
-                }}
-              />
               <label>
                 <span>Display order (optional)</span>
                 <input
@@ -452,6 +512,91 @@ export default function AdminBlogPage() {
                   onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
                 />
               </label>
+
+              <div className="blog-admin-image-field">
+                <label>
+                  <span>Image keywords</span>
+                  <input
+                    value={form.image_keywords}
+                    onChange={(e) => setForm((f) => ({ ...f, image_keywords: e.target.value }))}
+                    placeholder="e.g. calm office conversation natural light"
+                  />
+                  <span className="blog-admin-help">
+                    Used to search Unsplash. Calm, human, candid photos work best.
+                  </span>
+                </label>
+
+                <div className="blog-admin-fetch-row">
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={handleFetchImages}
+                    disabled={fetching}
+                  >
+                    {fetching ? 'Fetching…' : 'Fetch image from Unsplash'}
+                  </button>
+                </div>
+                {fetchError ? <p className="blog-comments-error">{fetchError}</p> : null}
+                {fetchResults.length > 0 ? (
+                  <ul className="unsplash-fetch-grid">
+                    {fetchResults.map((photo) => (
+                      <li key={photo.id}>
+                        <button
+                          type="button"
+                          className="unsplash-fetch-thumb"
+                          onClick={() => pickPhoto(photo)}
+                          title={`Photo by ${photo.photographer_name}`}
+                        >
+                          <img src={photo.thumb} alt="" loading="lazy" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                <label>
+                  <span>Header image URL</span>
+                  <input
+                    value={form.header_image_url}
+                    onChange={(e) => setForm((f) => ({
+                      ...f,
+                      header_image_url: e.target.value,
+                      pending_download_location: '',
+                      image_credit_name: e.target.value ? f.image_credit_name : '',
+                      image_credit_url: e.target.value ? f.image_credit_url : '',
+                    }))}
+                    placeholder="https://images.unsplash.com/… or /blog/example.jpg"
+                  />
+                  <span className="blog-admin-help">
+                    Photo by [Name] on Unsplash. Saved when you hit Save. Fetching options does not replace an image you already set.
+                  </span>
+                  {form.image_credit_name ? (
+                    <UnsplashCredit
+                      name={form.image_credit_name}
+                      profileUrl={form.image_credit_url}
+                      className="post-hero-credit"
+                    />
+                  ) : null}
+                </label>
+
+                {form.header_image_url ? (
+                  <div className="unsplash-picker-selected">
+                    <img src={form.header_image_url} alt="" className="unsplash-picker-preview" />
+                    {form.image_credit_name ? (
+                      <UnsplashCredit
+                        name={form.image_credit_name}
+                        profileUrl={form.image_credit_url}
+                      />
+                    ) : null}
+                    <div className="unsplash-picker-selected-actions">
+                      <button type="button" className="btn btn-outline" onClick={clearImage}>
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
               <label className="blog-admin-toggle">
                 <input
                   type="checkbox"
