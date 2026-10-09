@@ -3,11 +3,22 @@ import { Link, useLocation } from 'react-router-dom';
 import Mark from './Mark';
 import '../../pages/landing.css';
 
+function upsertMeta(attr, key, content) {
+  if (!content) return;
+  let el = document.head.querySelector(`meta[${attr}="${key}"]`);
+  if (!el) {
+    el = document.createElement('meta');
+    el.setAttribute(attr, key);
+    document.head.appendChild(el);
+  }
+  el.setAttribute('content', content);
+}
+
 /**
  * Shared marketing chrome: Sora, site nav, footer.
  * Hash links point at the landing page sections when not already on `/`.
  */
-export default function SiteShell({ title, children, notice }) {
+export default function SiteShell({ title, description, children, notice }) {
   const { pathname } = useLocation();
   const onHome = pathname === '/';
   const section = (hash) => (onHome ? hash : `/${hash}`);
@@ -23,10 +34,17 @@ export default function SiteShell({ title, children, notice }) {
     }
     const prev = document.title;
     if (title) document.title = title;
+    if (description) {
+      upsertMeta('name', 'description', description);
+      upsertMeta('property', 'og:description', description);
+    }
+    if (title) {
+      upsertMeta('property', 'og:title', title);
+    }
     return () => {
       document.title = prev || 'ChangeView';
     };
-  }, [title]);
+  }, [title, description]);
 
   return (
     <div className="cv-landing">
@@ -47,7 +65,7 @@ export default function SiteShell({ title, children, notice }) {
           <div className="navright">
             <Link className="signin" to="/login">Sign in</Link>
             <Link className="btn btn-navy" style={{ padding: '11px 22px', fontSize: 15 }} to="/signup?plan=solo&billing=monthly">
-              Start free
+              Start trial
             </Link>
           </div>
         </div>
@@ -62,8 +80,8 @@ export default function SiteShell({ title, children, notice }) {
               <Mark variant="footer" style={{ width: 32, height: 26, display: 'block' }} />
               <span>changeview</span>
             </span>
-            <span className="attrib">a Blackhand Technologies product</span>
-            <span className="tag">Change management that people actually adopt.</span>
+            <span className="attrib">a Blackhand technologies product</span>
+            <span className="tag">Change management software that people actually adopt.</span>
           </div>
           <div className="cols">
             <div className="col">
