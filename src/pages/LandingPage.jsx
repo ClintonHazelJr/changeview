@@ -4,6 +4,10 @@ import { hasAuthRedirectParams } from '../lib/authUrls';
 import { rememberCheckoutIntent } from '../lib/checkout';
 import Mark from '../components/landing/Mark';
 import SiteShell from '../components/landing/SiteShell';
+import LandingWhoStrip from '../components/landing/LandingWhoStrip';
+import LandingCompareSection from '../components/landing/LandingCompareSection';
+import LandingFaqSection from '../components/landing/LandingFaqSection';
+import LandingBlogPreview from '../components/landing/LandingBlogPreview';
 import { usePlanPrices } from '../hooks/usePlanPrices';
 import { formatUsdAmount, priceAmount, pricePeriodLabel } from '../../shared/planPrices.js';
 
@@ -112,6 +116,8 @@ export default function LandingPage() {
         </div>
       </header>
 
+      <LandingWhoStrip />
+
       <section className="section" id="features">
         <div className="wrap">
           <div className="head">
@@ -156,6 +162,8 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <LandingCompareSection />
+
       <section className="section how" id="how">
         <div className="wrap">
           <div className="head">
@@ -193,7 +201,7 @@ export default function LandingPage() {
             <span className="kicker">Pricing</span>
             <h2>Simple plans, real access.</h2>
             <p style={{ marginTop: 12, fontSize: 15, lineHeight: 1.5, color: '#4b4a47' }}>
-              1-week free trial. Card required. Charged only when the trial ends.
+              1-week free trial.
             </p>
           </div>
           <div className="tiers">
@@ -205,6 +213,7 @@ export default function LandingPage() {
               </div>
               <p>2 users, 1 workspace. For a consultant (and one collaborator) running a single client rollout. Monthly billing only.</p>
               <PlanCta tier="solo" className="btn btn-ghost-navy">Start your 1-week free trial</PlanCta>
+              <p className="tier-trial-note">Card required. Charged only when the trial ends.</p>
             </div>
             <div className="tier pop">
               <span className="badge">MOST POPULAR</span>
@@ -221,6 +230,7 @@ export default function LandingPage() {
               <PlanCta tier="small" billingCycle={billingCycle} className="btn btn-red pay">
                 Start your 1-week free trial
               </PlanCta>
+              <p className="tier-trial-note">Card required. Charged only when the trial ends.</p>
             </div>
             <div className="tier">
               <h3>Enterprise</h3>
@@ -234,6 +244,8 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <LandingFaqSection />
+
       <section className="band">
         <div className="wrap row">
           <div>
@@ -243,6 +255,8 @@ export default function LandingPage() {
           <Link className="btn btn-red" to="/signup?plan=solo&billing=monthly">Start your 1-week free trial</Link>
         </div>
       </section>
+
+      <LandingBlogPreview />
     </SiteShell>
   );
 }
