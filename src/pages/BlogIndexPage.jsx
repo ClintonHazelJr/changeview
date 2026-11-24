@@ -7,7 +7,13 @@ function PostCard({ post, featured = false }) {
     <li className={featured ? 'post-card post-card-featured' : 'post-card'}>
       <Link className="post-card-media" to={`/blog/${post.slug}`}>
         {post.header_image_url ? (
-          <img src={post.header_image_url} alt="" loading="lazy" />
+          <img
+            src={post.header_image_url}
+            alt=""
+            loading="lazy"
+            width={featured ? 1280 : 800}
+            height={featured ? 720 : 600}
+          />
         ) : (
           <span className="post-card-media-fallback" />
         )}
@@ -54,7 +60,10 @@ export default function BlogIndexPage() {
   const rest = posts.filter((p) => !p.featured);
 
   return (
-    <SiteShell title="Blog — changeview">
+    <SiteShell
+      title="Change Management Guides and Templates | ChangeView"
+      description="Practical guides on change plans, stakeholder analysis, adoption and change models."
+    >
       <main className="page">
         <div className="wrap narrow">
           <div className="prose">

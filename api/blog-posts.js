@@ -46,7 +46,7 @@ export default async function handler(req, res) {
   if (slug) {
     const { data, error } = await admin
       .from('blog_posts')
-      .select('id, slug, title, excerpt, content, header_image_url, image_credit_name, image_credit_url, published, featured, published_at, created_at')
+      .select('id, slug, title, excerpt, content, header_image_url, image_credit_name, image_credit_url, published, featured, published_at, created_at, updated_at, meta_title, meta_description')
       .eq('slug', slug)
       .eq('published', true)
       .maybeSingle();
@@ -56,6 +56,11 @@ export default async function handler(req, res) {
       if (/image_credit_/i.test(error.message || '')) {
         return res.status(500).json({
           error: 'Database missing image credit columns. Apply migration 028_blog_posts_image_credits.sql (image_credit_name, image_credit_url).',
+        });
+      }
+      if (/meta_title|meta_description/i.test(error.message || '')) {
+        return res.status(500).json({
+          error: 'Database missing blog SEO columns. Apply migration 031_blog_posts_meta.sql (meta_title, meta_description).',
         });
       }
       return res.status(500).json({ error: error.message || 'Could not load post.' });

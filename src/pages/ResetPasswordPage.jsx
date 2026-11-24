@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { C, HEAD, BODY, inputClass, inputStyle } from '../lib/constants';
 import { supabase } from '../lib/supabase';
+import { useNoIndex } from '../lib/useNoIndex';
 
 export default function ResetPasswordPage() {
+  useNoIndex();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');

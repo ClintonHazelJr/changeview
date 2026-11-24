@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import UnsplashCredit from '../components/landing/UnsplashCredit';
 import './landing.css';
+import { useNoIndex } from '../lib/useNoIndex';
 
 const emptyForm = {
   id: '',
@@ -48,6 +49,7 @@ function slugify(title) {
 }
 
 export default function AdminBlogPage() {
+  useNoIndex();
   const [checking, setChecking] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
   const [configured, setConfigured] = useState(true);

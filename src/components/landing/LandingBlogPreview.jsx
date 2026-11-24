@@ -2,18 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 function publishedAtMs(post) {
-  if (!post?.published_at) return 0;
-  const t = new Date(post.published_at).getTime();
+  const t = new Date(post?.published_at || post?.created_at || 0).getTime();
   return Number.isFinite(t) ? t : 0;
 }
 
-function sortPublicPosts(posts) {
-  return (posts || []).slice().sort((a, b) => {
-    const af = Boolean(a.featured);
-    const bf = Boolean(b.featured);
-    if (af !== bf) return af ? -1 : 1;
-    return publishedAtMs(b) - publishedAtMs(a);
-  });
+function newestPosts(posts, limit) {
+  return (posts || []).slice().sort((a, b) => publishedAtMs(b) - publishedAtMs(a)).slice(0, limit);
 }
 
 function BlogCard({ post }) {
@@ -49,8 +43,8 @@ export default function LandingBlogPreview() {
         const res = await fetch('/api/blog-posts');
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'Could not load posts.');
-        const sorted = sortPublicPosts(Array.isArray(data.posts) ? data.posts : []);
-        if (!cancelled) setPosts(sorted.slice(0, 3));
+        const sorted = newestPosts(Array.isArray(data.posts) ? data.posts : [], 3);
+        if (!cancelled) setPosts(sorted);
       } catch {
         if (!cancelled) setPosts([]);
       }

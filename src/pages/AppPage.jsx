@@ -3,6 +3,7 @@ import { Navigate, useSearchParams } from 'react-router-dom';
 import { C, BODY } from '../lib/constants';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useNoIndex } from '../lib/useNoIndex';
 import { WorkspaceProvider, useWorkspace } from '../contexts/WorkspaceContext';
 import TopNav from '../components/layout/TopNav';
 import AppSidebar from '../components/layout/AppSidebar';
@@ -327,6 +328,7 @@ function tintSafe(hex) {
 
 export default function AppPage() {
   const { session, loading } = useAuth();
+  useNoIndex();
 
   if (loading) {
     return (

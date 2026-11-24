@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { C, HEAD, BODY } from '../lib/constants';
 import { supabase } from '../lib/supabase';
+import { useNoIndex } from '../lib/useNoIndex';
 
 function readHashParams() {
   const hash = window.location.hash.startsWith('#')
@@ -16,6 +17,7 @@ function readHashParams() {
  * Never call exchangeCodeForSession — that requires a same-browser PKCE verifier.
  */
 export default function AuthCallbackPage() {
+  useNoIndex();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [error, setError] = useState('');

@@ -12,7 +12,7 @@ import { usePlanPrices } from '../hooks/usePlanPrices';
 import { formatUsdAmount, priceAmount, pricePeriodLabel } from '../../shared/planPrices.js';
 
 const PAGE_TITLE = 'ChangeView | Change Management Software for Consultants and Small Teams';
-const PAGE_DESCRIPTION = 'Plan, launch and measure change in one place. Stakeholder maps, readiness tracking, adoption analytics and comms. Built for change managers who are done with spreadsheets. 1-week free trial.';
+const PAGE_DESCRIPTION = 'Plan, launch and measure change in one place. Stakeholder maps, readiness tracking, adoption analytics and comms. 1-week free trial.';
 
 function trialSignupPath(tier, billingCycle = 'monthly') {
   const cycle = tier === 'solo' ? 'monthly' : (billingCycle === 'annual' ? 'annual' : 'monthly');
@@ -74,6 +74,27 @@ export default function LandingPage() {
     navigate(`/auth/callback${window.location.search}${window.location.hash}`, { replace: true });
   }, [navigate]);
 
+  useEffect(() => {
+    const id = 'cv-org-jsonld';
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement('script');
+      el.id = id;
+      el.type = 'application/ld+json';
+      document.head.appendChild(el);
+    }
+    el.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: 'ChangeView',
+      url: 'https://www.changeview.app',
+      logo: 'https://www.changeview.app/favicon.svg',
+    });
+    return () => {
+      el.remove();
+    };
+  }, []);
+
   const soloPrice = priceAmount(plans, 'solo', 'monthly');
   const smallPrice = priceAmount(plans, 'small', billingCycle);
   const pricePer = pricePeriodLabel(billingCycle);
@@ -111,6 +132,8 @@ export default function LandingPage() {
               alt="ChangeView dashboard showing planning, delivery, and impact severity"
               width={1734}
               height={903}
+              loading="eager"
+              fetchPriority="high"
             />
           </div>
         </div>

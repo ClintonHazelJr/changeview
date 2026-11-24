@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import Mark from './Mark';
 import '../../pages/landing.css';
 
+export const SITE_ORIGIN = 'https://www.changeview.app';
+
 function upsertMeta(attr, key, content) {
   if (!content) return;
   let el = document.head.querySelector(`meta[${attr}="${key}"]`);
@@ -12,6 +14,21 @@ function upsertMeta(attr, key, content) {
     document.head.appendChild(el);
   }
   el.setAttribute('content', content);
+}
+
+function upsertCanonical(href) {
+  let el = document.head.querySelector('link[rel="canonical"]');
+  if (!el) {
+    el = document.createElement('link');
+    el.setAttribute('rel', 'canonical');
+    document.head.appendChild(el);
+  }
+  el.setAttribute('href', href);
+}
+
+export function canonicalUrl(pathname) {
+  if (!pathname || pathname === '/') return `${SITE_ORIGIN}/`;
+  return `${SITE_ORIGIN}${pathname.split('?')[0].replace(/\/$/, '')}`;
 }
 
 /**
@@ -41,10 +58,11 @@ export default function SiteShell({ title, description, children, notice }) {
     if (title) {
       upsertMeta('property', 'og:title', title);
     }
+    upsertCanonical(canonicalUrl(pathname));
     return () => {
       document.title = prev || 'ChangeView';
     };
-  }, [title, description]);
+  }, [title, description, pathname]);
 
   return (
     <div className="cv-landing">
@@ -60,7 +78,7 @@ export default function SiteShell({ title, description, children, notice }) {
             <a href={section('#features')}>Product</a>
             <a href={section('#how')}>How it works</a>
             <a href={section('#pricing')}>Pricing</a>
-            <Link to="/blog">Resources</Link>
+            <Link to="/blog">Blog</Link>
           </div>
           <div className="navright">
             <Link className="signin" to="/login">Sign in</Link>

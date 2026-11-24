@@ -19,7 +19,10 @@ That's changeview.`;
 
 export default function AboutPage() {
   return (
-    <SiteShell title="About — changeview">
+    <SiteShell
+      title="About ChangeView | Change Management Software for Consultants"
+      description="ChangeView is built by a change manager for independent consultants and small teams who are done with spreadsheets."
+    >
       <main className="page">
         <div className="wrap narrow">
           <MarkdownBody source={ABOUT_MD} />

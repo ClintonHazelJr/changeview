@@ -5,11 +5,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { rememberCheckoutIntent, startCheckout } from '../lib/checkout';
 import { usePlanPrices } from '../hooks/usePlanPrices';
 import { formatPlanPrice } from '../../shared/planPrices.js';
+import { useNoIndex } from '../lib/useNoIndex';
 
 const VALID_PLANS = new Set(['solo', 'small']);
 
 export default function SignupPage() {
   const { signUp, signOut, session, loading } = useAuth();
+  useNoIndex();
   const [params] = useSearchParams();
   const planParam = String(params.get('plan') || 'solo').toLowerCase();
   const billingParam = String(params.get('billing') || 'monthly').toLowerCase();
