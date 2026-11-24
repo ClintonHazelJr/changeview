@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
+Disallow: /login
+Disallow: /signup
 
 Sitemap: https://www.changeview.app/sitemap.xml
