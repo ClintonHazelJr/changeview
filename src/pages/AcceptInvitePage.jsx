@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { C, HEAD, BODY, inputClass, inputStyle } from '../lib/constants';
 import { supabase } from '../lib/supabase';
+import { useNoIndex } from '../lib/useNoIndex';
 
 function readInviteTokens() {
   const hash = window.location.hash.startsWith('#')
@@ -18,6 +19,7 @@ function readInviteTokens() {
 }
 
 export default function AcceptInvitePage() {
+  useNoIndex();
   const navigate = useNavigate();
   const [bootstrapping, setBootstrapping] = useState(true);
   const [email, setEmail] = useState('');

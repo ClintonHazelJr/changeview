@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { C, HEAD, BODY, inputClass, inputStyle } from '../lib/constants';
+import { useNoIndex } from '../lib/useNoIndex';
 
 export default function CheckEmailPage() {
+  useNoIndex();
   const [params] = useSearchParams();
   const checkoutOk = params.get('checkout') === 'success';
   const emailFromQuery = useMemo(

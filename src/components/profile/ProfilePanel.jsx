@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { CreditCard, LogOut, Trash2, AlertTriangle } from 'lucide-react';
-import { C, HEAD, BODY, inputClass, inputStyle, initials, tint, PLAN_LABELS } from '../../lib/constants';
+import { CreditCard, LogOut, Trash2, AlertTriangle, Sparkles } from 'lucide-react';
+import { C, HEAD, BODY, inputClass, inputStyle, initials, tint, PLAN_LABELS, isPlatformAdminEmail, PLATFORM_RESET_CONFIRM, effectivePlanLimits, formatPlanLimit, trialDaysLeft as calcTrialDays, planTierRank } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { startBillingPortal } from '../../lib/checkout';
+import { startBillingPortal, updateSubscriptionPlan } from '../../lib/checkout';
 import { Field, SaveRow } from '../ui/shared';
 import Modal from '../ui/Modal';
 import { FormWorkspace } from '../forms/AdminForms';
+import { Link } from 'react-router-dom';
+import { usePlanPrices } from '../../hooks/usePlanPrices';
+import { formatPlanPrice } from '../../../shared/planPrices.js';
 
 function ConfirmDeleteModal({
   title, description, confirmWord = 'DELETE', accountName = '', confirmLabel, busy, error, onClose, onConfirm,
@@ -59,11 +62,13 @@ function ConfirmDeleteModal({
   );
 }
 
-export default function ProfilePanel() {
+export default function ProfilePanel({ initialUpgradeOpen = false, onUpgradeOpenConsumed }) {
   const { profile, session, refreshProfile, signOut } = useAuth();
-  const { workspaces, reload, createWorkspace, subscription, planTier } = useWorkspace();
+  const { workspaces, reload, createWorkspace, subscription, planTier, trialActive, trialDaysLeft } = useWorkspace();
+  const { plans } = usePlanPrices();
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [memberWorkspaces, setMemberWorkspaces] = useState([]);
+  const [activeUserCount, setActiveUserCount] = useState(null);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [dangerModal, setDangerModal] = useState(null);
@@ -71,6 +76,9 @@ export default function ProfilePanel() {
   const [dangerError, setDangerError] = useState('');
   const [showCreateWs, setShowCreateWs] = useState(false);
   const [wipeNotice, setWipeNotice] = useState('');
+  const [resetNotice, setResetNotice] = useState('');
+  const [tutorialBusy, setTutorialBusy] = useState(false);
+  const [tutorialMsg, setTutorialMsg] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -79,13 +87,52 @@ export default function ProfilePanel() {
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState('');
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [upgradeBusy, setUpgradeBusy] = useState(null);
+  const [upgradeError, setUpgradeError] = useState('');
+  const [upgradeSuccess, setUpgradeSuccess] = useState('');
+  const [upgradeCycle, setUpgradeCycle] = useState('monthly');
   const isOwner = profile?.role === 'owner';
+  const isPlatformAdmin = isPlatformAdminEmail(profile?.email || session?.user?.email);
   const accountName = profile?.accounts?.name || '';
   const hasStripeCustomer = Boolean(subscription?.stripe_customer_id);
+  const hasStripeSubscription = Boolean(subscription?.stripe_subscription_id);
+
+  useEffect(() => {
+    if (!initialUpgradeOpen) return;
+    setShowUpgrade(true);
+    onUpgradeOpenConsumed?.();
+  }, [initialUpgradeOpen, onUpgradeOpenConsumed]);
+
+  useEffect(() => {
+    setUpgradeCycle(subscription?.billing_cycle === 'annual' ? 'annual' : 'monthly');
+  }, [subscription?.billing_cycle]);
 
   useEffect(() => {
     setFullName(profile?.full_name || '');
   }, [profile?.full_name]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!profile?.account_id || !isOwner) {
+        setActiveUserCount(null);
+        return;
+      }
+      const { count, error: err } = await supabase
+        .from('users')
+        .select('id', { count: 'exact', head: true })
+        .eq('account_id', profile.account_id)
+        .neq('is_active', false);
+      if (cancelled) return;
+      if (err) {
+        setActiveUserCount(null);
+        return;
+      }
+      setActiveUserCount(count ?? 0);
+    })();
+    return () => { cancelled = true; };
+  }, [profile?.account_id, isOwner, workspaces.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,6 +182,28 @@ export default function ProfilePanel() {
           : msg,
       );
       setBillingBusy(false);
+    }
+  };
+
+  const handleUpgradePlan = async (tier, billingCycle) => {
+    setUpgradeError('');
+    setUpgradeSuccess('');
+    if (!hasStripeSubscription) {
+      setUpgradeError('No active subscription to update. Complete checkout first.');
+      return;
+    }
+    const key = `${tier}:${billingCycle}`;
+    setUpgradeBusy(key);
+    try {
+      const result = await updateSubscriptionPlan(tier, billingCycle, {
+        accessToken: session?.access_token,
+      });
+      setUpgradeSuccess(result.message || 'Plan updated. Billing will refresh in a moment.');
+      await reload();
+    } catch (err) {
+      setUpgradeError(err.message || 'Could not update plan');
+    } finally {
+      setUpgradeBusy(null);
     }
   };
 
@@ -242,6 +311,113 @@ export default function ProfilePanel() {
     }
   };
 
+  const runPlatformReset = async (confirm) => {
+    setDangerBusy(true);
+    setDangerError('');
+    setResetNotice('');
+    try {
+      const res = await fetch('/api/admin-reset-except', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ confirm }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Platform reset failed');
+      setDangerModal(null);
+      const parts = [
+        `${data.deletedAccounts ?? 0} accounts`,
+        `${data.deletedAuthUsers ?? 0} auth users`,
+        `${data.deletedStripeCustomers ?? 0} Stripe customers`,
+      ];
+      setResetNotice(`Platform reset complete: removed ${parts.join(', ')}. Your login and account were kept.`);
+      if (Array.isArray(data.errors) && data.errors.length) {
+        setResetNotice((prev) => `${prev} Some errors: ${data.errors.slice(0, 3).join('; ')}`);
+      }
+      await reload();
+      await refreshProfile();
+    } catch (err) {
+      setDangerError(err.message);
+    } finally {
+      setDangerBusy(false);
+    }
+  };
+
+  const restartTutorial = async () => {
+    if (!profile?.id || tutorialBusy) return;
+    setTutorialBusy(true);
+    setTutorialMsg('');
+    try {
+      const { error: err } = await supabase
+        .from('users')
+        .update({ onboarding_completed_at: null })
+        .eq('id', profile.id);
+      if (err) throw err;
+      await refreshProfile();
+      setTutorialMsg('Tutorial restarted.');
+    } catch (err) {
+      setTutorialMsg(err.message || 'Could not restart tutorial.');
+    } finally {
+      setTutorialBusy(false);
+    }
+  };
+
+  const planLimits = effectivePlanLimits(planTier, subscription);
+  const statusLabel = subscription?.status || '—';
+  const billingCycleLabel = subscription?.billing_cycle === 'annual'
+    ? 'Annual'
+    : subscription?.billing_cycle === 'monthly'
+      ? 'Monthly'
+      : '—';
+  const currentCycle = subscription?.billing_cycle === 'annual' ? 'annual' : 'monthly';
+  const currentRank = planTierRank(planTier);
+  const planPriceLabel = formatPlanPrice(
+    plans,
+    planTier,
+    currentCycle,
+  );
+  const nextBilling = subscription?.current_period_end
+    ? new Date(subscription.current_period_end).toLocaleDateString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+    })
+    : null;
+  const daysLeft = trialActive
+    ? (typeof trialDaysLeft === 'number' ? trialDaysLeft : calcTrialDays(subscription))
+    : 0;
+
+  const upgradeOptions = ['small', 'enterprise'].flatMap((tier) => {
+    const rank = planTierRank(tier);
+    if (tier === 'enterprise') {
+      if (rank <= currentRank) return [];
+      return [{
+        tier: 'enterprise',
+        cycle: null,
+        label: PLAN_LABELS.enterprise,
+        price: null,
+        salesAssisted: true,
+        blurb: 'Unlimited users and workspaces — sales-assisted setup',
+      }];
+    }
+    // Pro (small)
+    const cycles = [];
+    if (rank > currentRank) {
+      cycles.push('monthly', 'annual');
+    } else if (rank === currentRank && currentCycle === 'monthly') {
+      cycles.push('annual');
+    }
+    return cycles.map((cycle) => ({
+      tier,
+      cycle,
+      label: PLAN_LABELS[tier],
+      price: formatPlanPrice(plans, tier, cycle),
+      salesAssisted: false,
+      blurb: 'Schedule, Tasks, 5 more reports, 5 users, unlimited workspaces',
+    }));
+  }).filter((opt) => {
+    if (opt.salesAssisted) return true;
+    if (upgradeCycle === 'annual') return opt.cycle === 'annual';
+    return opt.cycle === 'monthly';
+  });
+
   const workspaceList = isOwner
     ? null
     : (memberWorkspaces.length ? memberWorkspaces : workspaces);
@@ -257,6 +433,15 @@ export default function ProfilePanel() {
           style={{ borderColor: tint(C.amber, '50'), background: tint(C.amber, '16'), color: C.ink }}
         >
           {wipeNotice}
+        </div>
+      )}
+
+      {resetNotice && (
+        <div
+          className="mb-4 text-sm rounded-2xl border px-4 py-3"
+          style={{ borderColor: tint(C.navy, '45'), background: tint(C.navy, '10'), color: C.ink }}
+        >
+          {resetNotice}
         </div>
       )}
 
@@ -360,34 +545,206 @@ export default function ProfilePanel() {
 
       {isOwner && (
         <div className="bg-white rounded-3xl border shadow-sm p-5 mb-4" style={{ borderColor: C.border }}>
-          <h3 className="text-sm font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Billing</h3>
-          <p className="text-xs mb-3" style={{ color: C.sub }}>
-            Update your payment method, view invoices, or manage your plan in Stripe's Customer Portal.
+          <h3 className="text-sm font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Your Plan</h3>
+          <p className="text-xs mb-4" style={{ color: C.sub }}>
+            Plan details for this account. Use Manage Billing to update payment or cancel in Stripe.
           </p>
-          {(planTier || subscription?.status) && (
-            <p className="text-xs font-semibold mb-4" style={{ color: C.purple }}>
-              {PLAN_LABELS[planTier] || planTier || 'Plan'}
-              {subscription?.billing_cycle === 'annual' ? ' · annual' : subscription?.billing_cycle ? ' · monthly' : ''}
-              {subscription?.status ? ` · ${subscription.status}` : ''}
-            </p>
-          )}
+
+          <dl className="space-y-2.5 mb-4 text-sm">
+            <div className="flex justify-between gap-3">
+              <dt style={{ color: C.sub }}>Plan</dt>
+              <dd className="font-semibold text-right" style={{ color: C.ink }}>
+                {PLAN_LABELS[planTier] || planTier || '—'}
+                {billingCycleLabel !== '—' ? ` · ${billingCycleLabel}` : ''}
+                {planPriceLabel ? ` · ${planPriceLabel}` : ''}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt style={{ color: C.sub }}>Status</dt>
+              <dd className="font-semibold text-right" style={{ color: C.ink }}>
+                {statusLabel}
+                {trialActive && (
+                  <span className="font-medium" style={{ color: C.sub }}>
+                    {daysLeft === 0
+                      ? ' · trial ends today'
+                      : daysLeft === 1
+                        ? ' · 1 day left'
+                        : ` · ${daysLeft} days left`}
+                  </span>
+                )}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt style={{ color: C.sub }}>Next billing</dt>
+              <dd className="font-semibold text-right" style={{ color: C.ink }}>
+                {nextBilling || (subscription?.status === 'incomplete' ? 'After checkout' : '—')}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt style={{ color: C.sub }}>Workspaces</dt>
+              <dd className="font-semibold text-right" style={{ color: C.ink }}>
+                {formatPlanLimit(workspaces.length, planLimits.workspaces)} Workspaces
+              </dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt style={{ color: C.sub }}>Users</dt>
+              <dd className="font-semibold text-right" style={{ color: C.ink }}>
+                {activeUserCount == null
+                  ? '—'
+                  : `${formatPlanLimit(activeUserCount, planLimits.users)} users`}
+              </dd>
+            </div>
+          </dl>
+
           {!hasStripeCustomer ? (
             <p className="text-sm" style={{ color: C.sub }}>No billing information on file yet.</p>
           ) : (
-            <button
-              type="button"
-              disabled={billingBusy}
-              onClick={handleManageBilling}
-              className="inline-flex items-center gap-2 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-50"
-              style={{ background: C.purple }}
-            >
-              <CreditCard size={15} />
-              {billingBusy ? 'Opening…' : 'Manage Billing'}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={billingBusy}
+                onClick={handleManageBilling}
+                className="inline-flex items-center gap-2 text-sm font-bold text-white px-4 py-2.5 rounded-full disabled:opacity-50"
+                style={{ background: C.purple }}
+              >
+                <CreditCard size={15} />
+                {billingBusy ? 'Opening…' : 'Manage Billing'}
+              </button>
+              {hasStripeSubscription && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUpgrade((v) => !v);
+                    setUpgradeError('');
+                    setUpgradeSuccess('');
+                  }}
+                  className="inline-flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-full border"
+                  style={{ borderColor: C.purple, color: C.purple, background: tint(C.purple, '10') }}
+                >
+                  <Sparkles size={15} />
+                  {showUpgrade ? 'Hide upgrades' : 'Upgrade Plan'}
+                </button>
+              )}
+            </div>
           )}
           {billingError && <p className="text-xs mt-3" style={{ color: C.coral }}>{billingError}</p>}
+
+          {showUpgrade && hasStripeSubscription && (
+            <div className="mt-5 pt-5 border-t" style={{ borderColor: C.border }}>
+              <p className="text-xs mb-3" style={{ color: C.sub }}>
+                You’ll be charged the prorated difference immediately, and your billing cycle restarts today
+                {trialActive ? ' (after trial ends if you’re still trialing)' : ''}.
+              </p>
+              {planTier !== 'enterprise' && (
+                <div className="flex gap-2 mb-3">
+                  {['monthly', 'annual'].map((cycle) => (
+                    <button
+                      key={cycle}
+                      type="button"
+                      onClick={() => setUpgradeCycle(cycle)}
+                      className="text-xs font-bold px-3 py-1.5 rounded-full"
+                      style={{
+                        background: upgradeCycle === cycle ? C.purple : tint(C.purple, '12'),
+                        color: upgradeCycle === cycle ? '#fff' : C.purple,
+                      }}
+                    >
+                      {cycle === 'annual' ? 'Annual' : 'Monthly'}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!upgradeOptions.length ? (
+                <p className="text-sm" style={{ color: C.sub }}>
+                  You’re on the highest self-serve plan
+                  {currentCycle === 'annual' ? '' : ' for this billing cycle'}.
+                  {' '}For Enterprise, contact us.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {upgradeOptions.map((opt) => {
+                    const busyKey = opt.salesAssisted ? 'enterprise' : `${opt.tier}:${opt.cycle}`;
+                    return (
+                      <div
+                        key={busyKey}
+                        className="rounded-2xl border p-4"
+                        style={{ borderColor: C.border }}
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div>
+                            <div className="text-sm font-extrabold" style={{ ...HEAD, color: C.ink }}>
+                              {opt.label}
+                              {!opt.salesAssisted && (
+                                <span className="font-semibold ml-1" style={{ color: C.sub }}>
+                                  · {opt.cycle === 'annual' ? 'Annual' : 'Monthly'}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs mt-0.5" style={{ color: C.sub }}>{opt.blurb}</p>
+                          </div>
+                          <div className="text-sm font-bold shrink-0" style={{ color: C.ink }}>
+                            {opt.salesAssisted ? 'Custom' : (opt.price || '—')}
+                          </div>
+                        </div>
+                        {opt.salesAssisted ? (
+                          <Link
+                            to="/contact"
+                            className="inline-flex text-sm font-bold text-white px-4 py-2 rounded-full no-underline"
+                            style={{ background: C.purple }}
+                          >
+                            Contact Us
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={Boolean(upgradeBusy)}
+                            onClick={() => handleUpgradePlan(opt.tier, opt.cycle)}
+                            className="text-sm font-bold text-white px-4 py-2 rounded-full disabled:opacity-50"
+                            style={{ background: C.purple }}
+                          >
+                            {upgradeBusy === busyKey ? 'Updating…' : `Upgrade to ${opt.label}`}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {upgradeError && <p className="text-xs mt-3" style={{ color: C.coral }}>{upgradeError}</p>}
+              {upgradeSuccess && <p className="text-xs mt-3" style={{ color: C.green }}>{upgradeSuccess}</p>}
+            </div>
+          )}
         </div>
       )}
+
+      <div className="bg-white rounded-3xl border shadow-sm p-5 mb-4" style={{ borderColor: C.border }}>
+        <h3 className="text-sm font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Help</h3>
+        <p className="text-xs mb-3" style={{ color: C.sub }}>
+          Replay the short product tour, or open the full written guide.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={tutorialBusy}
+            onClick={restartTutorial}
+            className="text-sm font-semibold underline disabled:opacity-50"
+            style={{ color: C.purple }}
+          >
+            {tutorialBusy ? 'Starting…' : 'Show tutorial again'}
+          </button>
+          <Link
+            to="/guide"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-semibold underline"
+            style={{ color: C.purple }}
+          >
+            Open user guide
+          </Link>
+        </div>
+        {tutorialMsg && (
+          <p className="text-xs mt-2" style={{ color: C.sub }}>{tutorialMsg}</p>
+        )}
+      </div>
 
       <div className="bg-white rounded-3xl border shadow-sm p-5 mb-4" style={{ borderColor: C.border }}>
         <h3 className="text-sm font-extrabold mb-1" style={{ ...HEAD, color: C.ink }}>Change password</h3>
@@ -490,6 +847,36 @@ export default function ProfilePanel() {
         </section>
       )}
 
+      {isPlatformAdmin && (
+        <section
+          className="rounded-3xl border p-5 mt-4"
+          style={{ borderColor: tint(C.ink, '35'), background: tint(C.ink, '06') }}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle size={16} style={{ color: C.ink }} />
+            <h3 className="text-sm font-extrabold" style={{ ...HEAD, color: C.ink }}>Platform admin</h3>
+          </div>
+          <p className="text-xs mb-5" style={{ color: C.sub }}>
+            Visible only to you. Purges every other tenancy so test resets stay consistent.
+          </p>
+          <div className="bg-white rounded-2xl border p-4" style={{ borderColor: tint(C.coral, '40') }}>
+            <div className="text-sm font-bold mb-1" style={{ color: C.coral }}>Reset platform (keep my login)</div>
+            <p className="text-xs mb-3" style={{ color: C.sub }}>
+              Permanently deletes every other account, workspace, app user, Auth login, and Stripe customer.
+              Keeps your email, account, subscription, and workspaces.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setDangerError(''); setDangerModal('platform-reset'); }}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-white px-3 py-2 rounded-full"
+              style={{ background: C.ink }}
+            >
+              <Trash2 size={13} /> Reset all except me
+            </button>
+          </div>
+        </section>
+      )}
+
       {dangerModal === 'data' && (
         <ConfirmDeleteModal
           title="Delete all data"
@@ -513,6 +900,19 @@ export default function ProfilePanel() {
           error={dangerError}
           onClose={() => setDangerModal(null)}
           onConfirm={runDeleteAccount}
+        />
+      )}
+
+      {dangerModal === 'platform-reset' && (
+        <ConfirmDeleteModal
+          title="Reset platform"
+          description="This permanently deletes every other account, workspace, user, Auth login, and Stripe customer. Your login, account, subscription, and workspaces are kept. This cannot be undone."
+          confirmWord={PLATFORM_RESET_CONFIRM}
+          confirmLabel="Reset platform"
+          busy={dangerBusy}
+          error={dangerError}
+          onClose={() => setDangerModal(null)}
+          onConfirm={runPlatformReset}
         />
       )}
 

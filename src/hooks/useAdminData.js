@@ -44,7 +44,7 @@ export function useAdminData() {
   const addOrg = async (name) => {
     const { data, error } = await supabase
       .from('organizations')
-      .insert({ account_id: accountId, workspace_id: workspaceId, name })
+      .insert({ account_id: accountId, workspace_id: workspaceId, name, is_active: true })
       .select()
       .single();
     if (error) throw error;
@@ -52,18 +52,92 @@ export function useAdminData() {
     return data;
   };
 
+  const updateOrg = async (id, name) => {
+    const { error } = await supabase
+      .from('organizations')
+      .update({ name })
+      .eq('id', id);
+    if (error) throw error;
+    await load();
+  };
+
+  const setOrgActive = async (id, isActive) => {
+    const { error } = await supabase
+      .from('organizations')
+      .update({ is_active: isActive })
+      .eq('id', id);
+    if (error) throw error;
+    await load();
+  };
+
   const addDepartment = async ({ orgId, name, location }) => {
     const { error } = await supabase.from('departments').insert({
-      account_id: accountId, workspace_id: workspaceId, org_id: orgId, name, location,
+      account_id: accountId,
+      workspace_id: workspaceId,
+      org_id: orgId,
+      name,
+      location,
+      is_active: true,
     });
+    if (error) throw error;
+    await load();
+  };
+
+  const updateDepartment = async (id, { orgId, name, location }) => {
+    const { error } = await supabase
+      .from('departments')
+      .update({
+        org_id: orgId,
+        name,
+        location: location || null,
+      })
+      .eq('id', id);
+    if (error) throw error;
+    await load();
+  };
+
+  const setDepartmentActive = async (id, isActive) => {
+    const { error } = await supabase
+      .from('departments')
+      .update({ is_active: isActive })
+      .eq('id', id);
     if (error) throw error;
     await load();
   };
 
   const addPerson = async ({ departmentId, name, title, email }) => {
     const { error } = await supabase.from('people').insert({
-      account_id: accountId, workspace_id: workspaceId, department_id: departmentId, name, title, email,
+      account_id: accountId,
+      workspace_id: workspaceId,
+      department_id: departmentId,
+      name,
+      title,
+      email,
+      is_active: true,
     });
+    if (error) throw error;
+    await load();
+  };
+
+  const updatePerson = async (id, { departmentId, name, title, email }) => {
+    const { error } = await supabase
+      .from('people')
+      .update({
+        department_id: departmentId || null,
+        name,
+        title: title || null,
+        email: email || null,
+      })
+      .eq('id', id);
+    if (error) throw error;
+    await load();
+  };
+
+  const setPersonActive = async (id, isActive) => {
+    const { error } = await supabase
+      .from('people')
+      .update({ is_active: isActive })
+      .eq('id', id);
     if (error) throw error;
     await load();
   };
@@ -86,6 +160,8 @@ export function useAdminData() {
 
   return {
     orgs, departments, people, teams, loading, reload: load,
-    addOrg, addDepartment, addPerson, addTeam, addTeamMember,
+    addOrg, updateOrg, setOrgActive,
+    addDepartment, updateDepartment, setDepartmentActive,
+    addPerson, updatePerson, setPersonActive, addTeam, addTeamMember,
   };
 }

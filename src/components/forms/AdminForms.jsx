@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Sparkles, Copy } from 'lucide-react';
 import {
-  C, inputClass, inputStyle, TAG_OPTIONS, SEVERITY_COLOR, SEVERITY_LEVELS,
+  C, inputClass, inputStyle, TAG_OPTIONS, SEVERITY_COLOR, SEVERITY_LEVELS, stripInitiativeMeta, assignableOptions, unarchivedOptions,
 } from '../../lib/constants';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,9 +20,10 @@ import { Field, Pill, SaveRow } from '../ui/shared';
 import PersonSelect from '../ui/PersonSelect';
 import { AttachmentList, FieldWithAttach } from '../ui/AttachmentField';
 
-export function FormOrg({ onSave }) {
-  const [name, setName] = useState('');
+export function FormOrg({ initial, onSave }) {
+  const [name, setName] = useState(initial?.name || '');
   const [error, setError] = useState('');
+  const editing = Boolean(initial?.id);
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
@@ -32,16 +33,18 @@ export function FormOrg({ onSave }) {
         <input className={inputClass} style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Software Co" autoFocus />
       </Field>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow />
+      <SaveRow label={editing ? 'Save changes' : 'Save'} />
     </form>
   );
 }
 
-export function FormDepartment({ orgs, onSave }) {
-  const [orgId, setOrgId] = useState(orgs[0]?.id || '');
-  const [name, setName] = useState('');
-  const [location, setLocation] = useState('');
+export function FormDepartment({ orgs, initial, onSave }) {
+  const assignableOrgs = assignableOptions(orgs, initial?.org_id);
+  const [orgId, setOrgId] = useState(initial?.org_id || assignableOrgs[0]?.id || '');
+  const [name, setName] = useState(initial?.name || '');
+  const [location, setLocation] = useState(initial?.location || '');
   const [error, setError] = useState('');
+  const editing = Boolean(initial?.id);
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
@@ -49,23 +52,24 @@ export function FormDepartment({ orgs, onSave }) {
     }}>
       <Field label="Org">
         <select className={inputClass} style={inputStyle} value={orgId} onChange={(e) => setOrgId(e.target.value)}>
-          {orgs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {assignableOrgs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </Field>
-      <Field label="Department"><input className={inputClass} style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Operations" /></Field>
+      <Field label="Department"><input className={inputClass} style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Operations" autoFocus /></Field>
       <Field label="Location"><input className={inputClass} style={inputStyle} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. 123 Anytown US" /></Field>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow />
+      <SaveRow label={editing ? 'Save changes' : 'Save'} />
     </form>
   );
 }
 
-export function FormPerson({ departments, onSave }) {
-  const [departmentId, setDepartmentId] = useState(departments[0]?.id || '');
-  const [name, setName] = useState('');
-  const [title, setTitle] = useState('');
-  const [email, setEmail] = useState('');
+export function FormPerson({ departments, initial, onSave }) {
+  const [departmentId, setDepartmentId] = useState(initial?.department_id || departments[0]?.id || '');
+  const [name, setName] = useState(initial?.name || '');
+  const [title, setTitle] = useState(initial?.title || '');
+  const [email, setEmail] = useState(initial?.email || '');
   const [error, setError] = useState('');
+  const editing = Boolean(initial?.id);
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
@@ -74,13 +78,13 @@ export function FormPerson({ departments, onSave }) {
       <Field label="Name"><input className={inputClass} style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Micheal Blackman" autoFocus /></Field>
       <Field label="Department">
         <select className={inputClass} style={inputStyle} value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-          {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          {assignableOptions(departments, departmentId).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
       </Field>
       <Field label="Title"><input className={inputClass} style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Change Manager" /></Field>
       <Field label="Email"><input className={inputClass} style={inputStyle} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. blackman@software.co" /></Field>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow />
+      <SaveRow label={editing ? 'Save changes' : 'Save'} />
     </form>
   );
 }
@@ -143,7 +147,7 @@ export function FormWorkspace({ onSave }) {
   );
 }
 
-export function FormInitiative({ onSave }) {
+export function FormInitiative({ initial, onSave }) {
   const { activeWorkspaceId } = useWorkspace();
   const [people, setPeople] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -151,12 +155,22 @@ export function FormInitiative({ onSave }) {
   const [loadingPeople, setLoadingPeople] = useState(true);
   const [loadingPrograms, setLoadingPrograms] = useState(true);
   const [vals, setVals] = useState({
-    name: '', description: '', programId: '', startDate: '', goLiveDate: '', budget: '', useCase: '', expectedBenefits: '',
-    changeOwnerId: '', productOwnerId: '', businessOwnerId: '', projectManagerId: '',
+    name: initial?.name || '',
+    description: stripInitiativeMeta(initial?.description),
+    programId: initial?.program_id || '',
+    status: initial?.status || 'planning',
+    startDate: initial?.start_date || '',
+    goLiveDate: initial?.proposed_go_live_date || '',
+    budget: initial?.budget ?? '',
+    useCase: initial?.use_case || '',
+    expectedBenefits: initial?.expected_benefits || '',
+    changeOwnerId: initial?.change_owner_id || '',
+    productOwnerId: initial?.product_owner_id || '',
+    businessOwnerId: initial?.business_owner_id || '',
+    projectManagerId: initial?.project_manager_id || '',
   });
   const [error, setError] = useState('');
   const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
-  const personName = (id) => people.find((p) => p.id === id)?.name || '';
 
   useEffect(() => {
     let cancelled = false;
@@ -174,9 +188,9 @@ export function FormInitiative({ onSave }) {
       setLoadingPeople(true);
       setLoadingPrograms(true);
       const [peopleRes, deptRes, programsRes] = await Promise.all([
-        supabase.from('people').select('id, name, title, email, department_id').eq('workspace_id', activeWorkspaceId).order('name'),
-        supabase.from('departments').select('id, name').eq('workspace_id', activeWorkspaceId),
-        supabase.from('programs').select('id, name').eq('workspace_id', activeWorkspaceId).order('name'),
+        supabase.from('people').select('id, name, title, email, department_id, is_active').eq('workspace_id', activeWorkspaceId).order('name'),
+        supabase.from('departments').select('id, name, is_active').eq('workspace_id', activeWorkspaceId),
+        supabase.from('programs').select('id, name, archived_at').eq('workspace_id', activeWorkspaceId).order('name'),
       ]);
       if (cancelled) return;
       if (peopleRes.error) setError(peopleRes.error.message);
@@ -185,8 +199,9 @@ export function FormInitiative({ onSave }) {
       setPrograms(programsRes.data || []);
       setLoadingPeople(false);
       setLoadingPrograms(false);
-      if ((programsRes.data || []).length === 1) {
-        setVals((prev) => ({ ...prev, programId: prev.programId || programsRes.data[0].id }));
+      const openPrograms = unarchivedOptions(programsRes.data || [], '');
+      if (openPrograms.length === 1) {
+        setVals((prev) => ({ ...prev, programId: prev.programId || openPrograms[0].id }));
       }
     })();
     return () => { cancelled = true; };
@@ -197,30 +212,30 @@ export function FormInitiative({ onSave }) {
       e.preventDefault();
       try {
         if (!vals.programId) throw new Error('Select a Program, or create one under Program first.');
-        if (vals.name) {
-          await onSave({
-            ...vals,
-            changeOwner: personName(vals.changeOwnerId),
-            productOwner: personName(vals.productOwnerId),
-            businessOwner: personName(vals.businessOwnerId),
-            projectManager: personName(vals.projectManagerId),
-          });
-        }
+        if (vals.name) await onSave(vals);
       } catch (err) { setError(err.message); }
     }}>
       <Field label="Program">
         {loadingPrograms ? (
           <p className="text-xs" style={{ color: C.sub }}>Loading programs…</p>
-        ) : programs.length === 0 ? (
+        ) : unarchivedOptions(programs, vals.programId).length === 0 ? (
           <p className="text-xs" style={{ color: C.sub }}>Create a Program first (sidebar → Program).</p>
         ) : (
           <select className={inputClass} style={inputStyle} value={vals.programId} onChange={set('programId')} required>
             <option value="">Select program</option>
-            {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {unarchivedOptions(programs, vals.programId).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
       </Field>
       <Field label="Initiative Name"><input className={inputClass} style={inputStyle} value={vals.name} onChange={set('name')} placeholder="e.g. Salesforce Rollout" autoFocus /></Field>
+      <Field label="Status">
+        <select className={inputClass} style={inputStyle} value={vals.status} onChange={set('status')}>
+          <option value="planning">Planning</option>
+          <option value="delivery">Delivery</option>
+          <option value="hypercare">Hypercare</option>
+          <option value="closed">Closed</option>
+        </select>
+      </Field>
       <Field label="Description"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.description} onChange={set('description')} /></Field>
       <div className="grid grid-cols-2 gap-4">
         <Field label="Start Date"><input type="date" className={inputClass} style={inputStyle} value={vals.startDate} onChange={set('startDate')} /></Field>
@@ -266,15 +281,20 @@ export function FormInitiative({ onSave }) {
         />
       </div>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow disabled={programs.length === 0} />
+      <SaveRow disabled={unarchivedOptions(programs, vals.programId).length === 0} />
     </form>
   );
 }
 
 export function FormProgram({ orgs, initial, onSave }) {
+  const { activeWorkspaceId } = useWorkspace();
+  const [people, setPeople] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [loadingPeople, setLoadingPeople] = useState(true);
+  const assignableOrgs = assignableOptions(orgs, initial?.organization_id);
   const [vals, setVals] = useState({
     name: initial?.name || '',
-    organizationId: initial?.organization_id || orgs[0]?.id || '',
+    organizationId: initial?.organization_id || assignableOrgs[0]?.id || '',
     description: initial?.description || '',
     status: initial?.status || 'planning',
     startDate: initial?.start_date || '',
@@ -282,9 +302,38 @@ export function FormProgram({ orgs, initial, onSave }) {
     budget: initial?.budget ?? '',
     goal: initial?.goal || '',
     benefits: initial?.benefits || '',
+    programManagerId: initial?.program_manager_id || '',
+    sponsorId: initial?.sponsor_id || '',
   });
   const [error, setError] = useState('');
   const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
+  const editing = Boolean(initial?.id);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!activeWorkspaceId) {
+        if (!cancelled) {
+          setPeople([]);
+          setDepartments([]);
+          setLoadingPeople(false);
+        }
+        return;
+      }
+      setLoadingPeople(true);
+      const [peopleRes, deptRes] = await Promise.all([
+        supabase.from('people').select('id, name, title, email, department_id, is_active').eq('workspace_id', activeWorkspaceId).order('name'),
+        supabase.from('departments').select('id, name, is_active').eq('workspace_id', activeWorkspaceId),
+      ]);
+      if (cancelled) return;
+      if (peopleRes.error) setError(peopleRes.error.message);
+      setPeople(peopleRes.data || []);
+      setDepartments(deptRes.data || []);
+      setLoadingPeople(false);
+    })();
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId]);
+
   return (
     <form onSubmit={async (e) => {
       e.preventDefault();
@@ -294,11 +343,11 @@ export function FormProgram({ orgs, initial, onSave }) {
       } catch (err) { setError(err.message); }
     }}>
       <Field label="Org">
-        {orgs.length === 0 ? (
+        {assignableOptions(orgs, vals.organizationId).length === 0 ? (
           <p className="text-xs" style={{ color: C.sub }}>Add an Org in Settings first.</p>
         ) : (
           <select className={inputClass} style={inputStyle} value={vals.organizationId} onChange={set('organizationId')}>
-            {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            {assignableOptions(orgs, vals.organizationId).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
           </select>
         )}
       </Field>
@@ -318,8 +367,26 @@ export function FormProgram({ orgs, initial, onSave }) {
       <Field label="Budget"><input type="number" className={inputClass} style={inputStyle} value={vals.budget} onChange={set('budget')} /></Field>
       <Field label="Goal"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.goal} onChange={set('goal')} /></Field>
       <Field label="Benefits"><textarea rows={2} className={inputClass} style={inputStyle} value={vals.benefits} onChange={set('benefits')} /></Field>
+      <div className="grid grid-cols-2 gap-4">
+        <PersonSelect
+          label="Program Manager"
+          people={people}
+          departments={departments}
+          loading={loadingPeople}
+          value={vals.programManagerId}
+          onChange={set('programManagerId')}
+        />
+        <PersonSelect
+          label="Sponsor"
+          people={people}
+          departments={departments}
+          loading={loadingPeople}
+          value={vals.sponsorId}
+          onChange={set('sponsorId')}
+        />
+      </div>
       {error && <p className="text-xs mb-2" style={{ color: C.coral }}>{error}</p>}
-      <SaveRow disabled={orgs.length === 0} />
+      <SaveRow label={editing ? 'Save changes' : 'Save'} disabled={assignableOptions(orgs, vals.organizationId).length === 0} />
     </form>
   );
 }
@@ -379,6 +446,7 @@ export function FormRequirement({ initiatives, people, departments = [], impacts
           <select className={inputClass} style={inputStyle} value={vals.status} onChange={set('status')}>
             <option value="draft">Draft</option>
             <option value="approved">Approved</option>
+            <option value="completed">Completed</option>
             <option value="rejected">Rejected</option>
           </select>
         </Field>
@@ -437,7 +505,7 @@ export function FormRequirement({ initiatives, people, departments = [], impacts
 }
 
 export function FormTask({
-  initiatives, people, departments = [], teams, requirements, initial, onSave, onDelete,
+  initiatives, people, departments = [], teams, requirements, learningNeeds = [], initial, onSave, onDelete,
 }) {
   const [vals, setVals] = useState({
     initiativeId: initial?.initiative_id || initiatives[0]?.id || '',
@@ -453,17 +521,27 @@ export function FormTask({
     sprint: initial?.sprint || '',
     pi: initial?.pi || '',
     requirementIds: initial?.requirementIds || [],
+    learningNeedIds: initial?.learningNeedIds || [],
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const set = (k) => (e) => setVals({ ...vals, [k]: e.target.value });
   const initiativeReqs = requirements.filter((r) => r.initiative_id === vals.initiativeId);
+  const initiativeLNs = learningNeeds.filter((ln) => ln.initiative_id === vals.initiativeId);
   const toggleReq = (id) => {
     setVals((prev) => ({
       ...prev,
       requirementIds: prev.requirementIds.includes(id)
         ? prev.requirementIds.filter((x) => x !== id)
         : [...prev.requirementIds, id],
+    }));
+  };
+  const toggleLN = (id) => {
+    setVals((prev) => ({
+      ...prev,
+      learningNeedIds: prev.learningNeedIds.includes(id)
+        ? prev.learningNeedIds.filter((x) => x !== id)
+        : [...prev.learningNeedIds, id],
     }));
   };
 
@@ -555,6 +633,25 @@ export function FormTask({
                   className="mt-1"
                 />
                 <span>{r.reference_number || 'Req'} — {r.description}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </Field>
+      <Field label="Linked Learning Needs">
+        {initiativeLNs.length === 0 ? (
+          <p className="text-xs" style={{ color: C.sub }}>No learning needs on this Initiative yet.</p>
+        ) : (
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {initiativeLNs.map((ln) => (
+              <label key={ln.id} className="flex items-start gap-2 text-sm" style={{ color: C.ink }}>
+                <input
+                  type="checkbox"
+                  checked={vals.learningNeedIds.includes(ln.id)}
+                  onChange={() => toggleLN(ln.id)}
+                  className="mt-1"
+                />
+                <span>{ln.team || 'Team'} — {ln.goal || 'Learning need'}</span>
               </label>
             ))}
           </div>
@@ -679,11 +776,11 @@ export function FormImpact({ departments, initial, onSave, onDelete, onComplete 
     }}>
       <div className="grid grid-cols-2 gap-4">
         <Field label="Department">
-          {departments.length === 0 ? (
+          {assignableOptions(departments, departmentId).length === 0 ? (
             <p className="text-xs" style={{ color: C.sub }}>Add a Department in Settings first.</p>
           ) : (
             <select className={inputClass} style={inputStyle} value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              {assignableOptions(departments, departmentId).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           )}
         </Field>
@@ -801,7 +898,7 @@ export function FormStakeholder({ people, departments = [], initial, onSave, onD
   );
 }
 
-export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete, onComplete }) {
+export function FormLearningNeed({ impacts, deptName, tasks = [], initial, onSave, onDelete, onComplete }) {
   const editing = Boolean(initial?.id);
   const { profile } = useAuth();
   const { activeWorkspaceId } = useWorkspace();
@@ -816,9 +913,16 @@ export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete,
   const [sessions, setSessions] = useState(initial?.session_count ?? 1);
   const [hours, setHours] = useState(initial?.time_hours ?? 0.5);
   const [status, setStatus] = useState(initial?.status || 'draft');
+  const [taskIds, setTaskIds] = useState(initial?.taskIds || []);
   const [materials, setMaterials] = useState([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const selectedImpact = impacts.find((i) => i.id === impactId);
+  const initiativeTasks = tasks.filter((t) => t.initiative_id === selectedImpact?.initiative_id);
+  const toggleTask = (id) => {
+    setTaskIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
 
   useEffect(() => {
     if (!initial?.id) return;
@@ -850,7 +954,7 @@ export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete,
       setError('');
       try {
         const saved = await onSave({
-          impactId, team, goal, headcount: Number(headcount) || 0, type, sessions: Number(sessions), hours: Number(hours), status,
+          impactId, team, goal, headcount: Number(headcount) || 0, type, sessions: Number(sessions), hours: Number(hours), status, taskIds,
         });
         const learningNeedId = saved?.id || initial?.id;
         if (!learningNeedId) throw new Error('Learning Need was saved but no id was returned.');
@@ -893,8 +997,28 @@ export function FormLearningNeed({ impacts, deptName, initial, onSave, onDelete,
         <select className={inputClass} style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="draft">Draft</option>
           <option value="approved">Approved</option>
+          <option value="completed">Completed</option>
           <option value="rejected">Rejected</option>
         </select>
+      </Field>
+      <Field label="Linked Tasks">
+        {initiativeTasks.length === 0 ? (
+          <p className="text-xs" style={{ color: C.sub }}>No tasks on this Initiative yet.</p>
+        ) : (
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {initiativeTasks.map((t) => (
+              <label key={t.id} className="flex items-start gap-2 text-sm" style={{ color: C.ink }}>
+                <input
+                  type="checkbox"
+                  checked={taskIds.includes(t.id)}
+                  onChange={() => toggleTask(t.id)}
+                  className="mt-1"
+                />
+                <span>{t.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
       </Field>
       <FieldWithAttach
         label="Training Material"
@@ -921,6 +1045,8 @@ export function FormHypercare({ initiative, hypercare, onSave }) {
   const [pilotSuccessCriteria, setPilotSuccessCriteria] = useState(hypercare?.pilot_success_criteria || '');
   const [assumptions, setAssumptions] = useState(hypercare?.assumptions || '');
   const [duration, setDuration] = useState(hypercare?.duration || '');
+  const [startDate, setStartDate] = useState(hypercare?.start_date || '');
+  const [endDate, setEndDate] = useState(hypercare?.end_date || '');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -930,7 +1056,9 @@ export function FormHypercare({ initiative, hypercare, onSave }) {
     setPilotSuccessCriteria(hypercare?.pilot_success_criteria || '');
     setAssumptions(hypercare?.assumptions || '');
     setDuration(hypercare?.duration || '');
-  }, [initiative?.id, initiative?.proposed_go_live_date, hypercare?.id]);
+    setStartDate(hypercare?.start_date || '');
+    setEndDate(hypercare?.end_date || '');
+  }, [initiative?.id, initiative?.proposed_go_live_date, hypercare?.id, hypercare?.start_date, hypercare?.end_date]);
 
   return (
     <form
@@ -945,6 +1073,8 @@ export function FormHypercare({ initiative, hypercare, onSave }) {
             pilotSuccessCriteria,
             assumptions,
             duration,
+            startDate: startDate || null,
+            endDate: endDate || null,
           });
         } catch (err) {
           setError(err.message);
@@ -962,6 +1092,26 @@ export function FormHypercare({ initiative, hypercare, onSave }) {
           onChange={(e) => setProposedGoLiveDate(e.target.value)}
         />
       </Field>
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Hypercare Start Date">
+          <input
+            type="date"
+            className={inputClass}
+            style={inputStyle}
+            value={startDate || ''}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </Field>
+        <Field label="Hypercare End Date">
+          <input
+            type="date"
+            className={inputClass}
+            style={inputStyle}
+            value={endDate || ''}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </Field>
+      </div>
       <Field label="Pilot">
         <label className="flex items-center gap-2 text-sm" style={{ color: C.ink }}>
           <input type="checkbox" checked={pilot} onChange={(e) => setPilot(e.target.checked)} />
@@ -989,7 +1139,7 @@ export function FormHypercare({ initiative, hypercare, onSave }) {
           placeholder="Key assumptions for hypercare"
         />
       </Field>
-      <Field label="Duration">
+      <Field label="Duration (optional note)">
         <input
           className={inputClass}
           style={inputStyle}
@@ -1007,6 +1157,7 @@ export function FormHypercare({ initiative, hypercare, onSave }) {
 export function FormComms({ initiative, impacts, deptName, initial, onSave, onDelete }) {
   const editing = Boolean(initial?.id);
   const [impactId, setImpactId] = useState(initial?.impact_id || '');
+  const [deliveryDate, setDeliveryDate] = useState(initial?.delivery_date || '');
   const [keyMessage, setKeyMessage] = useState(initial?.key_message || '');
   const [audience, setAudience] = useState((initial?.audience || []).map(titleCase));
   const [tone, setTone] = useState(initial?.tone || 'professional');
@@ -1062,6 +1213,7 @@ export function FormComms({ initiative, impacts, deptName, initial, onSave, onDe
       try {
         await onSave({
           impactId: impactId || null,
+          deliveryDate: deliveryDate || null,
           keyMessage,
           audience,
           tone,
@@ -1078,6 +1230,15 @@ export function FormComms({ initiative, impacts, deptName, initial, onSave, onDe
           {impacts.map((i) => <option key={i.id} value={i.id}>{deptName(i.department_id)} impact</option>)}
         </select>
       </Field>
+      <Field label="Delivery Date">
+        <input
+          type="date"
+          className={inputClass}
+          style={inputStyle}
+          value={deliveryDate || ''}
+          onChange={(e) => setDeliveryDate(e.target.value)}
+        />
+      </Field>
       <Field label="Key Message"><input className={inputClass} style={inputStyle} value={keyMessage} onChange={(e) => setKeyMessage(e.target.value)} placeholder="e.g. Laptops arrive next week, training required first" /></Field>
       <div className="grid grid-cols-2 gap-4">
         <Field label="Audience"><div>{['Internal', 'Customer', 'Leadership'].map((a) => <Pill key={a} active={audience.includes(a)} color={C.green} onClick={() => toggle(audience, setAudience, a)}>{a}</Pill>)}</div></Field>
@@ -1086,7 +1247,7 @@ export function FormComms({ initiative, impacts, deptName, initial, onSave, onDe
       <Field label="Tone"><div>{['professional', 'playful', 'caring'].map((t) => <Pill key={t} active={tone === t} color={C.purple} onClick={() => setTone(t)}>{t}</Pill>)}</div></Field>
       <Field label="Additional instructions (optional)"><input className={inputClass} style={inputStyle} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g. Keep it under 100 words" /></Field>
       <div className="rounded-2xl p-4 mb-4" style={{ background: C.purple + '0A', border: `1px solid ${C.purple}30` }}>
-        <button type="button" onClick={generate} disabled={loading} className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-full text-white shadow-sm disabled:opacity-60" style={{ background: C.purple }}>
+        <button type="button" data-tour="ai-comms-generator" onClick={generate} disabled={loading} className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-full text-white shadow-sm disabled:opacity-60" style={{ background: C.purple }}>
           {loading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
           {loading ? 'Generating...' : 'AI Comms Generator'}
         </button>
