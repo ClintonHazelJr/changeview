@@ -1,0 +1,29 @@
+# ChangeView
+
+> ChangeView is web-based change management software for independent change consultants and small change teams. It brings stakeholder maps, change impact assessments, readiness tracking, adoption analytics and communications planning into one place, replacing spreadsheets. It is for organizational change management, not IT change management (ITSM).
+
+## Who it is for
+- Independent change consultants and change managers
+- Small change teams running several rollouts
+- Larger organisations (Enterprise, contact for setup)
+
+## What it does
+- Stakeholder mapping and stance tracking
+- Change impact assessment
+- Phased change plans with milestones and tasks
+- Communications plan
+- Change readiness based on training completion
+- Adoption analytics and status reports
+- Close out report
+
+## Pricing and trial
+Self-serve. 1-week free trial, card required, charged only when the trial ends. Current plans and prices are on the home page: https://www.changeview.app/#pricing
+
+## Key pages
+- Home: https://www.changeview.app/
+- Blog (guides and templates): https://www.changeview.app/blog
+- About: https://www.changeview.app/about
+- User guide: https://www.changeview.app/guide
+- Contact: https://www.changeview.app/contact
+
+Operated by Blackhand Technologies (Melbourne, Australia).

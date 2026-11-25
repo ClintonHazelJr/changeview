@@ -40,7 +40,7 @@ export default function BlogPostPage() {
   if (!loading && notFound) return <Navigate to="/blog" replace />;
 
   return (
-    <SiteShell title={post ? `${post.title} — changeview` : 'Blog — changeview'}>
+    <SiteShell title={post ? (post.meta_title || `${post.title} | ChangeView`) : 'Change Management Guides and Templates | ChangeView'}>
       <main className="page">
         <div className="wrap narrow">
           <Link className="back-link" to="/blog">← Back to blog</Link>

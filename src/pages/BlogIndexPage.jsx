@@ -54,7 +54,7 @@ export default function BlogIndexPage() {
   const rest = posts.filter((p) => !p.featured);
 
   return (
-    <SiteShell title="Blog — changeview">
+    <SiteShell title="Change Management Guides and Templates | ChangeView">
       <main className="page">
         <div className="wrap narrow">
           <div className="prose">

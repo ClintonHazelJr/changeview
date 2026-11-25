@@ -75,7 +75,7 @@ Questions about these Terms: legal@changeview.app
 
 export default function TermsPage() {
   return (
-    <SiteShell title="Terms of Service — changeview">
+    <SiteShell title="Terms of Service | ChangeView">
       <main className="page">
         <div className="wrap narrow">
           <MarkdownBody source={TERMS_MD} />

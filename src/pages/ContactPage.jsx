@@ -24,7 +24,7 @@ export default function ContactPage() {
   };
 
   return (
-    <SiteShell title="Contact — changeview">
+    <SiteShell title="Contact ChangeView">
       <main className="page">
         <div className="wrap narrow">
           <div className="prose">
