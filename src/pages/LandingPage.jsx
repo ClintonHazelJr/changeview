@@ -7,7 +7,7 @@ import SiteShell from '../components/landing/SiteShell';
 import { usePlanPrices } from '../hooks/usePlanPrices';
 import { formatUsdAmount, priceAmount, pricePeriodLabel } from '../../shared/planPrices.js';
 
-const PAGE_TITLE = 'ChangeView — Change that people actually adopt';
+const PAGE_TITLE = 'Change Management Software for Consultants | ChangeView';
 
 function trialSignupPath(tier, billingCycle = 'monthly') {
   const cycle = tier === 'solo' ? 'monthly' : (billingCycle === 'annual' ? 'annual' : 'monthly');

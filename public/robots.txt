@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /app/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login
+Disallow: /signup
+Disallow: /check-email
+Disallow: /accept-invite
+Disallow: /auth/
+Disallow: /reset-password
+
+Sitemap: https://www.changeview.app/sitemap.xml

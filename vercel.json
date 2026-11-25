@@ -1,5 +1,23 @@
 {
+  "functions": {
+    "api/seo-page.js": { "includeFiles": "dist/index.html" }
+  },
+  "headers": [
+    {
+      "source": "/(login|signup|check-email|accept-invite|reset-password|auth/(.*)|app/(.*)|admin/(.*))",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    }
+  ],
   "rewrites": [
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    { "source": "/", "destination": "/api/seo-page?route=static&path=/" },
+    { "source": "/about", "destination": "/api/seo-page?route=static&path=/about" },
+    { "source": "/contact", "destination": "/api/seo-page?route=static&path=/contact" },
+    { "source": "/guide", "destination": "/api/seo-page?route=static&path=/guide" },
+    { "source": "/privacy", "destination": "/api/seo-page?route=static&path=/privacy" },
+    { "source": "/terms", "destination": "/api/seo-page?route=static&path=/terms" },
+    { "source": "/blog", "destination": "/api/seo-page?route=blog" },
+    { "source": "/blog/:slug", "destination": "/api/seo-page?route=post&slug=:slug" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]

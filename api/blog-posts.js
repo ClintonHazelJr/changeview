@@ -46,7 +46,7 @@ export default async function handler(req, res) {
   if (slug) {
     const { data, error } = await admin
       .from('blog_posts')
-      .select('id, slug, title, excerpt, content, header_image_url, published, featured, published_at, created_at')
+      .select('*')
       .eq('slug', slug)
       .eq('published', true)
       .maybeSingle();

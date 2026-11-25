@@ -79,7 +79,7 @@ Questions about this policy: privacy@changeview.app
 
 export default function PrivacyPage() {
   return (
-    <SiteShell title="Privacy Policy — changeview">
+    <SiteShell title="Privacy Policy | ChangeView">
       <main className="page">
         <div className="wrap narrow">
           <MarkdownBody source={PRIVACY_MD} />

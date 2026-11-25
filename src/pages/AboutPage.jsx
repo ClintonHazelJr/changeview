@@ -19,7 +19,7 @@ That's changeview.`;
 
 export default function AboutPage() {
   return (
-    <SiteShell title="About — changeview">
+    <SiteShell title="About ChangeView | Change Management Software">
       <main className="page">
         <div className="wrap narrow">
           <MarkdownBody source={ABOUT_MD} />
